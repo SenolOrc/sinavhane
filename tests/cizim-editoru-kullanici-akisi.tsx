@@ -1,0 +1,390 @@
+import { JSDOM } from "jsdom";
+
+function dogrula(kosul: unknown, mesaj: string) {
+  if (!kosul) throw new Error(`KULLANICI AKIŞI BAŞARISIZ: ${mesaj}`);
+}
+
+async function main() {
+  const dom = new JSDOM("<!doctype html><html><body><div id='root'></div></body></html>", { url: "http://localhost" });
+  Object.defineProperty(globalThis, "window", { value: dom.window, configurable: true });
+  Object.defineProperty(globalThis, "document", { value: dom.window.document, configurable: true });
+  Object.defineProperty(globalThis, "navigator", { value: dom.window.navigator, configurable: true });
+  Object.defineProperty(globalThis, "HTMLElement", { value: dom.window.HTMLElement, configurable: true });
+  Object.defineProperty(globalThis, "HTMLCanvasElement", { value: dom.window.HTMLCanvasElement, configurable: true });
+  Object.defineProperty(globalThis, "MouseEvent", { value: dom.window.MouseEvent, configurable: true });
+  Object.defineProperty(globalThis, "KeyboardEvent", { value: dom.window.KeyboardEvent, configurable: true });
+  Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", { value: true, configurable: true });
+
+  const sahteCtx = {
+    font: "", fillStyle: "", strokeStyle: "", lineWidth: 1, lineCap: "round", lineJoin: "round", textBaseline: "alphabetic",
+    clearRect() {}, fillRect() {}, strokeRect() {}, beginPath() {}, rect() {}, clip() {}, moveTo() {}, lineTo() {}, quadraticCurveTo() {}, stroke() {}, fill() {},
+    ellipse() {}, arc() {}, closePath() {}, save() {}, restore() {}, setLineDash() {}, translate() {}, rotate() {}, scale() {},
+    fillText() {}, measureText(metin: string) { return { width: [...metin].length * 10 }; },
+  };
+  Object.defineProperty(dom.window.HTMLCanvasElement.prototype, "getContext", { value: () => sahteCtx });
+  Object.defineProperty(dom.window.HTMLCanvasElement.prototype, "toDataURL", { value: () => "data:image/png;base64,TEST" });
+  Object.defineProperty(dom.window.HTMLCanvasElement.prototype, "getBoundingClientRect", {
+    value: function(this: HTMLCanvasElement) {
+      const width = Number.parseFloat(this.style.width) || 640;
+      const height = Number.parseFloat(this.style.height) || 400;
+      return { x: 0, y: 0, left: 0, top: 0, right: width, bottom: height, width, height, toJSON() {} };
+    },
+  });
+  Object.defineProperty(dom.window.HTMLCanvasElement.prototype, "setPointerCapture", { value: () => {} });
+
+  const React = await import("react");
+  const { act } = React;
+  const { createRoot } = await import("react-dom/client");
+  const { CizimEditoruModal } = await import("../src/modules/sinav-olusturucu/components/CizimEditoruModal");
+
+  const host = document.getElementById("root")!;
+  const root = createRoot(host);
+  const tikla = async (metin: string) => {
+    const buton = [...document.querySelectorAll("button")].find((b) => b.textContent?.trim().includes(metin));
+    dogrula(buton, `“${metin}” butonu bulunamadı`);
+    await act(async () => { (buton as HTMLButtonElement).click(); });
+  };
+  const tiklaTam = async (metin: string) => {
+    const buton = [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === metin);
+    dogrula(buton, `“${metin}” düğmesi bulunamadı`);
+    await act(async () => { (buton as HTMLButtonElement).click(); });
+  };
+  const basligaTikla = async (baslik: string) => {
+    const buton = document.querySelector(`button[title="${baslik}"]`);
+    dogrula(buton, `“${baslik}” başlıklı buton bulunamadı`);
+    await act(async () => { (buton as HTMLButtonElement).click(); });
+  };
+  const pointer = async (canvas: HTMLCanvasElement, tur: string, x: number, y: number, shiftKey = false) => {
+    const olay = new dom.window.MouseEvent(tur, { bubbles: true, clientX: x, clientY: y, shiftKey, buttons: tur === "pointermove" ? 1 : 0 });
+    Object.defineProperty(olay, "pointerId", { value: 1 });
+    await act(async () => { canvas.dispatchEvent(olay); });
+  };
+  const ciz = async (canvas: HTMLCanvasElement, x1: number, y1: number, x2: number, y2: number) => {
+    await pointer(canvas, "pointerdown", x1, y1);
+    await pointer(canvas, "pointermove", x2, y2);
+    await pointer(canvas, "pointerup", x2, y2);
+  };
+
+  // Senaryo 1: Kullanıcı gibi iç içe dikdörtgen, çember ve üçgen çiz.
+  let cikti: any = null;
+  await act(async () => root.render(<CizimEditoruModal key="manuel" onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
+  const canvas = document.querySelector("canvas")!;
+  await tikla("Dikdörtgen");
+  await ciz(canvas, 70, 55, 570, 345);
+  await ciz(canvas, 135, 105, 505, 295);
+  await ciz(canvas, 215, 155, 425, 245);
+  await tikla("Daire / Elips");
+  await ciz(canvas, 120, 45, 430, 355);
+  await ciz(canvas, 205, 130, 345, 270);
+  await tikla("Üçgen");
+  await ciz(canvas, 145, 80, 500, 330);
+  await ciz(canvas, 210, 115, 430, 285);
+  await tikla("Yeni Soru Olarak Ekle");
+  dogrula(cikti?.cizimVerisi?.sekiller.length === 7, "Karmaşık manuel çizimde şekil kaybı var");
+  dogrula(cikti.oran > 1.2 && cikti.oran < 2, "Karmaşık çizimin otomatik kırpma oranı mantıksız");
+  console.log("✓ Kullanıcı akışı: iç içe 3 dikdörtgen + 2 çember + 2 üçgen");
+
+  // Senaryo 2: Shift ile çoklu seç, grupla ve birlikte kaydet.
+  cikti = null;
+  const ikiSekil: any = { surum: 1, genislik: 640, yukseklik: 400, sekiller: [
+    { id: "a", tur: "dikdortgen", kalinlik: 2, x: 100, y: 120, w: 120, h: 80 },
+    { id: "b", tur: "elips", kalinlik: 2, x: 360, y: 120, w: 120, h: 80 },
+  ] };
+  await act(async () => root.render(<CizimEditoruModal key="grup" baslangicBelgesi={ikiSekil} duzenlemeModu onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
+  const grupCanvas = document.querySelector("canvas")!;
+  await tikla("Seç / Taşı");
+  await pointer(grupCanvas, "pointerdown", 100, 150); await pointer(grupCanvas, "pointerup", 100, 150);
+  await pointer(grupCanvas, "pointerdown", 420, 120, true); await pointer(grupCanvas, "pointerup", 420, 120, true);
+  await tikla("Grupla");
+  await tikla("Değişiklikleri Kaydet");
+  const grupIds = cikti.cizimVerisi.sekiller.map((s: any) => s.grupId);
+  dogrula(grupIds[0] && grupIds[0] === grupIds[1], "Çoklu seçim gruba dönüşmedi");
+  console.log("✓ Kullanıcı akışı: Shift çoklu seçim ve gruplama");
+
+  // Senaryo 3: Üç şekli çoklu seç ve yatay eşit dağıt.
+  cikti = null;
+  const daginik: any = { surum: 1, genislik: 640, yukseklik: 400, sekiller: [
+    { id: "d1", tur: "dikdortgen", kalinlik: 2, x: 60, y: 120, w: 60, h: 50 },
+    { id: "d2", tur: "dikdortgen", kalinlik: 2, x: 210, y: 120, w: 60, h: 50 },
+    { id: "d3", tur: "dikdortgen", kalinlik: 2, x: 500, y: 120, w: 60, h: 50 },
+  ] };
+  await act(async () => root.render(<CizimEditoruModal key="dagit" baslangicBelgesi={daginik} duzenlemeModu onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
+  const dagitCanvas = document.querySelector("canvas")!;
+  await tikla("Seç / Taşı");
+  await pointer(dagitCanvas, "pointerdown", 60, 140); await pointer(dagitCanvas, "pointerup", 60, 140);
+  await pointer(dagitCanvas, "pointerdown", 210, 140, true); await pointer(dagitCanvas, "pointerup", 210, 140, true);
+  await pointer(dagitCanvas, "pointerdown", 500, 140, true); await pointer(dagitCanvas, "pointerup", 500, 140, true);
+  await tikla("Yatay dağıt");
+  await tikla("Değişiklikleri Kaydet");
+  const merkezler = cikti.cizimVerisi.sekiller.map((s: any) => s.x + s.w / 2).sort((a: number, b: number) => a - b);
+  dogrula(Math.abs((merkezler[1] - merkezler[0]) - (merkezler[2] - merkezler[1])) < 0.01, "Yatay eşit dağıtma çalışmadı");
+  console.log("✓ Kullanıcı akışı: hizalama yardımcısıyla yatay eşit dağıtma");
+
+  // Senaryo 4: Döndürme tutamacını sürükle ve Shift ile 15°'ye kilitle.
+  cikti = null;
+  const tekSekil: any = { surum: 1, genislik: 640, yukseklik: 400, sekiller: [
+    { id: "r", tur: "dikdortgen", kalinlik: 2, x: 250, y: 160, w: 140, h: 70 },
+  ] };
+  await act(async () => root.render(<CizimEditoruModal key="dondur" baslangicBelgesi={tekSekil} duzenlemeModu onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
+  const rotCanvas = document.querySelector("canvas")!;
+  await tikla("Seç / Taşı");
+  await pointer(rotCanvas, "pointerdown", 250, 190); await pointer(rotCanvas, "pointerup", 250, 190);
+  await pointer(rotCanvas, "pointerdown", 320, 132);
+  await pointer(rotCanvas, "pointermove", 405, 195, true);
+  await pointer(rotCanvas, "pointerup", 405, 195, true);
+  await tikla("Değişiklikleri Kaydet");
+  dogrula(Math.abs(cikti.cizimVerisi.sekiller[0].donus) >= 45, "Döndürme tutamacı şekli döndürmedi");
+  dogrula(Math.abs(cikti.cizimVerisi.sekiller[0].donus % 15) < 0.001, "Shift ile 15° kilidi çalışmadı");
+  console.log("✓ Kullanıcı akışı: döndürme tutamacı ve 15° kilidi");
+
+  // Senaryo 5: Seçim kutusu, grup döndürme, yakınlaştırma ve silgi birlikte çalışmalı.
+  cikti = null;
+  const uxBelgesi: any = { surum: 1, genislik: 640, yukseklik: 400, sekiller: [
+    { id: "u1", tur: "dikdortgen", kalinlik: 2, x: 80, y: 90, w: 100, h: 70 },
+    { id: "u2", tur: "elips", kalinlik: 2, x: 230, y: 100, w: 100, h: 70 },
+    { id: "u3", tur: "ucgen", kalinlik: 2, x1: 430, y1: 80, x2: 380, y2: 190, x3: 500, y3: 190 },
+  ] };
+  await act(async () => root.render(<CizimEditoruModal key="ux" baslangicBelgesi={uxBelgesi} duzenlemeModu onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
+  const uxCanvas = document.querySelector("canvas")!;
+  await tikla("Seç / Taşı");
+  await ciz(uxCanvas, 55, 65, 350, 200);
+  dogrula(document.body.textContent?.includes("2 şekil seçili"), "Sürükleyerek çoklu seçim çalışmadı");
+  await pointer(uxCanvas, "pointerdown", 205, 62);
+  await pointer(uxCanvas, "pointermove", 350, 125, true);
+  await pointer(uxCanvas, "pointerup", 350, 125, true);
+  // İddia TAŞINDI, silinmedi. Koruduğu şey "yakınlaştırma tuvalin ekrandaki
+  // ölçüsünü değiştiriyor". Eski beklenen değer (1200px) tuvalin HEP 960 geniş
+  // olduğu varsayımından geliyordu; tuval artık BELGEDEN geldiği için (bu belge
+  // 640 diyor) beklenen değer de belgeden türetiliyor. Sabit bırakılsaydı iddia
+  // yakınlaştırmayı değil, eski sabiti korurdu.
+  dogrula(uxCanvas.width === uxBelgesi.genislik, "tuval ölçüsü belgeden alınmıyor");
+  const zoomOncesi = uxCanvas.style.width;
+  await basligaTikla("Yakınlaştır");
+  dogrula(
+    uxCanvas.style.width === `${uxBelgesi.genislik * 1.25}px`,
+    `Yakınlaştırma tuval ölçüsünü değiştirmedi (önce ${zoomOncesi}, sonra ${uxCanvas.style.width})`,
+  );
+  await tikla("Silgi");
+  // %125 zoom altında üçgenin tepe noktasından kenarı boyunca sil.
+  await ciz(uxCanvas, 537.5, 100, 475, 237.5);
+  await tikla("Değişiklikleri Kaydet");
+  dogrula(cikti.cizimVerisi.sekiller.length === 2, "Silgi üzerinden geçilen şekli silmedi");
+  dogrula(cikti.cizimVerisi.sekiller.every((s: any) => Math.abs(s.donus ?? 0) >= 15), "Grup döndürme seçili iki şekli birlikte döndürmedi");
+  console.log("✓ Kullanıcı akışı: seçim kutusu + grup döndürme + zoom + silgi");
+
+  // Senaryo 6: Tamamen temizlenmiş düzenleme de kaydetmeden kapanmamalı.
+  await act(async () => root.render(<CizimEditoruModal key="kapatma" baslangicBelgesi={tekSekil} duzenlemeModu onClose={() => {}} onOlustur={() => {}} />));
+  await tiklaTam("Tümünü temizle");
+  await tiklaTam("Temizle");
+  await tiklaTam("Vazgeç");
+  dogrula(document.body.textContent?.includes("Kaydedilmemiş çizim var"), "Boşaltılmış çizimde kapatma uyarısı açılmadı");
+  await tiklaTam("Çizime dön");
+  console.log("✓ Kullanıcı akışı: boş tuvalde kaydetmeden kapatma koruması");
+
+  // Senaryo 7: Kesin ölçüler ve tarama çıktının düzenlenebilir verisine yazılmalı.
+  cikti = null;
+  await act(async () => root.render(<CizimEditoruModal key="olcu" baslangicBelgesi={tekSekil} duzenlemeModu onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
+  const olcuCanvas = document.querySelector("canvas")!;
+  await tikla("Seç / Taşı");
+  await pointer(olcuCanvas, "pointerdown", 250, 190); await pointer(olcuCanvas, "pointerup", 250, 190);
+  const genislik = document.querySelector('input[aria-label="Genişlik"]') as HTMLInputElement;
+  dogrula(genislik, "Kesin genişlik alanı gösterilmedi");
+  await act(async () => { genislik.value = "180"; genislik.dispatchEvent(new dom.window.FocusEvent("focusout", { bubbles: true })); });
+  await tiklaTam("Çapraz");
+  await tikla("Değişiklikleri Kaydet");
+  dogrula(Math.abs(cikti.cizimVerisi.sekiller[0].w - 180) < 0.01, "Sayısal genişlik uygulanmadı");
+  dogrula(cikti.cizimVerisi.sekiller[0].tarama === "capraz", "Çapraz tarama belgeye kaydedilmedi");
+  console.log("✓ Kullanıcı akışı: kesin ölçü ve baskıya uygun tarama");
+
+  // Senaryo 8: Seçimi kullanıcı şablonuna kaydet, yeni editörde tekrar ekle.
+  cikti = null;
+  await act(async () => root.render(<CizimEditoruModal key="sablon-kaydet" baslangicBelgesi={tekSekil} duzenlemeModu onClose={() => {}} onOlustur={() => {}} />));
+  const sablonCanvas = document.querySelector("canvas")!;
+  await tikla("Seç / Taşı");
+  await pointer(sablonCanvas, "pointerdown", 250, 190); await pointer(sablonCanvas, "pointerup", 250, 190);
+  await tiklaTam("Şablon kaydet");
+  const adAlani = [...document.querySelectorAll("input")].find((i) => i.parentElement?.textContent?.includes("Şablon adı")) as HTMLInputElement;
+  dogrula(adAlani, "Şablon adı alanı açılmadı");
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, "value")?.set?.call(adAlani, "Özel kutu");
+    adAlani.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+  });
+  await tiklaTam("Kaydet");
+  dogrula(window.localStorage.getItem("ogretmen-asistani:cizim-sablonlari:v1")?.includes("Özel kutu"), "Kullanıcı şablonu kalıcı saklanmadı");
+  await act(async () => root.render(<CizimEditoruModal key="sablon-yeni" onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
+  await tiklaTam("Özel kutu");
+  await tikla("Yeni Soru Olarak Ekle");
+  dogrula(cikti.cizimVerisi.sekiller.length === 1, "Kullanıcı şablonu yeni editöre eklenmedi");
+  console.log("✓ Kullanıcı akışı: oturumlar arası kullanıcı şablonu");
+
+  // Senaryo 9: Klavyeyle sıfırdan şekil oluştur ve ekran okuyucu özetini doğrula.
+  cikti = null;
+  await act(async () => root.render(<CizimEditoruModal key="erisilebilir" onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
+  await tiklaTam("Üçgen");
+  const klavyeCanvas = document.querySelector("canvas")!;
+  await act(async () => { klavyeCanvas.focus(); klavyeCanvas.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Enter", bubbles: true })); });
+  dogrula(klavyeCanvas.getAttribute("role") === "img" && klavyeCanvas.getAttribute("aria-label")?.includes("1 şekil"), "Canvas erişilebilirlik özeti güncellenmedi");
+  await tikla("Yeni Soru Olarak Ekle");
+  dogrula(cikti.cizimVerisi.sekiller[0].tur === "ucgen", "Enter ile klavyeden şekil oluşturulmadı");
+  console.log("✓ Kullanıcı akışı: klavyeyle şekil oluşturma ve ekran okuyucu özeti");
+
+  // Senaryo 12: Sağ-alt köşedeki metin kutusu tuvalin dışına taşmamalı.
+  await act(async () => root.render(<CizimEditoruModal key="metin-sinir" onClose={() => {}} onOlustur={() => {}} />));
+  await tiklaTam("Metin etiketi");
+  const metinCanvas = document.querySelector("canvas")!;
+  await pointer(metinCanvas, "pointerdown", 955, 595);
+  const metinKutusu = document.querySelector('textarea[placeholder="Etiket metni"]')?.parentElement as HTMLDivElement;
+  // Tuval 960×600 (CANVAS_W/CANVAS_H); kutu 224×126 için üst sınır CANVAS_W-224 / CANVAS_H-126.
+  dogrula(Number.parseFloat(metinKutusu.style.left) <= 736 && Number.parseFloat(metinKutusu.style.top) <= 474, "Metin kutusu sağ-alt sınırdan taştı");
+  console.log("✓ Kullanıcı akışı: metin kutusu kenar sınırlaması");
+
+  // Senaryo 10: Uzun oturumda geçmiş sınırı kullanıcıya görünmeli ve 80'i aşmamalı.
+  await act(async () => root.render(<CizimEditoruModal key="gecmis" onClose={() => {}} onOlustur={() => {}} />));
+  await tiklaTam("Dikdörtgen");
+  const gecmisCanvas = document.querySelector("canvas")!;
+  for (let i = 0; i < 85; i += 1) {
+    await act(async () => { gecmisCanvas.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Enter", bubbles: true })); });
+    if (i < 84) await tiklaTam("Dikdörtgen");
+  }
+  dogrula(document.body.textContent?.includes("Geçmiş 80/80"), "Geçmiş sınırı görünür değil veya 80'i aştı");
+  console.log("✓ Kullanıcı akışı: 80 adımlık görünür geçmiş sınırı");
+
+  // Senaryo 13: ARAÇ ÇUBUĞU KİPİ.
+  //
+  // KORUDUĞU ŞEY ekran alanı: akış şeması çizen öğretmen üçgen/dalga/çokgen
+  // kullanmıyor ama hepsi tuvalin ÜSTÜNDE yer kaplıyordu ("ekran çok küçük
+  // kalıyor, yapılanlar görünmüyor"). Kip yalnız ÇUBUĞU değiştirir; şekiller
+  // ve tuval ortaktır — bu yüzden ikinci iddia var.
+  const dugmeVar = (metin: string) =>
+    [...document.querySelectorAll("button")].some((b) => b.textContent?.trim() === metin);
+
+  await act(async () => root.render(<CizimEditoruModal key="kip" onClose={() => {}} onOlustur={() => {}} />));
+  dogrula(dugmeVar("Üçgen") && !dugmeVar("Karar"), "Çizim kipinde genel araçlar yok ya da akış şeridi açık");
+  await tiklaTam("Akış şeması");
+  dogrula(dugmeVar("Karar"), "Akış kipinde akış şeması şeridi görünmüyor");
+  dogrula(!dugmeVar("Üçgen") && !dugmeVar("Dalga"), "Akış kipinde ilgisiz genel araçlar hâlâ ekranda");
+  dogrula(dugmeVar("Seç / Taşı") && dugmeVar("Silgi"), "Akış kipinde seçim/silgi kaybolmuş — kutu taşınamaz");
+
+  // Kip ŞEKİLLERİ değiştirmemeli: akışta kutu ekle, çizime dön, kutu dursun.
+  await tiklaTam("İşlem");
+  const kipCanvas = document.querySelector("canvas")!;
+  dogrula(kipCanvas.getAttribute("aria-label")?.includes("1 şekil"), "Akış kipinde kutu eklenmedi");
+  await tiklaTam("Çizim");
+  dogrula(
+    kipCanvas.getAttribute("aria-label")?.includes("1 şekil"),
+    "Kip değiştirince şekil kayboldu — kip yalnız çubuğu değiştirmeli",
+  );
+  dogrula(dugmeVar("Üçgen") && !dugmeVar("Karar"), "Çizim kipine dönülünce çubuk eski hâline gelmedi");
+  console.log("✓ Kullanıcı akışı: araç çubuğu kipi (çizim / akış şeması)");
+
+  // Senaryo 14: İÇİNDE AKIŞ KUTUSU OLAN çizim, akış kipinde AÇILMALI.
+  // Öğretmen kaldığı yerden devam eder; her açılışta kipi elle seçmek zorunda
+  // kalması, kipin kendisini bir engele çevirirdi.
+  await act(async () => root.render(
+    <CizimEditoruModal
+      key="kip-hatirlama"
+      onClose={() => {}}
+      onOlustur={() => {}}
+      duzenlemeModu
+      baslangicBelgesi={{
+        surum: 1,
+        genislik: 960,
+        yukseklik: 600,
+        sekiller: [{ id: "k1", tur: "akis", akisSekli: "islem", kalinlik: 2, cizgiTipi: "duz", x: 10, y: 10, w: 120, h: 60, metin: "x" }],
+      }}
+    />,
+  ));
+  dogrula(dugmeVar("Karar"), "Akış kutusu içeren çizim, çizim kipinde açıldı — öğretmen kipi her seferinde elle seçer");
+  console.log("✓ Kullanıcı akışı: akış kutulu çizim akış kipinde açılıyor");
+
+  // ——— Senaryo: araç çubuğu düzeni ———
+  // KORUDUĞU ŞEY: tuvalin görünen yüksekliği. 1200×800 gerçek pencerede
+  // ölçüldü — eskiden bir şekil seçilince çubuk 404 px içerik isteyip 240 px'e
+  // sıkışıyor (164 px kontrol kendi içinde kayıyor), tuvalin 600 px'inin
+  // yalnız 302 px'i görünüyordu. Üç değişiklik bunu düzeltti ve üçü de burada
+  // yoklanıyor, çünkü hepsi tek satırlık bir sınıf değişikliğiyle geri alınabilir.
+  await act(async () => root.render(
+    <CizimEditoruModal
+      key="duzen"
+      onClose={() => {}}
+      onOlustur={() => {}}
+      duzenlemeModu
+      baslangicBelgesi={{
+        surum: 1,
+        genislik: 960,
+        yukseklik: 600,
+        sekiller: [{ id: "d1", tur: "dikdortgen", kalinlik: 2, cizgiTipi: "duz", x: 40, y: 40, w: 120, h: 80 }],
+      }}
+    />,
+  ));
+
+  // 1) Seçim paneli SAĞ SÜTUNDA ve seçim yokken hiç çizilmiyor.
+  const panel = () => document.querySelector('aside[aria-label="Seçili şekil ayarları"]');
+  dogrula(panel(), "seçili şekil paneli sağ sütuna taşınmamış");
+  dogrula(
+    // Yeni yerleşim: panel yalnız gösterilecek bir şey varsa (seçim ya da şekil/şablon kütüphanesi) açılır.
+    (panel() as HTMLElement).className.includes("hidden") || !!(panel() as HTMLElement).textContent?.includes("Şablonlarım"),
+    "seçim yokken sağ sütun boşuna yer kaplıyor — tuval daralıyor",
+  );
+  const olcuTuvali = document.querySelector("canvas")!;
+  await tikla("Seç / Taşı");
+  // Dikdörtgenin KENARINA tıklanıyor, içine değil: `vurus.ts` şeklin içini
+  // dolu saymıyor (dolgusuz şekilde içeriden tıklamak seçmez).
+  await pointer(olcuTuvali, "pointerdown", 100, 40);
+  await pointer(olcuTuvali, "pointerup", 100, 40);
+  dogrula(
+    !(panel() as HTMLElement).className.includes("hidden"),
+    "şekil seçilince sağ sütun açılmıyor",
+  );
+
+  // 2) Araç çubuğu KENDİ İÇİNDE KAYMIYOR. `max-h-[30vh] overflow-y-auto`
+  //    geri gelirse kontroller yine ikinci bir kaydırma çubuğunun arkasında
+  //    kaybolur — iddia sınıfı doğrudan yokluyor.
+  // (Yeni yerleşim: araçlar solda dikey çubukta.)
+  const cubuk = document.querySelector('nav[aria-label="Çizim araçları"]') as HTMLElement | null;
+  dogrula(cubuk, "araç çubuğu bulunamadı — iddia bir şey yoklamıyor");
+  dogrula(
+    !cubuk!.className.includes("overflow-y-auto") && !cubuk!.className.includes("max-h-"),
+    "araç çubuğu yine kendi içinde kayıyor — kontroller görünmez oluyor",
+  );
+
+  // 3) Görünüm ayarları ALT ŞERİTTE, araç çubuğunda değil.
+  dogrula(
+    !cubuk!.textContent?.includes("Izgaraya yakala"),
+    "görünüm ayarları araç çubuğuna geri dönmüş",
+  );
+  dogrula(dugmeVar("Sadece tuval"), "odak kipi düğmesi yok");
+  console.log("✓ Kullanıcı akışı: seçim paneli sağda, çubuk kaymıyor, görünüm altta");
+
+  // Seçileni sil + Delete tuşu (eskiden güncelleyici boşaltılmış ref'i okuyup hiçbir şeyi silmiyordu)
+  {
+    const silDoc: any = { surum: 1, genislik: 640, yukseklik: 400, sekiller: [
+      { id: "s1", tur: "dikdortgen", kalinlik: 2, x: 100, y: 100, w: 120, h: 80 },
+      { id: "s2", tur: "dikdortgen", kalinlik: 2, x: 360, y: 100, w: 120, h: 80 },
+    ] };
+    let silCikti: any = null;
+    await act(async () => root.render(<CizimEditoruModal key="sil" baslangicBelgesi={silDoc} duzenlemeModu onClose={() => {}} onOlustur={(v) => { silCikti = v; }} />));
+    const silCanvas = document.querySelector("canvas")!;
+    await tikla("Seç / Taşı");
+    await pointer(silCanvas, "pointerdown", 100, 140); await pointer(silCanvas, "pointerup", 100, 140);
+    await tikla("Seçileni sil");
+    await tikla("Değişiklikleri Kaydet");
+    dogrula(silCikti?.cizimVerisi?.sekiller.length === 1, `"Seçileni sil" şekli silmedi (${silCikti?.cizimVerisi?.sekiller.length})`);
+    dogrula(silCikti.cizimVerisi.sekiller[0].id === "s2", "yanlış şekil silindi");
+    // Delete tuşu
+    silCikti = null;
+    await act(async () => root.render(<CizimEditoruModal key="sil2" baslangicBelgesi={silDoc} duzenlemeModu onClose={() => {}} onOlustur={(v) => { silCikti = v; }} />));
+    const silCanvas2 = document.querySelector("canvas")!;
+    await tikla("Seç / Taşı");
+    await pointer(silCanvas2, "pointerdown", 360, 140); await pointer(silCanvas2, "pointerup", 360, 140);
+    await act(async () => { document.body.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Delete", bubbles: true })); });
+    await tikla("Değişiklikleri Kaydet");
+    dogrula(silCikti?.cizimVerisi?.sekiller.length === 1 && silCikti.cizimVerisi.sekiller[0].id === "s1", "Delete tuşu seçili şekli silmedi");
+    console.log("✓ Kullanıcı akışı: Seçileni sil düğmesi ve Delete tuşu");
+  }
+
+  await act(async () => root.unmount());
+  console.log("TÜM KULLANICI AKIŞLARI BAŞARILI");
+}
+
+main().catch((hata) => { console.error(hata); process.exit(1); });

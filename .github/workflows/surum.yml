@@ -1,0 +1,47 @@
+name: Sürüm (Mac + Windows)
+
+# Yeni sürüm: "git tag v1.0.0 && git push --tags" ya da Actions > Run workflow.
+# Bitince Releases bölümünde taslak sürüm oluşur; kontrol edip "Publish" deyin.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  derle:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-14
+            args: --target universal-apple-darwin
+            hedefler: aarch64-apple-darwin,x86_64-apple-darwin
+          - platform: windows-latest
+            args: ""
+            hedefler: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.hedefler }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm install
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Sınavhane ${{ github.ref_name }}"
+          releaseBody: "Kurulum dosyaları aşağıda: Mac için .dmg, Windows için .exe / .msi."
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

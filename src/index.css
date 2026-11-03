@@ -1,0 +1,250 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+
+  /* Faz 0 tasarım tokenları — ortak UI bileşenlerinin tek görsel kaynağı. */
+  --oa-color-brand: #4f46e5;
+  --oa-color-brand-hover: #4338ca;
+  --oa-color-surface: #ffffff;
+  --oa-color-canvas: #f8fafc;
+  --oa-color-border: #e2e8f0;
+  --oa-color-text: #1e293b;
+  --oa-color-muted: #64748b;
+  --oa-radius-control: 0.75rem;
+  --oa-radius-card: 1rem;
+  --oa-radius-overlay: 1.125rem;
+  --oa-shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.06);
+  --oa-shadow-overlay: 0 20px 45px -16px rgb(15 23 42 / 0.32);
+  --oa-page-narrow: 48rem;
+  --oa-page-standard: 64rem;
+  --oa-page-wide: 72rem;
+  --oa-page-workspace: 80rem;
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  font-family: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #f8fafc; /* slate-50 */
+  color: #1e293b;      /* slate-800 */
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+/* Başlık hiyerarşisi — biraz daha sıkı letter-spacing */
+h1 { letter-spacing: -0.02em; }
+h2, h3 { letter-spacing: -0.01em; }
+
+/* Yumuşak, tutarlı odak halkası */
+*:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+
+/* Faz 8: uzun okul/sınıf/öğrenci adları kart ve diyalogları taşırmasın. */
+p, td, th, label, [role="alert"], [role="status"] {
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* İnce, modern kaydırma çubuğu */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; border: 2px solid #f8fafc; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Sınav Oluşturucu — kesir (üstte pay, çizgi, altta payda). "/" metin düğümü
+   Word/düz metne aktarınca "3/7" okunsun diye kesir-cizgi içinde tutulur ama
+   font-size:0 ile görsel olarak gizlenir; çizgiyi border-top çizer. */
+.kesir {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: middle;
+  line-height: 1.15;
+  margin: 0 2px;
+}
+.kesir-pay, .kesir-payda {
+  display: block;
+  padding: 0 2px;
+}
+.kesir-cizgi {
+  display: block;
+  width: 100%;
+  height: 0;
+  font-size: 0;
+  line-height: 0;
+  border-top: 1px solid currentColor;
+  margin: 1px 0;
+}
+/* Soru metnine eklenen basit tablo. Siyah-beyaz baskıya uygun: yalnız düz siyah
+   1px kenarlık, dolgu/renk yok. Sanitizer her tabloya bu sınıfı verir. */
+.soru-tablo {
+  border-collapse: collapse;
+  margin: 6px auto;
+  max-width: 100%;
+  color: #000;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.soru-tablo td, .soru-tablo th {
+  border: 1px solid #000;
+  padding: 2px 8px;
+  min-width: 28px;
+  height: 1.7em;
+  text-align: center;
+  vertical-align: middle;
+}
+.soru-tablo th { font-weight: 700; }
+
+.denklem-inline, .cizim-inline {
+  /* Tailwind preflight tüm img'lere display:block veriyor; bu satır içi
+     görselleri metnin akışına geri döndürür (aksi halde kendi satırına düşer). */
+  display: inline-block;
+  margin: 0 2px;
+  max-width: 100%;
+}
+
+
+/* Dokunmatik ekran (telefon VE tablet): parmakla dokunulan her denetim en az 44 px
+   (Android/Apple erişilebilirlik alt sınırı). 2026-09 telefon denetimi bunu yalnız
+   < 640 px için eklemişti. Çoklu ekran denetimi (320 px → 1024 px tablet) tablette ve
+   yatay telefonda "×" 13 px, "İşle" 28 px, sekmeler 24 px kaldığını gösterdi. Artık
+   genişlik koşulu yok ve diyaloglar (portal, main dışı) da kapsamda. Yalnız ikon
+   içeren düğmeler genişlikte de 44 px olur. `oa-kompakt` (öğenin kendisi) ve
+   `oa-kompakt-alan` (içindeki her şey: sınav kâğıdı/föy önizlemesi gibi ölçekli
+   baskı yüzeyleri) bilinçli istisnalardır. `screen`: baskı düzenine dokunmaz. */
+@media screen and (pointer: coarse) {
+  :is(main, [role="dialog"], [role="menu"], aside, nav) :is(button, [role="button"], [role="tab"], select, summary, a[href]):not(.oa-kompakt, .oa-kompakt-alan *, p a),
+  :is(main, [role="dialog"]) :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="hidden"]), textarea):not(.oa-kompakt, .oa-kompakt-alan *) {
+    min-height: 44px;
+  }
+  :is(main, [role="dialog"], [role="menu"], aside, nav) button:has(> svg:only-child):not(.oa-kompakt, .oa-kompakt-alan *) {
+    min-width: 44px;
+  }
+  /* Onay kutuları: 13 px → 20 px (etiketle birlikte dokunma alanı büyür). */
+  :is(main, [role="dialog"]) input:is([type="checkbox"], [type="radio"]):not(.oa-kompakt, .oa-kompakt-alan *) {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+  /* Yalnız fare üzerine gelince görünen düğmeler (kitap kartı Düzenle/Sil, soru
+     listesi "çoğalt", "yukarı/aşağı taşı" …) dokunmatikte HİÇ görünmüyordu (Y3). */
+  .group .group-hover\:opacity-100,
+  .group .sm\:group-hover\:opacity-100,
+  .group .md\:group-hover\:opacity-100,
+  .group .lg\:group-hover\:opacity-100 {
+    opacity: 1 !important;
+  }
+  .group .group-hover\:pointer-events-auto { pointer-events: auto !important; }
+  /* Klavye/fare kısayolu ipuçları dokunmatikte gizlenir ("Space işaretle", "Ctrl+V"). */
+  .oa-fare-ipucu { display: none !important; }
+}
+@media not (pointer: coarse) {
+  .oa-dokun-ipucu { display: none !important; }
+}
+
+/* Ortadaki diyaloglar alçak ekranda (yatay telefon, klavye açık) ekrana sığmıyor:
+   başlık üstte, "Föyü oluştur/Vazgeç" altta ekran dışında kalıyor ve kaydırılamıyordu
+   (T1). Ortalayan katman kayar, panel görünür yükseklikle sınırlanır. */
+@media screen {
+  .fixed.inset-0.flex.items-center.justify-center {
+    overflow-y: auto;
+  }
+  .fixed.inset-0.flex.items-center.justify-center > :is(div, section, form, aside) {
+    max-height: calc(100dvh - 1.5rem);
+    overflow-y: auto;
+  }
+}
+
+/* Düşük kontrast (K19): slate-400 metin beyaz üzerinde 2,5:1. Telefon/tablet ekranı
+   dışarıda, güneşte ve düşük parlaklıkta okunuyor; dokunmatikte bir ton koyulaşır
+   (slate-500, ≈4,8:1). Masaüstü görünümü değişmez. Koyu zeminli öğelerde slate-400
+   kullanılmıyor (orada text-white/xx var), bu yüzden kapsam açık zeminli yüzeyler. */
+@media screen and (pointer: coarse) {
+  :is(main, [role="dialog"], aside) .text-slate-400:not(:disabled) {
+    color: rgb(100 116 139);
+  }
+}
+
+/* Fareyle tutup yana kaydırırken (lib/surukleKaydir.ts) imleç "tutuyor" görünsün. */
+.oa-surukle-kaydiriyor, .oa-surukle-kaydiriyor * { cursor: grabbing !important; }
+
+/* Telefonda PDF üstünde yüzen haplar (Kitap okuyucu: sayfa + yakınlaştırma, OA52).
+   `oa-kompakt-alan` genel 44 px kuralını kapatır; burada 40 px — iki hap 320 px'e sığsın. */
+.oa-yuzen-hap button { min-width: 40px; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; padding-inline: 6px; }
+.oa-yuzen-hap > span { padding-inline: 2px; }
+
+/* OA71: vurgulu modül (Performans) ekranlarının hafif tonu — app/Layout.tsx main'e verir.
+   Üstte 3 px amber çizgi (inset gölge: yer kaplamaz), altına doğru 16rem'de sönen amber-50.
+   background-attachment: local → ton içerikle kayar, uzun sayfanın her yerine yayılmaz.
+   Baskıda ton olmaz (PDF/yazdırma çıktısına renk sızmasın). */
+.oa-vurgu-ekran {
+  background-image: linear-gradient(to bottom, rgb(255 251 235) 0, rgb(255 251 235 / 0.6) 6rem, rgb(248 250 252 / 0) 16rem);
+  background-attachment: local;
+  box-shadow: inset 0 3px 0 0 rgb(252 211 77);
+}
+@media print {
+  .oa-vurgu-ekran { background-image: none; box-shadow: none; }
+}
+
+/* OA90: iPad/iPhone (WebKit) tarih kutuları kendi doğal genişliğinde kalıyor, sütundan taşıp
+   yanındaki kutunun/düğmenin üstüne biniyordu (Ödev: Veriliş + Son tarih, Yapılacaklar: Ekle,
+   Sınav analizi tutanak tarihi "çok büyük"). Yalnız iOS'ta (-webkit-touch-callout yalnız orada var):
+   yerel görünüm kapatılır, kutu sütuna sığar, yazı sola ve sayfa yazı boyutuna döner. */
+@supports (-webkit-touch-callout: none) {
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"],
+  input[type="month"] {
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    font-size: inherit;
+    line-height: 1.25;
+  }
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value,
+  input[type="datetime-local"]::-webkit-date-and-time-value,
+  input[type="month"]::-webkit-date-and-time-value {
+    text-align: left;
+    margin: 0;
+    min-height: 1.25em; /* boş kutu çökmesin */
+  }
+}
+
+/* Dokunmatik ekran (iPad, tablet): büyük dokunma hedefleri, çift dokunuşla yakınlaşma yok,
+   odaklanınca iOS'un sayfayı büyütmesini önlemek için ≥16 px yazı. */
+html { -webkit-text-size-adjust: 100%; }
+button, [role="button"], a, summary, label { touch-action: manipulation; }
+@media (pointer: coarse) {
+  [role="dialog"] button, header button, header a { min-height: 36px; }
+  [role="dialog"] [data-arac-cubugu] button { min-height: 0; }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select { font-size: 16px !important; }
+  input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
+  body { overscroll-behavior: none; }
+}
+
+/* Satır içi çizim: genişlik sütuna sığmak için kısıldığında yükseklik sabit
+   kalıp resmi basıklaştırmasın; oran korunarak kutu içinde küçülür. */
+.cizim-inline { object-fit: contain; }

@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Varsayılan yetkiler (local; ağ yok — köprü Rust tarafında, MASTER Kural 5). core:window:allow-destroy: kapanış boşaltması (lib/kapanisBosaltma.ts) kapanışı durdurup bekleyen SQLite yazımını diske indirdikten SONRA pencereyi kendisi kapatmak zorunda; core:window:default yalnız OKUMA izinleri veriyor ve destroy onun içinde YOK — ölçüldü, izinsiz hâlde pencere hiç kapanmıyordu. allow-close DEĞİL allow-destroy: close yeni bir CloseRequested doğurup döngü kurardı.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:window:allow-destroy",
+    "dialog:allow-open",
+    "dialog:allow-save"
+  ]
+}
