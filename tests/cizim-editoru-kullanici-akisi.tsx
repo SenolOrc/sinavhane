@@ -20,6 +20,8 @@ async function main() {
     clearRect() {}, fillRect() {}, strokeRect() {}, beginPath() {}, rect() {}, clip() {}, moveTo() {}, lineTo() {}, quadraticCurveTo() {}, stroke() {}, fill() {},
     ellipse() {}, arc() {}, closePath() {}, save() {}, restore() {}, setLineDash() {}, translate() {}, rotate() {}, scale() {},
     fillText() {}, measureText(metin: string) { return { width: [...metin].length * 10 }; },
+    // Fizik kipindeki palet simgeleri (FizikSimgesi) ve fizik nesneleri için.
+    setTransform() {}, resetTransform() {}, bezierCurveTo() {}, arcTo() {}, strokeText() {}
   };
   Object.defineProperty(dom.window.HTMLCanvasElement.prototype, "getContext", { value: () => sahteCtx });
   Object.defineProperty(dom.window.HTMLCanvasElement.prototype, "toDataURL", { value: () => "data:image/png;base64,TEST" });
@@ -381,6 +383,179 @@ async function main() {
     await tikla("Değişiklikleri Kaydet");
     dogrula(silCikti?.cizimVerisi?.sekiller.length === 1 && silCikti.cizimVerisi.sekiller[0].id === "s1", "Delete tuşu seçili şekli silmedi");
     console.log("✓ Kullanıcı akışı: Seçileni sil düğmesi ve Delete tuşu");
+  }
+
+  const tus = async (key: string, ek: Partial<KeyboardEventInit> = {}) => {
+    await act(async () => { document.body.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key, bubbles: true, ...ek })); });
+  };
+  const etiketliTikla = async (etiket: string) => {
+    const buton = document.querySelector(`button[aria-label="${etiket}"]`);
+    dogrula(buton, `“${etiket}” etiketli düğme bulunamadı`);
+    await act(async () => { (buton as HTMLButtonElement).click(); });
+  };
+  const kesinOlcu = async (etiket: string, deger: string) => {
+    const alan = document.querySelector(`input[aria-label="${etiket}"]`) as HTMLInputElement;
+    dogrula(alan, `“${etiket}” kesin ölçü alanı yok`);
+    await act(async () => { alan.value = deger; alan.dispatchEvent(new dom.window.FocusEvent("focusout", { bubbles: true })); });
+  };
+
+  // Madde 12 + 16(2): tuval ölçüsü değişince tuval YENİDEN ÇİZİLMELİ ve
+  // Ctrl+Z ölçüyü geri almalı.
+  {
+    const belge: any = { surum: 1, genislik: 960, yukseklik: 600, sekiller: [
+      { id: "t1", tur: "dikdortgen", kalinlik: 2, x: 100, y: 100, w: 120, h: 80 },
+    ] };
+    await act(async () => root.render(<CizimEditoruModal key="tuval-olcu" baslangicBelgesi={belge} duzenlemeModu onClose={() => {}} onOlustur={() => {}} />));
+    const tuval = document.querySelector("canvas")!;
+    const silmeler: number[][] = [];
+    const eskiClear = sahteCtx.clearRect;
+    sahteCtx.clearRect = (...a: number[]) => { silmeler.push(a); };
+    await basligaTikla("1440×900");
+    sahteCtx.clearRect = eskiClear;
+    dogrula(tuval.width === 1440, "tuval ölçüsü değişmedi");
+    dogrula(silmeler.some((a) => a[2] === 1440 && a[3] === 900),
+      "tuval ölçüsü değişince yeniden çizilmedi — tarayıcı tuvali sildiği için ekran bembeyaz kalır");
+    await tus("z", { ctrlKey: true });
+    dogrula(tuval.width === 960, `Ctrl+Z tuval ölçüsünü geri almadı (${tuval.width})`);
+    await tus("y", { ctrlKey: true });
+    dogrula(tuval.width === 1440, `Ctrl+Y tuval ölçüsünü yinelemedi (${tuval.width})`);
+    console.log("✓ Kullanıcı akışı: tuval ölçüsü değişince yeniden çizim + Ctrl+Z/Ctrl+Y ölçüyü geri alır");
+  }
+
+  // Madde 12: genişletilmiş tuvalde ok tuşu ve Ctrl+D şekli eski 960×600 sınırına ışınlamamalı.
+  {
+    let cikti: any = null;
+    const belge: any = { surum: 1, genislik: 960, yukseklik: 600, sekiller: [
+      { id: "g1", tur: "dikdortgen", kalinlik: 2, x: 100, y: 100, w: 120, h: 80 },
+    ] };
+    await act(async () => root.render(<CizimEditoruModal key="genis-tus" baslangicBelgesi={belge} duzenlemeModu onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
+    const tuval = document.querySelector("canvas")!;
+    await basligaTikla("1440×900");
+    await tikla("Seç / Taşı");
+    await pointer(tuval, "pointerdown", 100, 140); await pointer(tuval, "pointerup", 100, 140);
+    await kesinOlcu("X", "1250");
+    await kesinOlcu("Y", "700");
+    await tus("ArrowRight");
+    await tus("ArrowDown");
+    await tus("d", { ctrlKey: true });
+    await act(async () => { await new Promise((r) => setTimeout(r, 5)); });
+    await tikla("Değişiklikleri Kaydet");
+    const [asil, kopya] = cikti.cizimVerisi.sekiller;
+    dogrula(Math.abs(asil.x - 1251) < 0.01 && Math.abs(asil.y - 701) < 0.01,
+      `ok tuşu geniş tuvalde şekli eski sınıra ışınladı: (${asil.x}, ${asil.y})`);
+    dogrula(kopya && Math.abs(kopya.x - 1267) < 0.01 && Math.abs(kopya.y - 717) < 0.01,
+      `Ctrl+D geniş tuvalde kopyayı eski sınıra ışınladı: (${kopya?.x}, ${kopya?.y})`);
+    dogrula(cikti.cizimVerisi.genislik === 1440, "kaydedilen belge genişliği yanlış");
+    console.log("✓ Kullanıcı akışı: geniş tuvalde ok tuşu ve Ctrl+D güncel tuval sınırını kullanır");
+  }
+
+  // Madde 13: Ctrl+D, şablon kaydet/ekle ve taşıma bağlayıcıları korur.
+  {
+    const fizikBelge = (): any => ({ surum: 1, genislik: 960, yukseklik: 600, sekiller: [
+      { id: "k1", tur: "fizik", nesne: "kutle", kalinlik: 2, x: 100, y: 100, w: 80, h: 60 },
+      { id: "k2", tur: "fizik", nesne: "kutle", kalinlik: 2, x: 400, y: 100, w: 80, h: 60 },
+      { id: "ip", tur: "baglayici", kalinlik: 2, kaynak: { sekilId: "k1" }, hedef: { sekilId: "k2" }, stil: "duz" },
+      { id: "v", tur: "baglayici", kalinlik: 2, kaynak: { sekilId: "k1" }, hedef: { x: 140, y: 300 }, stil: "vektor", okUcu: "son" },
+    ] });
+    const { baglayiciYolu } = await import("../src/modules/sinav-olusturucu/cizim/geometri");
+    const baglayicilarSaglam = (sekiller: any[], eskiIdler: string[]) => sekiller
+      .filter((s) => s.tur === "baglayici")
+      .every((b) => [b.kaynak, b.hedef].every((u: any) => !("sekilId" in u) || (sekiller.some((s) => s.id === u.sekilId) && !eskiIdler.includes(u.sekilId)))
+        && baglayiciYolu(sekiller, b) !== null);
+
+    // Ctrl+D: iki cisim seçili → ip ve vektör de kopyalanır, uçlar KOPYALARA bağlanır.
+    let cikti: any = null;
+    await act(async () => root.render(<CizimEditoruModal key="cogalt-bag" baslangicBelgesi={fizikBelge()} duzenlemeModu onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
+    let tuval = document.querySelector("canvas")!;
+    await tikla("Seç / Taşı");
+    await pointer(tuval, "pointerdown", 140, 130); await pointer(tuval, "pointerup", 140, 130);
+    await pointer(tuval, "pointerdown", 440, 130, true); await pointer(tuval, "pointerup", 440, 130, true);
+    await tus("d", { ctrlKey: true });
+    await act(async () => { await new Promise((r) => setTimeout(r, 5)); });
+    await tikla("Değişiklikleri Kaydet");
+    const sonra = cikti.cizimVerisi.sekiller as any[];
+    dogrula(sonra.length === 8, `Ctrl+D bağlayıcıları kopyalamadı (${sonra.length} şekil)`);
+    const yeniBaglar = sonra.slice(4).filter((s) => s.tur === "baglayici");
+    dogrula(yeniBaglar.length === 2 && baglayicilarSaglam(yeniBaglar.concat(sonra.slice(4)), ["k1", "k2"]),
+      "kopya bağlayıcılar eski cisimlere bağlı kaldı ya da çizilemiyor");
+    console.log("✓ Kullanıcı akışı: Ctrl+D bağlayıcı uçlarını kopyalara bağlar");
+
+    // Taşıma: cisim sürüklenince tek uçlu vektörün serbest ucu da aynı kadar gelir.
+    await act(async () => root.render(<CizimEditoruModal key="tasi-vektor" baslangicBelgesi={fizikBelge()} duzenlemeModu onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
+    tuval = document.querySelector("canvas")!;
+    await tikla("Seç / Taşı");
+    await pointer(tuval, "pointerdown", 140, 130);
+    await pointer(tuval, "pointermove", 200, 175);
+    await pointer(tuval, "pointerup", 200, 175);
+    await tikla("Değişiklikleri Kaydet");
+    const tasinmis = cikti.cizimVerisi.sekiller as any[];
+    const k1 = tasinmis.find((s) => s.id === "k1"), v = tasinmis.find((s) => s.id === "v");
+    const dx = k1.x - 100, dy = k1.y - 100;
+    dogrula(Math.abs(dx) > 1 || Math.abs(dy) > 1, "cisim taşınmadı");
+    dogrula(Math.abs(v.hedef.x - (140 + dx)) < 0.01 && Math.abs(v.hedef.y - (300 + dy)) < 0.01,
+      `vektörün serbest ucu cisimle gelmedi: (${v.hedef.x}, ${v.hedef.y}), cisim (${dx}, ${dy}) kaydı`);
+    const ip = tasinmis.find((s) => s.id === "ip");
+    dogrula(ip.kaynak.sekilId === "k1" && ip.hedef.sekilId === "k2", "iki cisme bağlı ip bozuldu");
+    console.log("✓ Kullanıcı akışı: cisim taşınınca kuvvet vektörünün serbest ucu da taşınır");
+
+    // Şablon: iki cisim + ip + vektör kaydedilir, yeni editörde eklenince teller görünür.
+    window.localStorage.removeItem("ogretmen-asistani:cizim-sablonlari:v1");
+    await act(async () => root.render(<CizimEditoruModal key="sablon-bag" baslangicBelgesi={fizikBelge()} duzenlemeModu onClose={() => {}} onOlustur={() => {}} />));
+    tuval = document.querySelector("canvas")!;
+    await tikla("Seç / Taşı");
+    await pointer(tuval, "pointerdown", 140, 130); await pointer(tuval, "pointerup", 140, 130);
+    await pointer(tuval, "pointerdown", 440, 130, true); await pointer(tuval, "pointerup", 440, 130, true);
+    await tiklaTam("Şablon kaydet");
+    const uzunAd = "Eğik Düzlem Sürtünmeli Makara 2";
+    const adAlani = [...document.querySelectorAll("input")].find((i) => i.parentElement?.textContent?.includes("Şablon adı")) as HTMLInputElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, "value")?.set?.call(adAlani, uzunAd);
+      adAlani.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+    });
+    await tiklaTam("Kaydet");
+    const kayitli = JSON.parse(window.localStorage.getItem("ogretmen-asistani:cizim-sablonlari:v1") ?? "[]");
+    dogrula(kayitli[0]?.ad === uzunAd, `şablon adı kesildi: “${kayitli[0]?.ad}”`);
+    dogrula(kayitli[0].sekiller.filter((s: any) => s.tur === "baglayici").length === 2, "şablona bağlayıcılar kaydedilmedi");
+    // Eski sürümün kaydettiği biçim: şablon içi kimlikler aynen (k1/k2/ip) — eklerken eşlenmeli.
+    window.localStorage.setItem("ogretmen-asistani:cizim-sablonlari:v1", JSON.stringify([
+      ...kayitli,
+      { id: "eski", ad: "Eski devre", sekiller: fizikBelge().sekiller.slice(0, 3) },
+    ]));
+    for (const ad of [uzunAd, "Eski devre"]) {
+      await act(async () => root.render(<CizimEditoruModal key={`sablon-ekle-${ad}`} onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
+      const dugme = [...document.querySelectorAll("button")].find((b) => b.getAttribute("title") === ad);
+      dogrula(dugme, `“${ad}” şablon düğmesi yok`);
+      await act(async () => { (dugme as HTMLButtonElement).click(); });
+      await tikla("Yeni Soru Olarak Ekle");
+      const eklenen = cikti.cizimVerisi.sekiller as any[];
+      dogrula(eklenen.some((s) => s.tur === "baglayici"), `“${ad}”: bağlayıcı eklenmedi`);
+      dogrula(baglayicilarSaglam(eklenen, ["k1", "k2"]), `“${ad}”: şablondaki teller/ipler eklendiği tuvalde kopuk`);
+    }
+    console.log("✓ Kullanıcı akışı: şablon (32 karakter ad) bağlayıcılarla kaydedilir; eski şablonun telleri eklerken onarılır");
+  }
+
+  // Madde 16(3): seçili temel şekle renk ve dolgu; "Siyah"/"Dolgusuz" alanı siler.
+  {
+    let cikti: any = null;
+    const belge: any = { surum: 1, genislik: 640, yukseklik: 400, sekiller: [
+      { id: "rd", tur: "dikdortgen", kalinlik: 2, x: 100, y: 100, w: 120, h: 80 },
+    ] };
+    await act(async () => root.render(<CizimEditoruModal key="renk" baslangicBelgesi={belge} duzenlemeModu onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
+    const tuval = document.querySelector("canvas")!;
+    await tikla("Seç / Taşı");
+    await pointer(tuval, "pointerdown", 100, 140); await pointer(tuval, "pointerup", 100, 140);
+    await etiketliTikla("Renk: Mavi");
+    await etiketliTikla("Dolgu: Açık gri");
+    await tikla("Değişiklikleri Kaydet");
+    dogrula(cikti.cizimVerisi.sekiller[0].renk === "#1d4ed8" && cikti.cizimVerisi.sekiller[0].dolgu === "#e2e8f0", "renk/dolgu belgeye yazılmadı");
+    await etiketliTikla("Renk: Siyah");
+    await etiketliTikla("Dolgu: Dolgusuz");
+    await tikla("Değişiklikleri Kaydet");
+    dogrula(!("renk" in cikti.cizimVerisi.sekiller[0]) && !("dolgu" in cikti.cizimVerisi.sekiller[0]), "Siyah/Dolgusuz seçilince alan silinmedi (eski biçim korunmalı)");
+    await tus("z", { ctrlKey: true });
+    await tikla("Değişiklikleri Kaydet");
+    dogrula(cikti.cizimVerisi.sekiller[0].dolgu === "#e2e8f0", "renk/dolgu değişikliği geri alınamıyor");
+    console.log("✓ Kullanıcı akışı: temel şekle renk/dolgu, siyah/dolgusuz eski biçime döner, geri alınabilir");
   }
 
   await act(async () => root.unmount());

@@ -3,7 +3,7 @@
   "private": true,
   "license": "MIT",
   "description": "Öğretmenler için ücretsiz, açık kaynaklı sınav hazırlama uygulaması",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -24,11 +24,9 @@
     "test:sinav-kutuphanesi": "shx mkdir -p node_modules/.cache/oa-tests && esbuild tests/sinav-kutuphanesi-senaryolari.ts --bundle --platform=node --format=esm --packages=external --define:import.meta.env.DEV=false --outfile=node_modules/.cache/oa-tests/sinav-kutuphanesi.mjs && node node_modules/.cache/oa-tests/sinav-kutuphanesi.mjs",
     "test:sinav-dayaniklilik": "shx mkdir -p node_modules/.cache/oa-tests && esbuild tests/sinav-dayaniklilik-senaryolari.ts --bundle --platform=node --format=cjs --packages=external --outfile=node_modules/.cache/oa-tests/sinav-dayaniklilik.cjs && node node_modules/.cache/oa-tests/sinav-dayaniklilik.cjs",
     "test:sinavlarim-ekrani": "shx mkdir -p node_modules/.cache/oa-tests && esbuild tests/sinavlarim-ekrani-senaryolari.tsx --bundle --platform=node --format=esm --packages=external --define:import.meta.env.DEV=false --outfile=node_modules/.cache/oa-tests/sinavlarim-ekrani.mjs && node node_modules/.cache/oa-tests/sinavlarim-ekrani.mjs",
-    "test:soru-rozetleri": "shx mkdir -p node_modules/.cache/oa-tests && esbuild tests/soru-rozetleri-senaryolari.ts --bundle --platform=node --format=cjs --packages=external --outfile=node_modules/.cache/oa-tests/soru-rozetleri.cjs && node node_modules/.cache/oa-tests/soru-rozetleri.cjs",
     "test:html-temizleme": "shx mkdir -p node_modules/.cache/oa-tests && esbuild tests/html-temizleme-senaryolari.ts --bundle --platform=node --format=esm --external:jsdom --outfile=node_modules/.cache/oa-tests/html-temizleme.mjs && node node_modules/.cache/oa-tests/html-temizleme.mjs",
     "test:sinav-taslak-guvenligi": "shx mkdir -p node_modules/.cache/oa-tests && esbuild tests/sinav-taslak-guvenligi.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.cache/oa-tests/sinav-taslak-guvenligi.mjs && node node_modules/.cache/oa-tests/sinav-taslak-guvenligi.mjs",
-    "test:sinav-aktarim": "shx mkdir -p node_modules/.cache/oa-tests && esbuild tests/sinav-aktarim-senaryolari.ts --bundle --platform=node --format=cjs --packages=external --outfile=node_modules/.cache/oa-tests/sinav-aktarim.cjs && node node_modules/.cache/oa-tests/sinav-aktarim.cjs",
-    "test": "npm run -s test:cizim && npm run -s test:fizik && npm run -s test:fizik:ui && npm run -s test:denklem-yazim && npm run -s test:denklem-motoru && npm run -s test:akis-metni && npm run -s test:a4-sayfalama && npm run -s test:sinav-kutuphanesi && npm run -s test:sinav-dayaniklilik && npm run -s test:sinavlarim-ekrani && npm run -s test:soru-rozetleri && npm run -s test:html-temizleme && npm run -s test:sinav-taslak-guvenligi && npm run -s test:sinav-aktarim"
+    "test": "npm run -s test:cizim && npm run -s test:fizik && npm run -s test:fizik:ui && npm run -s test:denklem-yazim && npm run -s test:denklem-motoru && npm run -s test:akis-metni && npm run -s test:a4-sayfalama && npm run -s test:sinav-kutuphanesi && npm run -s test:sinav-dayaniklilik && npm run -s test:sinavlarim-ekrani && npm run -s test:html-temizleme && npm run -s test:sinav-taslak-guvenligi"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.1.0",

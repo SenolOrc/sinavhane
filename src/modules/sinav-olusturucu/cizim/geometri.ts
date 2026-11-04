@@ -238,7 +238,29 @@ export function sekilGeometriAyarla(
 const AKIS_ASGARI_W = 40;
 const AKIS_ASGARI_H = 24;
 
+/**
+ * Tutamaçla boyutlandırma. `nokta`, ORİJİNAL şeklin yerel (dönüşsüz)
+ * uzayındadır (`noktaYerel`).
+ *
+ * DÖNÜK ŞEKİL: şekil kendi kutusunun MERKEZİ etrafında döndürülerek çiziliyor.
+ * Yerel uzayda w/h değişince merkez de kayıyor; düzeltme yapılmazsa sabit
+ * kalması gereken karşı köşe (nokta tutamacında: sürüklenmeyen köşeler)
+ * ekranda kayıyordu. Merkez farkı c−c′ ise şekli (c−c′) − R(c−c′) kadar
+ * ötelemek, sürüklenmeyen her noktanın dünya konumunu korur ve sürüklenen
+ * noktayı tam imlecin altına getirir.
+ */
 export function sekilBoyutlandir(orijinal: Sekil, handleId: TutamacId, nokta: Nokta): Sekil {
+  const sonuc = sekilBoyutlandirYerel(orijinal, handleId, nokta);
+  const derece = orijinal.donus ?? 0;
+  if (Math.abs(derece) < 0.01 || sonuc === orijinal) return sonuc;
+  const k0 = sekilGeometriKutusu(orijinal);
+  const k1 = sekilGeometriKutusu(sonuc);
+  const fark = { x: k0.x + k0.w / 2 - (k1.x + k1.w / 2), y: k0.y + k0.h / 2 - (k1.y + k1.h / 2) };
+  const donmus = noktaDondur(fark, { x: 0, y: 0 }, derece);
+  return sekilTasi(sonuc, fark.x - donmus.x, fark.y - donmus.y);
+}
+
+function sekilBoyutlandirYerel(orijinal: Sekil, handleId: TutamacId, nokta: Nokta): Sekil {
   if (typeof handleId === "string" && handleId.startsWith("nokta-")) {
     // Nokta-listesi olan her şekilde ortak yol: tek bir köşe/nokta bağımsız
     // sürüklenir — üçgende dik/geniş açılıya dönüşmesi, çokgende düzgünlükten
@@ -741,4 +763,111 @@ export function yolOrtaNoktasi(yol: Nokta[]): Nokta {
     kalan -= uzunluk;
   }
   return yol[0];
+}
+
+// ── Kopyalama (çoğalt / şablon) ve birlikte taşıma ─────────────────────────
+//
+// Bağlayıcının uçları şekle KİMLİKLE tutunuyor. Kopyalanan şekiller yeni
+// kimlik alırken bağlayıcı kopyası eski kimlikleri taşırsa ya eski şekle bağlı
+// kalıyor (Ctrl+D: kopya ok asıl kutulara gidiyor) ya da hiç bulamıyor
+// (şablon başka tuvale eklenince `baglayiciYolu` null → tel/ip/ok görünmüyor).
+
+/** Bağlayıcının uçlarından şekle tutunan kimlikler. */
+function baglayiciUcIdleri(b: Extract<Sekil, { tur: "baglayici" }>): string[] {
+  return [b.kaynak, b.hedef].flatMap((u) => ("sekilId" in u ? [u.sekilId] : []));
+}
+
+/**
+ * Seçime, uçları YALNIZ seçili şekillere (ya da serbest noktaya) tutunan
+ * bağlayıcıları ekler. Bağlayıcının kutusu bilerek tuval dışında olduğundan
+ * seçim dikdörtgeni onu hiç yakalamıyor; "iki kutuyu seç → çoğalt / şablon
+ * kaydet" akışında aradaki ok kendiliğinden gelmeli. En az bir ucu seçili bir
+ * şekle tutunmayan bağlayıcı eklenmez.
+ */
+export function seciliBaglayicilarlaGenislet(seciliIds: string[], sekiller: Sekil[]): string[] {
+  const kume = new Set(seciliIds);
+  const ekler = sekiller.filter((s) => {
+    if (s.tur !== "baglayici" || kume.has(s.id)) return false;
+    const idler = baglayiciUcIdleri(s);
+    return idler.length > 0 && idler.every((id) => kume.has(id));
+  });
+  return [...seciliIds, ...ekler.map((s) => s.id)];
+}
+
+/**
+ * Kopyalanan kümede KARŞILIĞI OLMAYAN şekle tutunan bağlayıcı uçlarını, o
+ * anki ekrandaki uç noktasında SERBEST noktaya çevirir (`tumSekiller` yol
+ * hesabı için tuvalin tamamı). Böylece kopya ok görünüşünü korur ama asıl
+ * şekle bağlı kalmaz. Yolu hesaplanamayan (yetim) bağlayıcı atılır.
+ */
+export function disUclariSerbestBirak(kume: Sekil[], tumSekiller: Sekil[]): Sekil[] {
+  const idler = new Set(kume.map((s) => s.id));
+  return kume.flatMap<Sekil>((s) => {
+    if (s.tur !== "baglayici") return [s];
+    const disKaynak = "sekilId" in s.kaynak && !idler.has(s.kaynak.sekilId);
+    const disHedef = "sekilId" in s.hedef && !idler.has(s.hedef.sekilId);
+    if (!disKaynak && !disHedef) return [s];
+    const yol = baglayiciYolu(tumSekiller, s);
+    if (!yol) return [];
+    const bas = yol[0];
+    const son = yol[yol.length - 1];
+    const sonuc: Sekil = {
+      ...s,
+      kaynak: disKaynak ? { x: bas.x, y: bas.y } : s.kaynak,
+      hedef: disHedef ? { x: son.x, y: son.y } : s.hedef,
+    };
+    // İki ucu da serbest kalıp üst üste düşen bağlayıcı çizilemez.
+    if (!("sekilId" in sonuc.kaynak) && !("sekilId" in sonuc.hedef)
+      && Math.hypot(son.x - bas.x, son.y - bas.y) < 0.5) return [];
+    return [sonuc];
+  });
+}
+
+/**
+ * Şekillere yeni kimlik verir; grup kimliklerini ve BAĞLAYICI UÇLARINI aynı
+ * eşlemeyle yeniler. Kümede bulunmayan bir şekle tutunmuş uç kalırsa (ör. eski
+ * sürümün kaydettiği, dışarıya bağlı bir şablon) o bağlayıcı atılır — eklendiği
+ * tuvalde zaten çizilemezdi. Eski şablonlarda şablon İÇİ kimlikler kayıtta
+ * aynen durduğundan, ekleme sırasında bu eşleme kopuk telleri geri bağlar.
+ */
+export function kimlikleriYenile(kume: Sekil[], yeniId: () => string = sekilId): Sekil[] {
+  const idMap = new Map<string, string>();
+  const grupMap = new Map<string, string>();
+  for (const s of kume) idMap.set(s.id, yeniId());
+  return kume.flatMap<Sekil>((s) => {
+    let grupId = s.grupId;
+    if (grupId) {
+      if (!grupMap.has(grupId)) grupMap.set(grupId, `grup-${yeniId()}`);
+      grupId = grupMap.get(grupId);
+    }
+    const temel = { ...s, id: idMap.get(s.id)!, grupId } as Sekil;
+    if (temel.tur !== "baglayici") return [temel];
+    const ucEsle = (u: BaglayiciUcu): BaglayiciUcu | null => {
+      if (!("sekilId" in u)) return u;
+      const yeni = idMap.get(u.sekilId);
+      return yeni ? { ...u, sekilId: yeni } : null;
+    };
+    const kaynak = ucEsle(temel.kaynak);
+    const hedef = ucEsle(temel.hedef);
+    if (!kaynak || !hedef) return [];
+    return [{ ...temel, kaynak, hedef }];
+  });
+}
+
+/**
+ * Taşınan şekillerle BİRLİKTE gelmesi gereken bağlayıcılar: en az bir ucu
+ * taşınan bir şekle tutunan, diğer ucu serbest nokta (ya da yine taşınan bir
+ * şekil) olan bağlayıcılar. Cismin üstündeki kuvvet vektörünün serbest ucu
+ * yerinde kalsaydı cisim taşınınca vektörün yönü ve boyu bozulurdu. Ucu
+ * taşınmayan bir şekle tutunan bağlayıcı eklenmez — onun yolu iki şekilden
+ * zaten yeniden hesaplanıyor.
+ */
+export function birlikteTasinanBaglayicilar(sekiller: Sekil[], tasinanIds: Iterable<string>): Sekil[] {
+  const kume = new Set(tasinanIds);
+  return sekiller.filter((s) => {
+    if (s.tur !== "baglayici" || kume.has(s.id)) return false;
+    const idler = baglayiciUcIdleri(s);
+    const serbestVar = idler.length < 2;
+    return serbestVar && idler.length > 0 && idler.every((id) => kume.has(id));
+  });
 }

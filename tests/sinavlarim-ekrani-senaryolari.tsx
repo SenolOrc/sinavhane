@@ -59,12 +59,12 @@ async function calistir() {
   const { SinavlarimScreen } = await import("../src/modules/sinav-olusturucu/SinavlarimScreen");
   const { aktifSinavIdOku, aktifSinavIdYaz } = await import("../src/modules/sinav-olusturucu/lib/sinavKutuphanesi");
   const { createRoot } = await import("react-dom/client");
-  // Geri al toast'ı artık ekranın kendi JSX'inde değil, app/Layout.tsx'in
-  // her sayfada bir kez render ettiği GLOBAL <GeriAlToast /> bileşeninde
-  // (bkz. lib/geriAlKuyrugu.ts gerekçesi: ekran değişince bildirim kaybolmasın
-  // diye). Bu test SinavlarimScreen'i Layout OLMADAN monte ediyor; gerçek
-  // uygulamayı doğru taklit etmek için burada da ayrıca render edilmeli.
-  const { GeriAlToast } = await import("../src/components/GeriAlToast");
+  // Geri al toast'ı ekranın kendi JSX'inde değil, app/Layout.tsx'in her
+  // sayfada bir kez render ettiği GLOBAL <GeriAlToast /> bileşeninde (bkz.
+  // lib/geriAlKuyrugu.ts gerekçesi: ekran değişince bildirim kaybolmasın).
+  // Test bu yüzden ekranları GERÇEK Layout'un altında monte eder; toast
+  // Layout'tan kaldırılırsa (eski hata: hiç render edilmiyordu) 2. adım düşer.
+  const { Layout } = await import("../src/app/Layout");
 
   function taslakUret(ozel: Record<string, unknown> = {}) {
     return {
@@ -85,8 +85,14 @@ async function calistir() {
   aktifSinavIdYaz(birinci.id);
 
   const routes = [
-    { path: "/sinav-olusturucu/sinavlarim", element: <><SinavlarimScreen /><GeriAlToast /></> },
-    { path: "/sinav-olusturucu", element: <><div data-testid="editor-yer-tutucu">EDİTÖR</div><GeriAlToast /></> },
+    {
+      path: "/",
+      element: <Layout />,
+      children: [
+        { path: "sinav-olusturucu/sinavlarim", element: <SinavlarimScreen /> },
+        { path: "sinav-olusturucu", element: <div data-testid="editor-yer-tutucu">EDİTÖR</div> },
+      ],
+    },
   ];
   const router = createMemoryRouter(routes, { initialEntries: ["/sinav-olusturucu/sinavlarim"] });
   const host = document.createElement("div");
@@ -121,7 +127,7 @@ async function calistir() {
     await new Promise((r) => setTimeout(r, ZAMANLAYICI_TIK_BEKLEME));
   });
   dogrula(!repo.sinavBul(ikinci.id), "silinen sınav kütüphaneden çıkmamış");
-  dogrula(!!document.querySelector('[role="status"]')?.textContent?.includes("silindi"), "geri al toast'ı görünmüyor");
+  dogrula(!!document.querySelector('[role="status"]')?.textContent?.includes("silindi"), "geri al toast'ı görünmüyor (Layout <GeriAlToast />'ı render etmiyor mu?)");
   const geriAlButonu = document.querySelector('[role="status"] button') as HTMLButtonElement;
   dogrula(!!geriAlButonu && geriAlButonu.textContent!.includes("10 sn"), "geri al düğmesi 10 sn kalıbını taşımıyor");
   await act(async () => {
@@ -187,7 +193,7 @@ async function calistir() {
   host.remove();
 
   console.log("✓ Liste metadata ile çiziliyor, içerik yalnız silme anlık görüntüsünde okunuyor");
-  console.log("✓ Silme + 10 sn geri al round-trip yapıyor (Soru Havuzu kalıbı)");
+  console.log("✓ Silme + 10 sn geri al round-trip yapıyor (toast gerçek Layout'tan geliyor)");
   console.log("✓ Yeniden adlandırma kalıcı (ozelAd), aktif rozeti doğru");
   console.log("✓ Geçiş yap aktif işaretçiyi taşıyor ve Sınav Oluşturucu'ya dönüyor");
   console.log("TÜM SINAVLARIM EKRANI SENARYOLARI BAŞARILI");

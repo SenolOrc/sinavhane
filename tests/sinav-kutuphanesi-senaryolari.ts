@@ -225,57 +225,6 @@ async function calistir() {
     dogrula(!!repo.sinavBul(kayit.id), "geri yüklenen sınav aynı kimlikle dönmeli");
   }
 
-  // ─── 6. Yıl geçişi: sınavlar KORUNUR (kullanıcı kararı) ──────────────────
-  {
-    const { foyIcerigiKaydet, foyDeposuSnapshotiAl } = await import("../src/modules/ders-kitabi/storage/foyDepo");
-    const { yilGecisiniTamamla } = await import("../src/lib/yilGecisi");
-
-    const oncekiSayi = repo.sinavlarGetir().length;
-    dogrula(oncekiSayi > 0, "ön koşul: kütüphanede sınav olmalı");
-
-    // Föy METADATA'sı repo'da, İÇERİĞİ IndexedDB'de. Eski kod yalnız
-    // yeniYilIcinSifirla çağırdığı için içerik erişilemez ama silinemez hâlde
-    // kalıyor, üstelik foyDeposuSnapshotiAl onu her tam yedeğe tekrar sokuyordu.
-    const silinecekFoy = repo.foyEkle({ ad: "Yıl geçişinde silinecek föy" });
-    await foyIcerigiKaydet(silinecekFoy.id, {
-      ad: silinecekFoy.ad,
-      sorular: [{ id: "s1", gorselDataUrl: "data:image/jpeg;base64,AA==", gorselOran: 1.4 }],
-      olusturma: "2026-07-25T10:00:00.000Z",
-    });
-    dogrula(
-      Object.keys(await foyDeposuSnapshotiAl()).length > 0,
-      "ön koşul: föy içeriği IndexedDB'ye yazılmalı",
-    );
-
-    // Yedek/rapor onaylanmadan çağrılırsa sıfırlama İMKANSIZ olmalı — veri
-    // katmanının son kapısı, yalnız UI'daki disabled buton değil.
-    let engellendi = false;
-    try {
-      await yilGecisiniTamamla("2026-2027", { yedekAlindi: false, raporIndirildi: true });
-    } catch {
-      engellendi = true;
-    }
-    dogrula(engellendi, "yedek onayı olmadan yıl geçişi reddedilmeli");
-    dogrula(repo.sinavlarGetir().length === oncekiSayi, "reddedilen çağrı hiçbir veriyi silmemeli");
-
-    await yilGecisiniTamamla("2026-2027", { yedekAlindi: true, raporIndirildi: true });
-
-    dogrula(
-      repo.sinavlarGetir().length === oncekiSayi,
-      "sınavlar yıl geçişinde korunmalı (föylerin aksine: öğrenci verisi içermez, yeniden kullanılır)",
-    );
-    dogrula(repo.foylerGetir().length === 0, "föy metadata'sı yıl geçişinde silinmeye devam etmeli");
-    dogrula(
-      Object.keys(await foyDeposuSnapshotiAl()).length === 0,
-      "föy İÇERİKLERİ IndexedDB'de yetim kaldı — yıl geçişi temizlemiyor",
-    );
-    dogrula(
-      repo.yilArsivleriGetir().some((a) => a.yil === "2026-2027"),
-      "yıl arşivi izi sıfırlamadan önce yazılmalı",
-    );
-    dogrula(repo.donemDurumuGetir().aktifDonem === 1, "yeni yıl 1. dönemle açılmalı");
-  }
-
   // ——— Yeni sınav mevcut sınavı EZMEZ (2026-07-26 veri kaybı düzeltmesi) ———
   //
   // Bu dosyanın başındaki not "tek slot devrinde Yeni Başla emeği siliyordu"
@@ -343,36 +292,39 @@ async function calistir() {
   {
     const { readFileSync } = await import("node:fs");
     const ekran = readFileSync("src/modules/sinav-olusturucu/SinavOlusturucuScreen.tsx", "utf8");
+    // Editördeki "Yeni sınav" (yeniSinavaBasla) kütüphane kapısından geçmeli.
+    // (Eski `yeniTaslaklaBasla` yalnız ders kitabı/soru havuzu aktarımının
+    // kurtarma modalından açılıyordu; bağımsız pakette o akış kaldırıldı.)
     const govde = ekran.slice(
-      ekran.indexOf("async function yeniTaslaklaBasla"),
-      ekran.indexOf("async function bekleyenAktarimiDevamEttir"),
+      ekran.indexOf("async function yeniSinavaBasla"),
+      ekran.indexOf("const [acikBolumler, setAcikBolumler]"),
     );
-    dogrula(govde.length > 0, "yeniTaslaklaBasla bulunamadı — test hedefini kaybetti");
+    dogrula(govde.length > 0, "yeniSinavaBasla bulunamadı — test hedefini kaybetti");
     dogrula(
       govde.includes("yeniSinavOlusturVeAktifYap"),
-      "yeniTaslaklaBasla kütüphane kapısını atlıyor; eski sınav ezilir",
+      "yeniSinavaBasla kütüphane kapısını atlıyor; eski sınav ezilir",
     );
     dogrula(
       !govde.includes("crypto.randomUUID"),
-      "yeniTaslaklaBasla yine kendi id'sini üretiyor — aktifSinaviKaydet onu yok sayıp aktif sınava yazar",
+      "yeniSinavaBasla kendi id'sini üretiyor — aktifSinaviKaydet onu yok sayıp aktif sınava yazar",
     );
 
-    // Aktarımın DEFTER KAYDI ile İÇERİĞİN aynı id'ye gitmesi.
-    //
-    // KORUDUĞU ŞEY: `taslakKaydet` olarak verilen `aktifSinaviKaydet` her zaman
-    // AKTİF kayda yazar. `hedefId` taslağın id'sinden türetilirse ikisi
-    // ayrışır — paylaşılan bir .json yüklendiğinde `sinavTaslakIdRef` o
-    // dosyanın id'sine kayar, aktif kayıt değişmez. O durumda ack/kullanım
-    // kayıtları içeriği OLMAYAN bir id'ye bağlanırdı.
-    const aktarimGovdesi = ekran.slice(
-      ekran.indexOf("const hedefId ="),
-      ekran.indexOf("sinavTaslakIdRef.current = sonuc.taslak.id"),
-    );
-    dogrula(aktarimGovdesi.length > 0, "aktifAktarimiUygula gövdesi bulunamadı — test hedefini kaybetti");
-    dogrula(
-      /const hedefId = aktifSinavIdRef\.current \?\?/.test(aktarimGovdesi),
-      "aktarım hedefi aktif kayıttan türetilmiyor; defter kaydı içeriği olmayan bir id'ye bağlanır",
-    );
+    // Bağımsız pakette ders-kitabi / soru-havuzu modülleri YOK (app/router.tsx):
+    // editör o modüllere bağlanmamalı, yoksa öğretmen "Bu sayfa bu sürümde
+    // yok" ekranına ya da var olmayan modüle atıf yapan boş seçiciye düşer.
+    for (const yasak of [
+      "Soru Havuzundan",
+      "SoruSeciciModal",
+      "@/modules/ders-kitabi",
+      "aktarimTuketici",
+      "sinavAktarimDepo",
+      "soruKaynaginiAc",
+      "sinavIcinAyrilanNotlar",
+    ]) {
+      dogrula(!ekran.includes(yasak), `editör hâlâ kaldırılan akışa bağlı: ${yasak}`);
+    }
+    const sinavlarim = readFileSync("src/modules/sinav-olusturucu/SinavlarimScreen.tsx", "utf8");
+    dogrula(!sinavlarim.includes("SinavIcinAyrilanlar"), "Sınavlarım hâlâ ders kitabı 'Ayırdıkların' bölümünü gösteriyor");
 
     // Denetim (2026-10, E5): ekranı yalnız açmak kütüphanede 0 soruluk "Adsız sınav"
     // bırakmamalı. Açılış (aktifSinaviHazirla) kayıt AÇMAZ; kayıt ilk içerikte açılır.
@@ -390,7 +342,7 @@ async function calistir() {
   console.log("✓ Boyut göstergesi içerikle orantılı ve stringify'sız hesaplanıyor");
   console.log("✓ Aktif sınır uygulanıyor; arşivdekiler sayılmıyor ve arşiv içeriği silmiyor");
   console.log("✓ Silme geri alınabiliyor");
-  console.log("✓ Yeni sınav öncekini EZMİYOR; aktarımın defter kaydı ile içeriği aynı id'ye gidiyor");
+  console.log("✓ Yeni sınav öncekini EZMİYOR; editör kaldırılan ders kitabı/soru havuzu akışına bağlı değil");
   console.log("✓ Dış taslak yeni yerel sınav oluyor; mevcut sınav korunuyor");
   console.log("✓ Sınavlar yıl geçişinde korunuyor; föy metadata'sı VE IndexedDB içeriği birlikte siliniyor");
   console.log("TÜM SINAV KÜTÜPHANESİ SENARYOLARI BAŞARILI");

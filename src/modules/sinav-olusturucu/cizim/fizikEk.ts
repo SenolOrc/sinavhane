@@ -8,7 +8,7 @@
 
 import type { FizikEk, Nokta, Sekil } from "./tipler";
 import { MUREKKEP } from "./sabitler";
-import { fizikMetniCiz } from "./fizik";
+import { fizikMetniCiz, fizikMetniOlcu } from "./fizik";
 
 type FizikSekli = Extract<Sekil, { tur: "fizik" }>;
 
@@ -282,7 +282,11 @@ export const ENERJI_VARSAYILAN_GECISLER = "2>1; 3>1; 4>2";
 
 const eVYaz = (e: number) => `${String(Math.round(e * 100) / 100).replace(".", ",").replace("-", "−")} eV`;
 
-function enerjiDuzeyiCiz(ctx: CanvasRenderingContext2D, s: FizikSekli, ek: FizikEk) {
+/**
+ * Enerji diyagramının yerleşimi — çizim ve dış pay (PNG kırpma sınırı) AYNI
+ * hesabı kullansın diye tek yerde.
+ */
+function enerjiYerlesimi(s: FizikSekli, ek: FizikEk) {
   const { x, y, w, h } = s;
   const d = enerjiDuzeyleriOku(ek.metin ?? ENERJI_VARSAYILAN_DUZEYLER);
   const varsayilanD = enerjiDuzeyleriOku(ENERJI_VARSAYILAN_DUZEYLER) as { duzeyler: EnerjiDuzeyi[] };
@@ -308,6 +312,42 @@ function enerjiDuzeyiCiz(ctx: CanvasRenderingContext2D, s: FizikSekli, ek: Fizik
     const onceki = yaziY[asagidan[k - 1]];
     if (onceki - yaziY[asagidan[k]] < 15) yaziY[asagidan[k]] = onceki - 15;
   }
+  const gecisX = (i: number) => sol + ((sag - sol) * (i + 1)) / (gecisler.length + 1);
+  return { duzeyler, gecisler, sol, sag, ys, yaziY, gecisX };
+}
+
+/**
+ * Enerji diyagramında yazıların kutu DIŞINA taşan payı (yerel, dönüşsüz).
+ * Düzey adları solda sağa yaslı, eV değerleri sağda sola yaslı yazılıyor;
+ * dar kutuda ya da uzun adlarda (ör. "n=∞ (iyon)") kutunun dışına çıkıyor ve
+ * PNG dışa aktarımında kırpılıyordu (ölçüldü: 0,55 ölçekli varsayılan
+ * diyagramda sağda 19 px).
+ */
+export function enerjiDuzeyiDisPayi(ctx: CanvasRenderingContext2D, s: FizikSekli) {
+  const ek: FizikEk = s.ek ?? {};
+  const { duzeyler, gecisler, sol, sag, ys, yaziY, gecisX } = enerjiYerlesimi(s, ek);
+  const PAY = 4;
+  let x0 = s.x, x1 = s.x + s.w, y0 = s.y, y1 = s.y + s.h;
+  const kat = (sx: number, ex: number, cy: number, yh: number) => {
+    x0 = Math.min(x0, sx - PAY); x1 = Math.max(x1, ex + PAY);
+    y0 = Math.min(y0, cy - yh / 2 - PAY); y1 = Math.max(y1, cy + yh / 2 + PAY);
+  };
+  duzeyler.forEach((q, i) => {
+    const ad = fizikMetniOlcu(ctx, q.ad, 16);
+    kat(sol - 8 - ad.w, sol - 8, yaziY[i], ad.h);
+    const ev = fizikMetniOlcu(ctx, eVYaz(q.e), 15);
+    kat(sag + 8, sag + 8 + ev.w, yaziY[i], ev.h);
+  });
+  gecisler.forEach((gc, i) => {
+    if (!gc.etiket) return;
+    const o = fizikMetniOlcu(ctx, gc.etiket, 15);
+    kat(gecisX(i) + 5, gecisX(i) + 5 + o.w, (ys[gc.bas - 1] + ys[gc.son - 1]) / 2, o.h);
+  });
+  return { sol: s.x - x0, ust: s.y - y0, sag: x1 - (s.x + s.w), alt: y1 - (s.y + s.h) };
+}
+
+function enerjiDuzeyiCiz(ctx: CanvasRenderingContext2D, s: FizikSekli, ek: FizikEk) {
+  const { duzeyler, gecisler, sol, sag, ys, yaziY, gecisX } = enerjiYerlesimi(s, ek);
   // Düzey çizgileri ve yazıları
   duzeyler.forEach((q, i) => {
     cizgi(ctx, sol, ys[i], sag, ys[i]);
@@ -322,7 +362,7 @@ function enerjiDuzeyiCiz(ctx: CanvasRenderingContext2D, s: FizikSekli, ek: Fizik
   });
   // Geçiş okları: birbirinden ayrık x konumlarında
   gecisler.forEach((gc, i) => {
-    const px = sol + ((sag - sol) * (i + 1)) / (gecisler.length + 1);
+    const px = gecisX(i);
     const y1 = ys[gc.bas - 1], y2 = ys[gc.son - 1];
     const yon = y2 > y1 ? 1 : -1;
     cizgi(ctx, px, y1, px, y2 - yon * 6);

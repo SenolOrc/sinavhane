@@ -10,7 +10,7 @@
 
 import type { FizikEk, GeoAciIsareti, GeometriVerisi, Nokta, Sekil } from "./tipler";
 import { MUREKKEP } from "./sabitler";
-import { fizikMetniCiz } from "./fizik";
+import { fizikMetniCiz, fizikMetniOlcu } from "./fizik";
 
 type FizikSekli = Extract<Sekil, { tur: "fizik" }>;
 type UcgenVerisi = Extract<GeometriVerisi, { tur: "ucgen" }>;
@@ -516,4 +516,35 @@ export function fizikEkGecerliMi(v: unknown): v is FizikEk {
   const kisa = (t: unknown) => t === undefined || (typeof t === "string" && t.length <= 400);
   const sayi1 = (t: unknown) => t === undefined || (sayi(t) && Math.abs(t as number) <= 1e4);
   return (e.ters === undefined || typeof e.ters === "boolean") && sayi1(e.sayi) && sayi1(e.sayi2) && kisa(e.metin) && kisa(e.metin2);
+}
+
+// ── Dış pay (PNG kırpma sınırı) ────────────────────────────────────────────
+
+/**
+ * Geometri şeklinin yazılarının kutu DIŞINA taşabileceği pay (yerel, dönüşsüz).
+ *
+ * Köşe adları/etiketler köşeden dışarı doğru en çok ~34 px uzağa, ORTALI
+ * yazılıyor; köşe kutunun kenarında olabildiği için taşma ≈ 34 + yazı/2.
+ * Varsayılan adlarda taşma kırpma payının (14 px) içinde kalıyordu; koordinatlı
+ * adlarda ("A(−12,15)") PNG'de 11 px kırpıldığı ölçüldü. Kesin konumu her
+ * şablonda ayrı hesaplamak yerine en uzun yazıdan güvenli bir üst sınır
+ * veriliyor — fazla beyaz alan dışa aktarımda `icerigeKirp` ile zaten atılıyor.
+ */
+export function geometriDisPayi(ctx: CanvasRenderingContext2D, s: FizikSekli) {
+  const v = s.geo && geometriVerisiGecerliMi(s.geo) ? s.geo : varsayilanGeometri(s.nesne);
+  const yazilar: string[] =
+    v.tur === "ucgen" ? [...v.adlar, ...v.kenarlar, ...v.acilar, v.yukseklikEtiket, v.ayakAdi]
+    : v.tur === "cember" ? [...v.adlar, v.merkezAciEtiket, v.cevreAciEtiket]
+    : v.tur === "benzer" ? [...v.adlar, ...v.etiketler]
+    : [...v.adlar];
+  let w = 0, h = 0;
+  for (const y of yazilar) {
+    const t = (y ?? "").trim();
+    if (!t) continue;
+    const o = fizikMetniOlcu(ctx, t, 18);
+    w = Math.max(w, o.w); h = Math.max(h, o.h);
+  }
+  const yatay = Math.max(28, Math.ceil(34 + w / 2 + 4));
+  const dikey = Math.max(24, Math.ceil(34 + h / 2 + 4));
+  return { sol: yatay, sag: yatay, ust: dikey, alt: dikey };
 }

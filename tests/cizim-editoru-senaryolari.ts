@@ -29,7 +29,16 @@ import {
 import { akisMetniniSar, sekilleriCiz } from "../src/modules/sinav-olusturucu/cizim/ciz";
 import type { Sekil } from "../src/modules/sinav-olusturucu/cizim/tipler";
 import { sekilGecerliMi } from "../src/modules/sinav-olusturucu/cizim/sablon";
-import { sigdirmaOrani } from "../src/modules/sinav-olusturucu/cizim/sabitler";
+import { sigdirmaOrani, SABLON_ADI_SINIRI } from "../src/modules/sinav-olusturucu/cizim/sabitler";
+import {
+  birlikteTasinanBaglayicilar,
+  disUclariSerbestBirak,
+  kimlikleriYenile,
+  seciliBaglayicilarlaGenislet,
+} from "../src/modules/sinav-olusturucu/cizim/geometri";
+import { noktaYerel, sekilMerkezi } from "../src/modules/sinav-olusturucu/cizim/sinirlar";
+import { tasimaKenarDegerleri } from "../src/modules/sinav-olusturucu/cizim/hizalama";
+import { temelDolgu, temelRenk } from "../src/modules/sinav-olusturucu/cizim/ciz";
 
 function dogrula(kosul: unknown, mesaj: string) {
   if (!kosul) throw new Error(`TEST BAŞARISIZ: ${mesaj}`);
@@ -721,5 +730,147 @@ console.log("✓ Akış kutusunda denklem: metnin yerine geçiyor, kutuya sığd
   dogrula(sigdirmaOrani(0, 0, olcu) === 100, "kap ölçülemediğinde %100'e düşmüyor");
 }
 console.log("✓ Pencereye sığdır: kaydırma çubuğu bırakmayan oran");
+
+// ── Madde 15: döndürülmüş şekli boyutlandırırken sabit köşe dünyada sabit ──
+{
+  const dunyaKosesi = (sk: Sekil, kose: "sol-ust" | "sag-ust" | "sol-alt" | "sag-alt") => {
+    const k = sekilGeometriKutusu(sk);
+    const yerel = kose === "sol-ust" ? { x: k.x, y: k.y } : kose === "sag-ust" ? { x: k.x + k.w, y: k.y }
+      : kose === "sol-alt" ? { x: k.x, y: k.y + k.h } : { x: k.x + k.w, y: k.y + k.h };
+    return noktaDondur(yerel, sekilMerkezi(ctx, sk), sk.donus ?? 0);
+  };
+  const karsi = { "sol-ust": "sag-alt", "sag-ust": "sol-alt", "sol-alt": "sag-ust", "sag-alt": "sol-ust" } as const;
+  for (const tur of ["dikdortgen", "elips"] as const) {
+    for (const derece of [30, 90]) {
+      const sk = { id: `r-${tur}`, tur, ...ortak, x: 200, y: 150, w: 180, h: 90, donus: derece } as Sekil;
+      for (const tutamac of ["sol-ust", "sag-ust", "sol-alt", "sag-alt"] as const) {
+        const sabitOnce = dunyaKosesi(sk, karsi[tutamac]);
+        const tutulan = dunyaKosesi(sk, tutamac);
+        // İmleç dünyada sürükleniyor; tuval bunu şeklin YEREL uzayına çevirip veriyor.
+        // (a) köşeyi dışarı doğru çek (kutu ters dönmez): karşı köşe AYNI adlı köşe olarak kalmalı.
+        const disari = { x: tutulan.x + (tutulan.x - sabitOnce.x) * 0.3, y: tutulan.y + (tutulan.y - sabitOnce.y) * 0.3 };
+        const yeni = sekilBoyutlandir(sk, tutamac, noktaYerel(ctx, sk, disari));
+        const sabitSonra = dunyaKosesi(yeni, karsi[tutamac]);
+        dogrula(Math.hypot(sabitOnce.x - sabitSonra.x, sabitOnce.y - sabitSonra.y) < 1e-6,
+          `${derece}° ${tur} ${tutamac}: karşı köşe kaydı (${sabitOnce.x.toFixed(2)},${sabitOnce.y.toFixed(2)}) → (${sabitSonra.x.toFixed(2)},${sabitSonra.y.toFixed(2)})`);
+        const yeniTutulan = dunyaKosesi(yeni, tutamac);
+        dogrula(Math.hypot(yeniTutulan.x - disari.x, yeniTutulan.y - disari.y) < 1e-6, `${derece}° ${tur} ${tutamac}: sürüklenen köşe imlecin altında değil`);
+        // (b) karşı köşeyi aşacak kadar çek (kutu ters döner): sabit nokta yine yeni kutunun bir köşesi.
+        const ters = { x: sabitOnce.x + 260, y: sabitOnce.y - 140 };
+        const yeni2 = sekilBoyutlandir(sk, tutamac, noktaYerel(ctx, sk, ters));
+        const enYakin = Math.min(...(["sol-ust", "sag-ust", "sol-alt", "sag-alt"] as const).map((k) => {
+          const n = dunyaKosesi(yeni2, k);
+          return Math.hypot(n.x - sabitOnce.x, n.y - sabitOnce.y);
+        }));
+        dogrula(enYakin < 1e-6, `${derece}° ${tur} ${tutamac} (ters dönen): sabit köşe ${enYakin.toFixed(2)} px kaydı`);
+        dogrula(Math.abs((yeni.donus ?? 0) - derece) < 1e-9, "boyutlandırma açıyı değiştirdi");
+      }
+    }
+  }
+  // Döndürülmüş üçgende nokta tutamacı: sürüklenmeyen köşeler yerinde, sürüklenen imlecin altında.
+  const ucgenD: Sekil = { id: "u-d", tur: "ucgen", ...ortak, donus: 30, x1: 300, y1: 100, x2: 200, y2: 300, x3: 420, y3: 280 };
+  const dunya = (sk: Sekil, i: number) => {
+    const u = sk as Extract<Sekil, { tur: "ucgen" }>;
+    const n = [{ x: u.x1, y: u.y1 }, { x: u.x2, y: u.y2 }, { x: u.x3, y: u.y3 }][i];
+    return noktaDondur(n, sekilMerkezi(ctx, sk), 30);
+  };
+  const imlec = { x: 520, y: 420 };
+  const ucgenSonra = sekilBoyutlandir(ucgenD, "nokta-2", noktaYerel(ctx, ucgenD, imlec));
+  for (const i of [0, 1]) {
+    const a = dunya(ucgenD, i), b = dunya(ucgenSonra, i);
+    dogrula(Math.hypot(a.x - b.x, a.y - b.y) < 1e-6, `döndürülmüş üçgende ${i}. köşe kaydı`);
+  }
+  const surulen = dunya(ucgenSonra, 2);
+  dogrula(Math.hypot(surulen.x - imlec.x, surulen.y - imlec.y) < 1e-6, "sürüklenen köşe imlecin altında değil");
+  // Dönüşsüz şekilde davranış aynen eski (öteleme yok).
+  const duz: Sekil = { id: "d0", tur: "dikdortgen", ...ortak, x: 10, y: 10, w: 50, h: 40 };
+  const duzSonra = sekilBoyutlandir(duz, "sag-alt", { x: 100, y: 80 }) as Extract<Sekil, { tur: "dikdortgen" }>;
+  dogrula(duzSonra.x === 10 && duzSonra.y === 10 && duzSonra.w === 90 && duzSonra.h === 70, "dönüşsüz boyutlandırma değişti");
+}
+console.log("✓ Madde 15: 30°/90° döndürülmüş kutu ve üçgende sabit köşe dünyada sabit");
+
+// ── Madde 13: kopyalamada bağlayıcı uçları yeni kimliklere eşlenir ─────────
+{
+  const k1: Sekil = { id: "k1", tur: "fizik", nesne: "kutle", kalinlik: 2, x: 100, y: 100, w: 80, h: 60 } as Sekil;
+  const k2: Sekil = { id: "k2", tur: "fizik", nesne: "kutle", kalinlik: 2, x: 400, y: 100, w: 80, h: 60 } as Sekil;
+  const ip: Sekil = { id: "ip", tur: "baglayici", kalinlik: 2, kaynak: { sekilId: "k1" }, hedef: { sekilId: "k2" }, stil: "duz" };
+  const vektor: Sekil = { id: "v", tur: "baglayici", kalinlik: 2, kaynak: { sekilId: "k1" }, hedef: { x: 140, y: 260 }, stil: "vektor", okUcu: "son" };
+  const tum = [k1, k2, ip, vektor];
+  // Seçim (k1, k2) bağlayıcıları kendiliğinden kapsar.
+  const genis = seciliBaglayicilarlaGenislet(["k1", "k2"], tum);
+  dogrula(genis.includes("ip") && genis.includes("v"), "seçili şekiller arasındaki bağlayıcılar seçime eklenmedi");
+  dogrula(!seciliBaglayicilarlaGenislet(["k1"], tum).includes("ip"), "dışarıya bağlı ip seçime yanlışlıkla eklendi");
+  let n = 0;
+  const kopya = kimlikleriYenile(tum, () => `yeni-${++n}`);
+  const idler = new Set(kopya.map((s) => s.id));
+  const kIp = kopya.find((s) => s.tur === "baglayici" && "sekilId" in s.hedef) as Extract<Sekil, { tur: "baglayici" }>;
+  dogrula(!!kIp && "sekilId" in kIp.kaynak && idler.has(kIp.kaynak.sekilId) && kIp.kaynak.sekilId !== "k1", "kopya ip eski kutuya bağlı kaldı");
+  dogrula(baglayiciYolu(kopya, kIp) !== null, "kopya ipin yolu çizilemiyor");
+  // Kümede karşılığı olmayan uç → serbest nokta (o anki ekrandaki ucunda).
+  const yalnizK1 = disUclariSerbestBirak([k1, ip], tum);
+  const serbestIp = yalnizK1.find((s) => s.id === "ip") as Extract<Sekil, { tur: "baglayici" }>;
+  const eskiYol = baglayiciYolu(tum, ip as Extract<Sekil, { tur: "baglayici" }>)!;
+  dogrula(!("sekilId" in serbestIp.hedef) && Math.abs((serbestIp.hedef as { x: number }).x - eskiYol[eskiYol.length - 1].x) < 1e-6,
+    "seçim dışı şekle bağlı uç serbest noktaya çevrilmedi");
+  dogrula("sekilId" in serbestIp.kaynak && serbestIp.kaynak.sekilId === "k1", "seçim içi uç bozuldu");
+  // Eski kayıtlı (kopuk) şablon: dışarıya bağlı uç eklenince atılır, iç uçlar eşlenir.
+  const eskiSablon = kimlikleriYenile([k1, ip]);
+  dogrula(eskiSablon.length === 1 && eskiSablon[0].tur === "fizik", "eşlenemeyen uçlu bağlayıcı atılmadı");
+  // Birlikte taşıma: tek uçlu vektör cisimle gelir; iki şekle bağlı ip gelmez.
+  const birlikte = birlikteTasinanBaglayicilar(tum, ["k1"]).map((s) => s.id);
+  dogrula(birlikte.length === 1 && birlikte[0] === "v", `birlikte taşınan bağlayıcılar yanlış: ${birlikte.join(",")}`);
+  // Seçili serbest vektör ok tuşuyla/çoğaltmayla 1e6 px fırlamamalı.
+  const serbestV: Sekil = { id: "sv", tur: "baglayici", kalinlik: 2, kaynak: { x: 100, y: 100 }, hedef: { x: 200, y: 100 }, stil: "vektor" };
+  const kaymis = sekilTasiSinirli(ctx, serbestV, 1, 0, { w: 960, h: 600 }) as Extract<Sekil, { tur: "baglayici" }>;
+  dogrula((kaymis.kaynak as { x: number }).x === 101 && (kaymis.hedef as { x: number }).x === 201, `serbest vektör ok tuşuyla yanlış kaydı: ${JSON.stringify(kaymis.kaynak)}`);
+  const kenar = tasimaKenarDegerleri(ctx, [k1, ip, vektor]);
+  dogrula(kenar.sol > -1000 && kenar.ust > -1000, "bağlayıcı taşıma sınırını -1e6'ya çekti");
+}
+console.log("✓ Madde 13: çoğalt/şablon bağlayıcı eşlemesi, serbest uç, birlikte taşıma");
+
+// ── Madde 16: temel şekillere renk/dolgu; eski çizim aynen ─────────────────
+{
+  const kayitci = () => {
+    const kayit: { ad: string; renk?: string }[] = [];
+    const nesne: Record<string, unknown> = { font: "", lineWidth: 1, strokeStyle: "", fillStyle: "" };
+    const p: any = new Proxy(nesne, {
+      get(h, ad: string) {
+        if (ad === "measureText") return (m: string) => ({ width: [...m].length * 10 });
+        if (ad in h) return h[ad];
+        return () => { kayit.push({ ad, renk: ad === "fill" || ad === "fillText" ? String(h.fillStyle) : ad === "stroke" ? String(h.strokeStyle) : undefined }); };
+      },
+      set(h, ad: string, v) { h[ad] = v; return true; },
+    });
+    // save/restore fillStyle'ı gerçekten geri almalı.
+    const yigin: unknown[] = [];
+    nesne.save = () => { yigin.push(nesne.fillStyle); };
+    nesne.restore = () => { nesne.fillStyle = yigin.pop(); };
+    return { ctx: p as CanvasRenderingContext2D, kayit };
+  };
+  const eski: Sekil = { id: "e", tur: "dikdortgen", ...ortak, x: 10, y: 10, w: 50, h: 40 };
+  const a = kayitci();
+  sekilleriCiz(a.ctx, [eski]);
+  dogrula(!a.kayit.some((k) => k.ad === "fill"), "renk/dolgu alanı olmayan eski şekil dolduruldu");
+  dogrula(a.kayit.filter((k) => k.ad === "stroke").every((k) => k.renk === "#0f172a"), "eski şeklin rengi değişti");
+  const boyali = { ...eski, renk: "#1d4ed8", dolgu: "#e2e8f0" } as Sekil;
+  const b = kayitci();
+  sekilleriCiz(b.ctx, [boyali]);
+  dogrula(b.kayit.some((k) => k.ad === "fill" && k.renk === "#e2e8f0"), "dolgu boyanmadı");
+  dogrula(b.kayit.some((k) => k.ad === "stroke" && k.renk === "#1d4ed8"), "çizgi rengi uygulanmadı");
+  const fillSira = b.kayit.findIndex((k) => k.ad === "fill"), strokeSira = b.kayit.findIndex((k) => k.ad === "stroke");
+  dogrula(fillSira < strokeSira, "dolgu kenarın üstüne boyandı");
+  const metinR: Sekil = { id: "m", tur: "metin", metin: "F", x: 10, y: 40, renk: "#b91c1c" };
+  const c = kayitci();
+  sekilleriCiz(c.ctx, [metinR]);
+  dogrula(c.kayit.filter((k) => k.ad === "fillText").every((k) => k.renk === "#b91c1c"), "metin rengi uygulanmadı");
+  // Güvenlik: yalnız #rrggbb.
+  dogrula(temelRenk({ ...eski, renk: "url(javascript:1)" } as Sekil) === "#0f172a", "geçersiz renk çizime ulaştı");
+  dogrula(temelDolgu({ ...eski, dolgu: "red" } as Sekil) === null, "geçersiz dolgu çizime ulaştı");
+  dogrula(!sekilGecerliMi({ ...eski, renk: "expression(1)" }), "şablon doğrulayıcı geçersiz rengi kabul etti");
+  dogrula(!sekilGecerliMi({ ...eski, dolgu: "#12" }), "şablon doğrulayıcı geçersiz dolguyu kabul etti");
+  dogrula(sekilGecerliMi(boyali), "şablon doğrulayıcı geçerli renk/dolguyu reddetti");
+  dogrula(SABLON_ADI_SINIRI >= 32 && "Eğik Düzlem Sürtünmeli".length <= SABLON_ADI_SINIRI, "şablon adı sınırı 32 değil");
+}
+console.log("✓ Madde 16: renk/dolgu çizimi, eski çizim aynen, #rrggbb süzgeci, şablon adı 32");
 
 console.log("TÜM ÇİZİM EDİTÖRÜ SENARYOLARI BAŞARILI");

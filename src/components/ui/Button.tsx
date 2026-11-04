@@ -71,36 +71,3 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     </button>
   );
 });
-
-export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  label: string;
-  icon: ReactNode;
-  variant?: ButtonVariant;
-  size?: ButtonSize;
-}
-
-export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
-  { label, icon, variant = "ghost", size = "md", className, type = "button", ...props },
-  ref,
-) {
-  const kare = size === "sm" ? "h-8 w-8 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11" : size === "lg" ? "h-11 w-11" : "h-10 w-10 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11";
-  return (
-    <button
-      ref={ref}
-      type={type}
-      aria-label={label}
-      title={label}
-      className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-xl border font-semibold transition-colors",
-        "disabled:cursor-not-allowed disabled:opacity-50",
-        VARYANT[variant],
-        kare,
-        className,
-      )}
-      {...props}
-    >
-      {icon}
-    </button>
-  );
-});
-

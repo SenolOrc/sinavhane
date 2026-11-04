@@ -85,6 +85,11 @@ function ifadeGeometri(
   };
 }
 
+/** Vektör işaretinin taban çizgisinden yüksekliği (içerik tepesinin biraz üstü). */
+function vektorIsaretY(punto: number, icerikUst: number): number {
+  return Math.max(punto * 0.88, icerikUst + punto * 0.08);
+}
+
 function ifadeCiz(
   ctx: CanvasRenderingContext2D,
   punto: number,
@@ -304,6 +309,17 @@ function parcaGeometri(
     };
   }
   if (parca.tur === "vektor") {
+    // `\vec{F_1}` gibi YAPILI içerik (alt/üst simge, kesir…) varsa iç
+    // parçaların gerçek geometrisi kullanılır; yoksa ham "F_1" metni
+    // alt çizgisiyle basılıyordu.
+    if (parca.ifadeParcalari && parca.ifadeParcalari.length > 0) {
+      const icGeo = toplamGeometri(ctx, punto, parca.ifadeParcalari);
+      return {
+        genislik: icGeo.genislik + punto * 0.12,
+        ust: Math.max(punto * 1.05, vektorIsaretY(punto, icGeo.ust) + punto * 0.17),
+        alt: Math.max(punto * 0.25, icGeo.alt),
+      };
+    }
     ctx.font = `${parca.stil === "kalin" ? "bold " : ""}${punto}px ${FONT}`;
     return {
       genislik: ctx.measureText(parca.ifade).width + punto * 0.12,
@@ -744,13 +760,25 @@ function parcaCiz(
   }
 
   if (parca.tur === "vektor") {
-    ctx.font = `${parca.stil === "kalin" ? "bold " : ""}${punto}px ${FONT}`;
-    ctx.textAlign = "left";
-    ctx.fillText(parca.ifade, x, taban);
-    const w = ctx.measureText(parca.ifade).width;
+    // İşaretin (ok/çizgi/şapka/nokta) taban çizgisinden yüksekliği: düz
+    // metinde sabit; yapılı içerikte (ör. üslü) içeriğin tepesine göre.
+    let isaretY = punto * 0.88;
+    let w: number;
+    if (parca.ifadeParcalari && parca.ifadeParcalari.length > 0) {
+      const icGeo = toplamGeometri(ctx, punto, parca.ifadeParcalari);
+      ifadeCiz(ctx, punto, parca.ifade, parca.ifadeParcalari, x, taban);
+      w = icGeo.genislik;
+      isaretY = vektorIsaretY(punto, icGeo.ust);
+    } else {
+      ctx.font = `${parca.stil === "kalin" ? "bold " : ""}${punto}px ${FONT}`;
+      ctx.textAlign = "left";
+      ctx.fillText(parca.ifade, x, taban);
+      w = ctx.measureText(parca.ifade).width;
+    }
     ctx.lineWidth = Math.max(1, punto * 0.045);
+    const fark = isaretY - punto * 0.88;
     if (parca.stil === "ok") {
-      const y = taban - punto * 0.88;
+      const y = taban - isaretY;
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x + w, y);
@@ -760,18 +788,18 @@ function parcaCiz(
       ctx.stroke();
     } else if (parca.stil === "ustcizgi") {
       ctx.beginPath();
-      ctx.moveTo(x, taban - punto * 0.86);
-      ctx.lineTo(x + w, taban - punto * 0.86);
+      ctx.moveTo(x, taban - punto * 0.86 - fark);
+      ctx.lineTo(x + w, taban - punto * 0.86 - fark);
       ctx.stroke();
     } else if (parca.stil === "sapka") {
       ctx.font = `${punto * 0.65}px ${FONT}`;
       ctx.textAlign = "center";
-      ctx.fillText("^", x + w / 2, taban - punto * 0.7);
+      ctx.fillText("^", x + w / 2, taban - punto * 0.7 - fark);
     } else if (parca.stil === "nokta") {
       ctx.beginPath();
       ctx.arc(
         x + w / 2,
-        taban - punto * 0.88,
+        taban - isaretY,
         Math.max(1.5, punto * 0.06),
         0,
         Math.PI * 2,

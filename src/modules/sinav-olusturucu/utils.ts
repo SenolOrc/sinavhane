@@ -183,6 +183,9 @@ export function trBuyuk(value: string, fallback: string) {
  */
 export const TEST_SIK_HARFLERI = "ABCDE";
 
+/** Cevap anahtarında doğru şıkkı işaretlenmemiş sorunun yerine basılan işaret. */
+export const ISARETSIZ_CEVAP = "—";
+
 /** Şık/madde harf biçimi. `buyuk` = A) B) C) D) E); `kucuk` = a) b) c) …
  *  Verilmezse kipin kendi varsayılanı: test → buyuk, yazılı → kucuk. */
 export type SikBicimi = "buyuk" | "kucuk";
@@ -194,8 +197,11 @@ export function maddeHarfi(index: number, testModu?: boolean, sikBicimi?: SikBic
   const bicim: SikBicimi = sikBicimi ?? (testModu ? "buyuk" : "kucuk");
   if (bicim === "buyuk") {
     // Test kipinde yalnız A–E (cevap anahtarıyla birebir); sonrası sayı.
-    const sinir = testModu ? TEST_SIK_HARFLERI.length : 26;
-    if (index < sinir) return "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[index];
+    if (testModu) return index < TEST_SIK_HARFLERI.length ? TEST_SIK_HARFLERI[index] : `${index + 1}`;
+    // Yazılı kipinde büyük harf de TÜRK alfabesidir (A B C Ç D …): küçük harf
+    // seçeneğiyle (a b c ç d) aynı sıra. Eskiden İngilizce alfabe (A B C D E)
+    // kullanılıyordu; aynı madde küçük harfte "ç)", büyükte "D)" oluyordu.
+    if (index < MADDE_HARFLERI.length) return MADDE_HARFLERI[index].toLocaleUpperCase("tr-TR");
     return `${index + 1}`;
   }
   // Test kipinde küçük harf Latin sırasıdır (a b c d e): Türk alfabesi 4./5.
@@ -299,6 +305,58 @@ export function puanlariMantiksalEsitDagit(sorular: SoruOgesi[]): SoruOgesi[] {
   );
 }
 
+/**
+ * BEP görünümünde "Puanları 100'e eşit dağıt": 100 puan YALNIZ BEP'e seçilmiş
+ * mantıksal sorulara, `bepPuan` alanı üzerinden dağıtılır. Normal `puan` ve
+ * madde puanları olduğu gibi kalır; böylece aynı taslaktan basılan normal sınav
+ * da BEP kâğıdı da 100 tam puan üzerinden çıkar. Paket sorularda (çok parçalı
+ * tek soru) puan ilk parçaya yazılır, kalan parçalar `null` alır —
+ * `puanlariMantiksalEsitDagit` ile aynı kural.
+ */
+export function bepPuanlariniEsitDagit(sorular: SoruOgesi[], bepSeciliIds: readonly string[]): SoruOgesi[] {
+  const secili = new Set(bepSeciliIds);
+  const gruplar = mantiksalSoruGruplari(sorular).filter((grup) => grup.some((soru) => secili.has(soru.id)));
+  if (gruplar.length === 0) return sorular;
+  const taban = Math.floor(100 / gruplar.length);
+  const artan = 100 - taban * gruplar.length;
+  const yeniPuan = new Map<string, number | null>();
+  gruplar.forEach((grup, index) => {
+    grup.forEach((soru, parcaIndex) => {
+      yeniPuan.set(soru.id, parcaIndex === 0 ? taban + (index < artan ? 1 : 0) : null);
+    });
+  });
+  return sorular.map((soru) => (yeniPuan.has(soru.id) ? { ...soru, bepPuan: yeniPuan.get(soru.id)! } : soru));
+}
+
+/**
+ * BEP kâğıdında gösterilecek soru: `bepPuan` atanmışsa soru puanı onunla
+ * değiştirilir ve madde puanları gizlenir (`soruPuani` madde puanlarını
+ * önceliklendirdiği için, aksi halde normal sınavın madde puanları BEP
+ * toplamına karışırdı). `bepPuan` hiç atanmamışsa (eski kayıtlar) soru AYNEN
+ * döner, yani normal puan kullanılır.
+ */
+export function bepPuaniniUygula(soru: SoruOgesi): SoruOgesi {
+  if (soru.bepPuan === undefined) return soru;
+  return {
+    ...soru,
+    puan: soru.bepPuan,
+    maddeler: soru.maddeler.some((madde) => madde.puan != null)
+      ? soru.maddeler.map((madde) => ({ ...madde, puan: null }))
+      : soru.maddeler,
+  };
+}
+
+/** BEP seçimi DEĞİŞTİĞİNDE eski BEP puan dağıtımı geçersizdir (toplam artık
+ *  100 tutmaz); `bepPuan` alanları temizlenir, normal puana dönülür. */
+export function bepPuanlariniTemizle(sorular: SoruOgesi[]): SoruOgesi[] {
+  if (!sorular.some((soru) => soru.bepPuan !== undefined)) return sorular;
+  return sorular.map((soru) => {
+    if (soru.bepPuan === undefined) return soru;
+    const { bepPuan: _bepPuan, ...kalan } = soru;
+    return kalan;
+  });
+}
+
 export function mantiksalSoruGrubunuSil(sorular: SoruOgesi[], soruId: string): SoruOgesi[] {
   const hedef = sorular.find((soru) => soru.id === soruId);
   if (!hedef) return sorular;
@@ -359,40 +417,56 @@ export function paketFarkindaKaristir(liste: SoruOgesi[], seed: number): SoruOge
 }
 
 /**
- * Soru Havuzu'nda işaretli olup sınavda BOŞ kalan doğru şıkları bulur.
- *
- * NEDEN VAR: `dogruSik` havuzdan sınava aktarım ANINDA kopyalanıyor
- * (kirpmaGom → gorselSoruYap). Öğretmen soruyu cevapsız gönderip cevabı
- * sonradan havuzda işaretlerse o bilgi sınava hiç ulaşmıyordu — ne senkron
- * ne uyarı vardı, soru cevap anahtarına sessizce girmiyordu.
- *
- * ELLE İŞARETLENMİŞ ŞIK ADAY DEĞİLDİR. Bu bir tercih değil, bu depodaki
- * yerleşik kural: §17'de senkron akışı için "kaynak: elle bir notun üstüne
- * sormadan yazılmaz" diye konmuştu. Sınavda bilerek farklı işaretlenmiş bir
- * şıkkı havuzdan gelen değerle ezmek aynı hatanın bu moduldeki hâli olurdu.
+ * B grubu şık karıştırmasının SORU BAZLI tohumu: grup tohumu + soru kimliği.
+ * Aynı `bSeed` her açılışta/yazdırmada aynı şık sırasını verir (dağıtılmış
+ * kâğıtla anahtar uyuşur); sorular farklı tohum aldığı için hepsi aynı
+ * permütasyonla karışmaz. `bSeed` Date.now() olduğundan önce 32 bite indirilir.
  */
-export function havuzdanEksikCevaplar(
-  sorular: SoruOgesi[],
-  havuzMetalari: Record<string, { dogruSik?: string } | undefined>,
-): { soruId: string; sik: string }[] {
-  return sorular.flatMap((soru) => {
-    if (soru.dogruSik) return [];
-    const havuzSik = soru.kirpmaId ? havuzMetalari[soru.kirpmaId]?.dogruSik : undefined;
-    return havuzSik ? [{ soruId: soru.id, sik: havuzSik }] : [];
-  });
+export function sikKaristirmaTohumu(seed: number, soruId: string): number {
+  let ozet = 2166136261; // FNV-1a
+  for (let i = 0; i < soruId.length; i += 1) {
+    ozet ^= soruId.charCodeAt(i);
+    ozet = Math.imul(ozet, 16777619) >>> 0;
+  }
+  const taban = Math.floor(Math.abs(seed)) % 4294967296;
+  return ((taban ^ ozet) >>> 0) || 1;
 }
 
-/** `havuzdanEksikCevaplar` sonucunu uygular. Boş olmayan şıkka DOKUNMAZ:
- *  liste üretildikten sonra öğretmen elle işaretlemiş olabilir. */
-export function eksikCevaplariUygula(
-  sorular: SoruOgesi[],
-  eksikler: { soruId: string; sik: string }[],
-): SoruOgesi[] {
-  const harita = new Map(eksikler.map((k) => [k.soruId, k.sik]));
-  if (harita.size === 0) return sorular;
-  return sorular.map((soru) =>
-    !soru.dogruSik && harita.has(soru.id)
-      ? { ...soru, dogruSik: harita.get(soru.id) }
-      : soru,
+/**
+ * Test sorusunun şıklarını (maddeler) deterministik karıştırır ve `dogruSik`
+ * harfini YENİ sıralamaya göre eşler (B grubu cevap anahtarı otomatik doğru
+ * çıkar). Karıştırılmayan durumlar — soru AYNEN döner:
+ *  - 2'den az ya da A–E'den fazla şık (anahtar yalnız A–E bilir),
+ *  - işaretli doğru şık şık sayısının dışında (ör. şıkları görselin içinde
+ *    olan soru); bu durumda karıştırmak anahtarı bozardı.
+ */
+export function siklariKaristir(soru: SoruOgesi, seed: number): SoruOgesi {
+  const adet = soru.maddeler.length;
+  if (adet < 2 || adet > TEST_SIK_HARFLERI.length) return soru;
+  const eskiIndex = soru.dogruSik ? TEST_SIK_HARFLERI.indexOf(soru.dogruSik) : -1;
+  if (soru.dogruSik && (eskiIndex < 0 || eskiIndex >= adet)) return soru;
+  const sira = deterministikKaristir(
+    soru.maddeler.map((_, i) => i),
+    sikKaristirmaTohumu(seed, soru.id),
   );
+  const yeniDogruSik = eskiIndex >= 0 ? TEST_SIK_HARFLERI[sira.indexOf(eskiIndex)] : soru.dogruSik;
+  return {
+    ...soru,
+    maddeler: sira.map((i) => soru.maddeler[i]),
+    dogruSik: yeniDogruSik,
+  };
+}
+
+/** Kâğıttaki (görünen) sıraya göre cevap anahtarı: HER mantıksal soru bir
+ *  satır; doğru şıkkı işaretlenmemiş soru `ISARETSIZ_CEVAP` ("—") alır. */
+export function cevapAnahtariOlustur(gorunenSorular: SoruOgesi[]): { sira: number; cevap: string }[] {
+  return mantiksalSoruGruplari(gorunenSorular).map((grup, index) => ({
+    sira: index + 1,
+    cevap: grup.find((soru) => soru.dogruSik)?.dogruSik ?? ISARETSIZ_CEVAP,
+  }));
+}
+
+/** B grubu (yalnız Test kipinde): her sorunun şıklarını kendi tohumuyla karıştırır. */
+export function bGrubuSiklariniKaristir(liste: SoruOgesi[], seed: number): SoruOgesi[] {
+  return liste.map((soru) => siklariKaristir(soru, seed));
 }

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import type { DersKitabiGorselAktarimi, DersKitabiSinavAktarimState } from "@shared/types";
+import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   BookOpen,
@@ -81,13 +80,17 @@ import {
   mantiksalSoruGrubunuHedefeTasi,
   mantiksalSoruGrubunuSil,
   mantiksalSoruGrubunuTasi,
-  eksikCevaplariUygula,
-  havuzdanEksikCevaplar,
   mantiksalSoruId,
   mantiksalSoruSiraHaritasi,
   METIN_ALANI_DAR_ESIK_MM,
   paketFarkindaKaristir,
+  bGrubuSiklariniKaristir,
+  ISARETSIZ_CEVAP,
+  cevapAnahtariOlustur,
   puanlariMantiksalEsitDagit,
+  bepPuaniniUygula,
+  bepPuanlariniEsitDagit,
+  bepPuanlariniTemizle,
   sayiSinirla,
   soruPuani,
   trBuyuk,
@@ -99,11 +102,6 @@ import { htmlTemizle } from "./security/html";
 import { yazdirmayiBaslat } from "@/lib/yazdirma";
 import { useDokunmatik, useDokunmatikDar } from "@/lib/dokunmatik";
 import { useDarEkran } from "@/lib/useDarEkran";
-// Bilinçli modüller-arası istisna (odev/OdevCiktiScreen.tsx'teki aynı gerekçe):
-// havuz VERİSİNE değil, ders-kitabi'nin dışa verdiği BİLEŞENE bağlanıyoruz.
-// Kırpmaları/kitapları yalnız o modül okur; buraya yalnız hazır zarfın
-// transferId'si döner ve mevcut aktarım yolundan uygulanır.
-import { SoruSeciciModal } from "@/modules/ders-kitabi/components/SoruSeciciModal";
 import {
   sinavIcerigiKaydet,
   sinavIcerigiOku,
@@ -119,25 +117,10 @@ import {
   yeniSinavOlusturVeAktifYap,
   iceAktarilanSinaviYeniKayitYap,
 } from "./lib/sinavKutuphanesi";
-import { sinavBul, sinavEkle, sinavlarGetir, sinavIcinAyrilanNotlar } from "@/db/repo";
+import { sinavBul, sinavEkle, sinavlarGetir } from "@/db/repo";
 import { TelefonBilgisi } from "@/components/TelefonBilgisi";
 import { okulProfiliOku } from "@/lib/useEokulProfil";
 import { sinavTaslakKimlikleriniYenile, sinavTaslakParmakIzi, taslakDosyadanOku, taslakDosyayaIndir } from "./storage/taslakDosya";
-import { sinavAktarimKaynakEtiketi, sinavAktarimKullaniminiUzlastir, sinavAktariminiKalicilastir } from "./aktarimTuketici";
-import {
-  bekleyenSinavAktarimlariniListele,
-  sinavAktarimAck,
-  sinavAktarimDiscard,
-  sinavAktarimKullaniminiTamamla,
-  sinavAktarimOku,
-  sinavAktarimTtlTemizle,
-  tamamlanmamisSinavAktarimKullanimlariniListele,
-  SINAV_AKTARIM_SOZLESME_SURUMU,
-  type SinavAktarimPayload,
-  type SinavAktarimZarfi,
-} from "@/lib/sinavAktarimDepo";
-import { soruKullanimKaydet } from "@/lib/soruKullanim";
-import { soruHavuzMetalariniOku } from "@/lib/soruRozetleri";
 import { useModalErisilebilirligi } from "@/lib/modalErisilebilirligi";
 import { KaydedilmemisDegisiklikKoruyucu } from "@/components/KaydedilmemisDegisiklikKoruyucu";
 import { ConfirmDialog } from "@/components/ui";
@@ -161,7 +144,6 @@ import {
 } from "./dayaniklilik";
 import {
   cekmeceKlavyesiniYonet,
-  kitapKaynakHedefi,
   menuKlavyesiniYonet,
   odaklanabilirOgeler,
 } from "./uiErisilebilirlik";
@@ -175,7 +157,6 @@ import {
   IceAktarOnayModal,
   KisayolYardimModal,
   MetinSoruModal,
-  TaslakKurtarmaModal,
   TemizleOnayModal,
 } from "./components/SinavModallari";
 import { SinavParolaModal } from "./components/SinavParolaModal";
@@ -234,11 +215,6 @@ function soruListesiDarBaslangic(): boolean {
     return false;
   }
 }
-type AktifSinavAktarimi = {
-  transferId?: string;
-  payload: SinavAktarimPayload;
-  source: "ders-kitabi" | "soru-havuzu";
-};
 const VARSAYILAN_BOLUMLER: Record<string, boolean> = {
   // Başlık (okul/sınıf/ders/dönem) sınavın İLK adımı; kapalı ve panelin dibinde
   // olduğu için sıfırdan başlayan öğretmen nereden başlayacağını göremiyordu.
@@ -252,60 +228,7 @@ const VARSAYILAN_BOLUMLER: Record<string, boolean> = {
   taslakDosyasi: true,
 };
 
-function dersKitabiSorulariniOlustur(
-  gelen: DersKitabiGorselAktarimi[],
-  ayarlar?: Partial<SinavTaslagi["ayarlar"]>,
-): SoruOgesi[] {
-  const kenar = ayarlar?.kenarBosluk ?? 10;
-  const ciftSutun = (ayarlar?.sayfaDuzeni ?? "cift") === "cift";
-  const sutunArasi = ayarlar?.sutunAra ?? 8;
-  const tamGenislik = Math.max(80, A4_GENISLIK_MM - kenar * 2);
-  const sutunGenisligi = ciftSutun
-    ? Math.max(40, (tamGenislik - sutunArasi) / 2)
-    : tamGenislik;
-  const baglamMm = Math.max(20, (ciftSutun ? sutunGenisligi : tamGenislik) - 7);
-  const genislikMm = Math.round(ciftSutun ? baglamMm : baglamMm * 0.6);
-  const boslukMm = ayarlar?.varsayilanSoruBosluk ?? 4 * SATIR_MM;
-  return gelen.map((g) =>
-    gorselSoruYap(
-      {
-        gorselDataUrl: g.dataUrl,
-        dosyaAdi: g.dosyaAdi,
-        // Tam sayfa aktarimlar sutun genisligine KUCULTULMEZ: kitabin sayfasi
-        // okunamayacak hale geliyordu. Sayfa duzeni "tek" ya da "cift" olsun,
-        // tam sayfa her zaman tam genisliktedir ve kendi sayfasina gider.
-        genislikMm: g.tamSayfaMi ? tamGenislik : genislikMm,
-        boslukMm,
-      },
-      {
-        gorselOran: g.oran,
-        kaynakAd: g.kaynakAd,
-        kirpmaId: g.kirpmaId,
-        kaynakKitapId: g.kitapId,
-        kaynakSayfa: g.sayfa,
-        kaynakSinif: g.sinif,
-        kaynakDers: g.ders,
-        kaynakKonu: g.konu,
-        logicalQuestionId: g.logicalQuestionId ?? g.paketId ?? g.kirpmaId,
-        paketId: g.paketId,
-        paketSira: g.paketSira,
-        paketParcaSayisi: g.paketParcaSayisi,
-        paketBasligi: g.paketBasligi,
-        // Havuzda işaretlenen doğru şık buraya geçmezse "Cevap Anahtarı"
-        // düğmesi pasif kalıyor ve öğretmen cevabı soru soru yeniden
-        // işaretlemek zorunda kalıyordu.
-        dogruSik: g.dogruSik,
-        tamGenislik: g.tamSayfaMi === true,
-        tamSayfa: g.tamSayfaMi === true,
-      },
-    ),
-  );
-}
-
 export function SinavOlusturucuScreen() {
-  // OA77: "Sınavda sor" notlarından sınava alınmamış olanlar (Sınavlarım'da listelenir).
-  const ayrilanSayisi = sinavIcinAyrilanNotlar().filter((n) => !n.sinavaAlindi).length;
-  const location = useLocation();
   const nav = useNavigate();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pdfFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -316,59 +239,7 @@ export function SinavOlusturucuScreen() {
   const { olcumRef, yukseklikler, bloklar } = useSoruOlcumu();
   const seciliSoruPanelRef = useRef<HTMLElement | null>(null);
   const onizlemeKaydirRef = useRef<HTMLDivElement | null>(null);
-  const dersKitabiAktarimRef = useRef<DersKitabiSinavAktarimState | null>(
-    location.state as DersKitabiSinavAktarimState | null,
-  );
-  const kitapOkuyucudanDonusRef = useRef(
-    (location.state as { from?: string } | null)?.from === "kitap-okuyucu",
-  );
-  const legacyGorseller = dersKitabiAktarimRef.current?.iceAktarilacakGorseller;
-  const [aktifAktarim, setAktifAktarim] = useState<AktifSinavAktarimi | null>(() =>
-    legacyGorseller
-      ? {
-          payload: {
-            iceAktarilacakGorseller: legacyGorseller,
-            gonderilemeyenSayisi: dersKitabiAktarimRef.current?.gonderilemeyenSayisi,
-            gonderilemeyenler: dersKitabiAktarimRef.current?.gonderilemeyenler,
-            kullanilanKirpmaIdler: legacyGorseller.map((gorsel) => gorsel.kirpmaId).filter((id): id is string => !!id),
-          },
-          source: dersKitabiAktarimRef.current?.source ?? "ders-kitabi",
-        }
-      : null,
-  );
-  const aktifAktarimRef = useRef<AktifSinavAktarimi | null>(aktifAktarim);
-  aktifAktarimRef.current = aktifAktarim;
-  const [aktarimBaslatmaHazir, setAktarimBaslatmaHazir] = useState(!!legacyGorseller);
-  const [aktarimIsleniyor, setAktarimIsleniyor] = useState(false);
-  const aktarimIsleniyorRef = useRef(false);
-  const [aktarimHatasi, setAktarimHatasi] = useState("");
-  const [bekleyenAktarimlar, setBekleyenAktarimlar] = useState<SinavAktarimZarfi[]>([]);
-  const [sonAktarimBilgisi, setSonAktarimBilgisi] = useState<{
-    gelen: number;
-    gonderilemeyenSayisi: number;
-    gonderilemeyenler: NonNullable<SinavAktarimPayload["gonderilemeyenler"]>;
-    source: "ders-kitabi" | "soru-havuzu";
-  } | null>(null);
   const sinavTaslakIdRef = useRef<string>(crypto.randomUUID());
-  const gorunenAktarimPayload = aktifAktarim?.payload;
-  const dersKitabindanGelenSayisi = gorunenAktarimPayload?.iceAktarilacakGorseller.length ?? sonAktarimBilgisi?.gelen ?? 0;
-  const gonderilemeyenSayisi = gorunenAktarimPayload?.gonderilemeyenSayisi ?? sonAktarimBilgisi?.gonderilemeyenSayisi ?? 0;
-  const gonderilemeyenler = gorunenAktarimPayload?.gonderilemeyenler ?? sonAktarimBilgisi?.gonderilemeyenler ?? [];
-  const aktarimSource = aktifAktarim?.source ?? sonAktarimBilgisi?.source ?? "ders-kitabi";
-  const aktarimKaynakEtiketi = sinavAktarimKaynakEtiketi(aktarimSource);
-  const [atlananTekrarSayisi, setAtlananTekrarSayisi] = useState(0);
-  /** Aktarım özet şeridi kapatılabilir (telefonda ~50 px); yeni aktarım gelince yeniden görünür. */
-  const [kapatilanAktarimOzeti, setKapatilanAktarimOzeti] = useState("");
-  const dersKitabiDurumBilgisi = dersKitabindanGelenSayisi
-      ? `${Math.max(0, dersKitabindanGelenSayisi - atlananTekrarSayisi)} soru ${aktarimKaynakEtiketi}'ndan eklendi${
-        gonderilemeyenSayisi > 0
-          ? ` · ${gonderilemeyenSayisi} soru gönderilemedi (Soru Havuzunda korunuyor)`
-          : ""
-      }${atlananTekrarSayisi > 0 ? ` · ${atlananTekrarSayisi} tekrar zaten taslakta olduğu için atlandı` : ""}.`
-    : "";
-  const dersKitabiDurumEki = dersKitabiDurumBilgisi
-    ? ` · ${dersKitabiDurumBilgisi}`
-    : "";
 
   // ── Sınav belgesi: başlık + sorular + sayfa düzeni ayarları ──────────────
   //
@@ -470,7 +341,6 @@ export function SinavOlusturucuScreen() {
   // seferde biri görünür, görünen kutu ekranın kalanını tamamen kullanır.
   const [telefonSekme, setTelefonSekme] = useState<"sorular" | "kagit">("kagit");
   const [yeniSinavIsleniyor, setYeniSinavIsleniyor] = useState(false);
-  const [havuzSeciciAcik, setHavuzSeciciAcik] = useState(false);
   const [adDuzenleniyor, setAdDuzenleniyor] = useState(false);
   const [adTaslagi, setAdTaslagi] = useState("");
   const [adHatasi, setAdHatasi] = useState("");
@@ -546,8 +416,6 @@ export function SinavOlusturucuScreen() {
   const [yazdirmaHatasi, setYazdirmaHatasi] = useState("");
   const [yazdiriliyor, setYazdiriliyor] = useState(false);
   const printRootRef = useRef<HTMLDivElement | null>(null);
-  const [kurtarilacakTaslak, setKurtarilacakTaslak] =
-    useState<SinavTaslagi | null>(null);
   // B grubu, BEP ve sınav türü alanları belge durumunda (yukarıdaki useReducer);
   // yalnız modalın açık/kapalı olması belgeye ait değil.
   const [bepModalAcik, setBepModalAcik] = useState(false);
@@ -587,7 +455,6 @@ export function SinavOlusturucuScreen() {
     !!denklemModal ||
     !!gorselTaslak ||
     temizleOnayAcik ||
-    !!kurtarilacakTaslak ||
     !!bekleyenIceAktarTaslak ||
     bepModalAcik ||
     !!kirpilacakSoruId ||
@@ -892,18 +759,9 @@ export function SinavOlusturucuScreen() {
     window.setTimeout(() => yanPanelAciciRef.current?.focus(), 0);
   }
 
-  function soruKaynaginiAc(soru: SoruOgesi) {
-    const hedef = kitapKaynakHedefi(soru);
-    if (!hedef) return;
-    setAutosaveDurum("Kaynak açılmadan önce taslak kaydediliyor...");
-    void aktifSinaviKaydet(taslakOlustur())
-      .then(() => nav(hedef.yol, { state: hedef.state }))
-      .catch(() => setAutosaveDurum("Kaynak açılamadı; taslak kaydedilemedi."));
-  }
-
   // Sınavlarım'a geçmeden önce taslak kaydedilir — aksi halde son birkaç
   // saniyenin autosave debounce'u iptal olur ve o değişiklikler kaybolur
-  // (bkz. soruKaynaginiAc'teki aynı kalıp).
+  // (flush-then-nav kalıbı).
   function sinavlarimaGit() {
     setAutosaveDurum("Sınavlarım açılmadan önce taslak kaydediliyor...");
     void aktifSinaviKaydet(taslakOlustur())
@@ -1027,12 +885,20 @@ export function SinavOlusturucuScreen() {
   const ciftSutun = sayfaDuzeni === "cift";
   const gorunenSorular = useMemo(() => {
     let liste = sorular;
-    if (bGrubuAktif && aktifGrup === "B")
+    if (bGrubuAktif && aktifGrup === "B") {
       liste = paketFarkindaKaristir(liste, bSeed);
+      // Test kipinde B grubu şıkları da karıştırır; doğru şık harfi yeni
+      // sıraya göre eşlenir (cevap anahtarı bu listeden türetilir). Yazılıda
+      // a/b/c alt maddeleri sıralı bir soru akışı olabilir: karıştırılmaz.
+      // (`testModu` aşağıda tanımlı; memo burada çalıştığı için doğrudan okunur.)
+      if (sinavTuru === "test") liste = bGrubuSiklariniKaristir(liste, bSeed);
+    }
     if (!bepAktif) return liste;
     const secili = new Set(bepSeciliIds);
     return liste
       .filter((soru) => secili.has(soru.id))
+      // BEP kâğıdı kendi puanıyla (`bepPuan`) basılır; atanmamışsa normal puan.
+      .map(bepPuaniniUygula)
       .map((soru) => ({
         ...soru,
         punto: soru.punto + bepPuntoArtis,
@@ -1044,6 +910,7 @@ export function SinavOlusturucuScreen() {
     bGrubuAktif,
     aktifGrup,
     bSeed,
+    sinavTuru,
     bepAktif,
     bepSeciliIds,
     bepPuntoArtis,
@@ -1081,85 +948,6 @@ export function SinavOlusturucuScreen() {
   );
 
 
-  async function bekleyenAktarimlariYenile() {
-    try {
-      await sinavAktarimTtlTemizle();
-      setBekleyenAktarimlar(await bekleyenSinavAktarimlariniListele());
-    } catch {
-      // Kurtarma listesi yardımcıdır; aktif aktarımın kabulünü engellemez.
-    }
-  }
-
-  /** Router state ancak taslak kalıcılaştıktan ve zarf ACK olduktan sonra temizlenir. */
-  async function aktifAktarimiUygula(
-    tabanTaslak: SinavTaslagi,
-    aktarim = aktifAktarimRef.current,
-  ): Promise<SinavTaslagi> {
-    if (!aktarim) return tabanTaslak;
-    if (aktarimIsleniyorRef.current) throw new Error("Aktarım zaten işleniyor.");
-    aktarimIsleniyorRef.current = true;
-    setAktarimIsleniyor(true);
-    setAktarimHatasi("");
-    try {
-      // Hedef, içeriğin GERÇEKTEN yazılacağı yer olmalı. `taslakKaydet` olarak
-      // verilen `aktifSinaviKaydet` her zaman aktif kayda yazıyor; hedefi
-      // taslağın id'sinden türetmek, defter kaydını (ack, kullanım, hedefAd)
-      // içeriği olmayan bir id'ye bağlıyordu. İkisi dosyadan yüklenmiş bir
-      // taslakta ayrışıyor — bkz. aktifSinaviKaydet üstündeki not.
-      // E5: henüz kütüphane kaydı yoksa (boş açılış) gelen sorular için şimdi açılır.
-      aktifSinavKaydiniHazirla(tabanTaslak, true);
-      const hedefId = aktifSinavIdRef.current ?? tabanTaslak.id ?? sinavTaslakIdRef.current;
-      const hedefAd = [tabanTaslak.baslik.ders, tabanTaslak.baslik.sinifSeviyesi, "sınav taslağı"]
-        .filter(Boolean)
-        .join(" · ") || "Sınav taslağı";
-      const sonuc = await sinavAktariminiKalicilastir({
-        taslak: { ...tabanTaslak, id: hedefId },
-        payload: aktarim.payload,
-        transferId: aktarim.transferId,
-        hedefId,
-        hedefAd,
-        sorulariOlustur: (gelen) => dersKitabiSorulariniOlustur(gelen, tabanTaslak.ayarlar),
-      }, {
-        taslakKaydet: aktifSinaviKaydet,
-        ackle: sinavAktarimAck,
-        kullanimiTamamla: sinavAktarimKullaniminiTamamla,
-        kullanimKaydet: (idler, ayrinti) => soruKullanimKaydet(idler, "sinav", ayrinti),
-      });
-      sinavTaslakIdRef.current = sonuc.taslak.id ?? hedefId;
-      // Aktarım da "toptan yükleme"dir: düz taslakUygula, boş sahneyi geri-al
-      // geçmişine "önceki hâl" olarak yazıyor ve aktarımdan sonraki ilk Ctrl+Z
-      // gelen soruların hepsini siliyordu (v0.11C hatasının aktarım yolundaki
-      // kalıntısı — bkz. taslakYukleVeGecmisiSifirla üstündeki not).
-      taslakYukleVeGecmisiSifirla(sonuc.taslak);
-      setSeciliSoruId(sonuc.eklenenSayisi > 0
-        ? sonuc.taslak.sorular[sonuc.taslak.sorular.length - sonuc.eklenenSayisi]?.id ?? null
-        : null);
-      setAtlananTekrarSayisi(sonuc.tekrarSayisi);
-      setSonAktarimBilgisi({
-        gelen: aktarim.payload.iceAktarilacakGorseller.length,
-        gonderilemeyenSayisi: aktarim.payload.gonderilemeyenSayisi ?? 0,
-        gonderilemeyenler: aktarim.payload.gonderilemeyenler ?? [],
-        source: aktarim.source,
-      });
-      setAktifAktarim(null);
-      aktifAktarimRef.current = null;
-      setAutosaveHazir(true);
-      setAutosaveDurum(`Aktarım taslağa kaydedildi.${dersKitabiDurumEki}`);
-      if (!sonuc.kullanimTamamlandi) {
-        setAktarimHatasi("Sorular kaydedildi; kullanım geçmişi daha sonra otomatik tamamlanacak.");
-      }
-      nav(location.pathname, { replace: true, state: null });
-      void bekleyenAktarimlariYenile();
-      return sonuc.taslak;
-    } catch (err) {
-      const mesaj = err instanceof Error ? err.message : "Aktarım taslağa eklenemedi.";
-      setAktarimHatasi(`${mesaj} Bekleyen aktarım korunuyor; yeniden deneyebilirsiniz.`);
-      throw err;
-    } finally {
-      aktarimIsleniyorRef.current = false;
-      setAktarimIsleniyor(false);
-    }
-  }
   // Öğretmen adı yoksa imza bloğu hiç render edilmez (OgretmenImzaAlani null döner).
   const imzaAlaniMm = ogretmenler.some((ad) => ad.trim())
     ? OGRETMEN_IMZA_YUKSEKLIK_MM
@@ -1247,18 +1035,19 @@ export function SinavOlusturucuScreen() {
   /** Yerleşim/puan uyarısı çıktığında bekleyen yazdırma isteği; onay diyalogu
    *  bu doluyken görünür. `null` = bekleyen istek yok. */
   const [yazdirmaOnayi, setYazdirmaOnayi] = useState<{
-    hedef: "sinav" | "sinavVeAnahtar";
+    hedef: "sinav" | "sinavVeAnahtar" | "anahtar";
     uyarilar: string[];
   } | null>(null);
 
-  const cevapAnahtari = useMemo(() => {
-    const liste: { sira: number; cevap: string }[] = [];
-    mantiksalSoruGruplari(gorunenSorular).forEach((grup, index) => {
-      const cevapli = grup.find((soru) => soru.dogruSik);
-      if (cevapli?.dogruSik) liste.push({ sira: index + 1, cevap: cevapli.dogruSik });
-    });
-    return liste;
-  }, [gorunenSorular]);
+  /** Cevap anahtarı: test sorularının TAMAMI. Doğru şıkkı işaretlenmemiş soru
+   *  "—" ile basılır; eskiden listeden tümüyle düşüyordu ve öğretmen anahtarda
+   *  hangi soruyu işaretlemeyi unuttuğunu göremiyordu. */
+  const cevapAnahtari = useMemo(() => cevapAnahtariOlustur(gorunenSorular), [gorunenSorular]);
+  /** Doğru şıkkı işaretli soru sayısı (sayaçlar ve "hiç işaret yok" kilidi için). */
+  const isaretliCevapSayisi = cevapAnahtari.filter((satir) => satir.cevap !== ISARETSIZ_CEVAP).length;
+  const isaretsizCevapSiralari = cevapAnahtari
+    .filter((satir) => satir.cevap === ISARETSIZ_CEVAP)
+    .map((satir) => satir.sira);
 
   const yukseklikGetir = (soru: SoruOgesi) =>
     yukseklikler[soru.id] ??
@@ -1315,7 +1104,7 @@ export function SinavOlusturucuScreen() {
   // anahtar son sayfada normal akışta çizildiği için ona yer ayrılmazsa son soru
   // taşar ve baskı sayfası `overflow: hidden` olduğundan SESSİZCE kırpılır.
   const yazdirmaSayfalari = useMemo(() => {
-    if (yazdirmaHedefi !== "sinavVeAnahtar" || cevapAnahtari.length === 0) {
+    if (yazdirmaHedefi !== "sinavVeAnahtar" || isaretliCevapSayisi === 0) {
       return sayfalar;
     }
     return sayfalariOlustur(sayfaSorulari, yukseklikGetir, {
@@ -1330,6 +1119,7 @@ export function SinavOlusturucuScreen() {
     sayfalar,
     yazdirmaHedefi,
     cevapAnahtari.length,
+    isaretliCevapSayisi,
     sayfaSorulari,
     yukseklikler,
     etkinCiftSutun,
@@ -1343,31 +1133,6 @@ export function SinavOlusturucuScreen() {
   // sırasında güncel değeri okuyabilmek için ref'e yansıtılır
   // (herhangiBirModalAcikRef ile aynı kalıp).
   sayfaSayisiRef.current = Math.max(1, sayfalar.length);
-
-  // Havuzda SONRADAN işaretlenen doğru şık.
-  //
-  // `dogruSik` aktarım ANINDA kopyalanıyor (kirpmaGom → gorselSoruYap), yani
-  // öğretmen soruyu cevapsız gönderip cevabı sonradan Soru Havuzu'nda
-  // işaretlerse o bilgi sınava HİÇ ulaşmıyordu; ne senkron ne uyarı vardı ve
-  // soru cevap anahtarına sessizce girmiyordu. Bağ kopmuş değil: soruda
-  // `kirpmaId` duruyor, havuz metası da onunla anahtarlanıyor.
-  //
-  // OTOMATİK YAZILMIYOR. Sınavda ELLE işaretlenmiş bir şıkkın üstüne sormadan
-  // yazmak, bu depoda §17'de zaten konmuş kuralın ihlali olurdu ("kaynak:
-  // elle bir notun üstüne sormadan yazılmaz"). Bu yüzden yalnız BOŞ olanlar
-  // aday sayılıyor ve uygulama öğretmenin bir tıkına bağlı.
-  const havuzdanGelebilecekCevaplar = useMemo(() => {
-    if (sinavTuru !== "test") return [];
-    return havuzdanEksikCevaplar(sorular, soruHavuzMetalariniOku());
-    // `sorular` değişince yeniden okunuyor: "Getir"den sonra liste kendiliğinden
-    // boşalıyor, Soru Havuzu'ndan dönüşte de (ekran ayrı route, yeniden
-    // kuruluyor) taze meta okunuyor.
-  }, [sorular, sinavTuru]);
-
-  function havuzdakiCevaplariGetir() {
-    if (havuzdanGelebilecekCevaplar.length === 0) return;
-    setSorular((mevcut) => eksikCevaplariUygula(mevcut, havuzdanGelebilecekCevaplar));
-  }
 
   const toplamPuan = gorunenSorular.reduce(
     (toplam, soru) => toplam + (soruPuani(soru) ?? 0),
@@ -1431,13 +1196,11 @@ export function SinavOlusturucuScreen() {
   // üretirdi. Bu yüzden payload'ın id'si de hedefe eşitleniyor.
   //
   // Bu davranış §13.3'te "tuzak" diye kayıtlıydı çünkü imza aksini
-  // düşündürüyordu; tuzak olan davranış değil, yazılı olmamasıydı. Tek gerçek
-  // tutarsızlık `aktifAktarimiUygula`'daki `hedefId`'ydi (defter kaydı başka
-  // id'ye işaret ediyordu) — o da aynı adrese çekildi.
+  // düşündürüyordu; tuzak olan davranış değil, yazılı olmamasıydı.
   // Denetim (2026-10, E5): kütüphane kaydı ilk içerikte açılır. `ilkIcerikVarRef`
   // autosave etkisi belgenin açılıştaki hâlinden farklılaştığını gördüğünde true olur;
   // o zamana dek (ör. açıp hiçbir şey yapmadan Sınavlarım'a gitmek) kayıt açılmaz.
-  // `zorla`: aktarımla soru gelmesi / ad verilmesi gibi kendisi içerik olan işler.
+  // `zorla`: ad verilmesi gibi kendisi içerik olan işler.
   const ilkIcerikVarRef = useRef(false);
   function aktifSinavKaydiniHazirla(taslak: SinavTaslagi, zorla = false): string | null {
     const mevcut = aktifSinavIdRef.current;
@@ -1511,74 +1274,11 @@ export function SinavOlusturucuScreen() {
 
   useEffect(() => {
     let iptal = false;
-    async function aktarimKoprusunuBaslat() {
-      try {
-        const eksikMakbuzlar = await tamamlanmamisSinavAktarimKullanimlariniListele();
-        let tamamlanamayanMakbuz = false;
-        for (const zarf of eksikMakbuzlar) {
-          const tamamlandi = await sinavAktarimKullaniminiUzlastir(zarf, {
-            kullanimiTamamla: sinavAktarimKullaniminiTamamla,
-            kullanimKaydet: (idler, ayrinti) => soruKullanimKaydet(idler, "sinav", ayrinti),
-          });
-          if (!tamamlandi) tamamlanamayanMakbuz = true;
-        }
-        if (!iptal && tamamlanamayanMakbuz) {
-          setAktarimHatasi("Bazı aktarım kullanım kayıtları tamamlanamadı; uygulama yeniden deneyecek.");
-        }
-      } catch {
-        if (!iptal) setAktarimHatasi("Bekleyen aktarım kullanım kayıtları denetlenemedi; uygulama yeniden deneyecek.");
-      }
-      if (!iptal) void bekleyenAktarimlariYenile();
-
-      const routeState = dersKitabiAktarimRef.current;
-      if (routeState?.iceAktarilacakGorseller) return;
-      if (!routeState?.transferId) {
-        if (!iptal) setAktarimBaslatmaHazir(true);
-        return;
-      }
-      try {
-        if (routeState.version !== SINAV_AKTARIM_SOZLESME_SURUMU) {
-          throw new Error(`Aktarım sürümü desteklenmiyor: ${String(routeState.version ?? "bilinmiyor")}.`);
-        }
-        const zarf = await sinavAktarimOku(routeState.transferId);
-        if (!zarf) throw new Error("Aktarım zarfı bulunamadı veya süresi doldu.");
-        if (zarf.version !== routeState.version || (routeState.source && zarf.source !== routeState.source)) {
-          throw new Error("Aktarım zarfı route bilgisiyle eşleşmiyor.");
-        }
-        if (zarf.durum === "ack") {
-          const tamamlandi = await sinavAktarimKullaniminiUzlastir(zarf, {
-            kullanimiTamamla: sinavAktarimKullaniminiTamamla,
-            kullanimKaydet: (idler, ayrinti) => soruKullanimKaydet(idler, "sinav", ayrinti),
-          });
-          if (!tamamlandi) throw new Error("Aktarım kaydedildi fakat kullanım geçmişi henüz tamamlanamadı.");
-          if (!iptal) nav(location.pathname, { replace: true, state: null });
-        } else if (zarf.durum === "discarded") {
-          throw new Error("Bu aktarım daha önce iptal edilmiş.");
-        } else if (!zarf.payload) {
-          throw new Error("Bekleyen aktarımın içeriği eksik.");
-        } else if (!iptal) {
-          const yeniAktarim = { transferId: zarf.transferId, payload: zarf.payload, source: zarf.source };
-          aktifAktarimRef.current = yeniAktarim;
-          setAktifAktarim(yeniAktarim);
-        }
-      } catch (err) {
-        if (!iptal) setAktarimHatasi(err instanceof Error ? err.message : "Aktarım yüklenemedi.");
-      } finally {
-        if (!iptal) setAktarimBaslatmaHazir(true);
-      }
-    }
-    void aktarimKoprusunuBaslat();
-    return () => { iptal = true; };
-  }, []);
-
-  useEffect(() => {
-    if (!aktarimBaslatmaHazir) return undefined;
-    let iptal = false;
     // Kütüphane açılışı:
     //  1) Kütüphane öncesi tek slot varsa ilk sınav olarak taşınır (idempotent).
     //  2) Aktif sınav çözülür: kayıtlı işaretçi geçerliyse o, değilse en son
     //     güncellenen arşivlenmemiş sınav, hiç yoksa yeni boş bir sınav.
-    //  3) O sınavın içeriği okunur; kurtarma/aktarım akışı aynen devam eder.
+    //  3) O sınavın içeriği okunur ve doğrudan yüklenir.
     async function aktifSinaviHazirla(): Promise<SinavTaslagi | null> {
       await eskiTekSlotuGocur(taslakAnlamliMi, 1).catch(() => null);
 
@@ -1609,53 +1309,24 @@ export function SinavOlusturucuScreen() {
       .then(async (taslak) => {
         if (iptal) return;
         if (taslak && taslakAnlamliMi(taslak)) {
-          // Kütüphaneden SONRA "yarım kalan taslak" sorusu yalnız aktarım
-          // varken anlamlı: gelen soruların hangi sınava ekleneceği kararı
-          // kullanıcıya ait. Aktarım yoksa aktif sınav DOĞRUDAN yüklenir —
-          // tek slot devrinde her açılışta çıkan o modal artık gereksiz ve
-          // kafa karıştırıcıydı ("yarım kalan" değil, senin sınavın).
-          if (!aktifAktarimRef.current) {
-            taslakYukleVeGecmisiSifirla(taslak);
-            setAutosaveHazir(true);
-            setAutosaveDurum(
-              kitapOkuyucudanDonusRef.current
-                ? "Kitap kaynağından sınav taslağına dönüldü."
-                : `Sınav yüklendi.${dersKitabiDurumEki}`,
-            );
-            if (kitapOkuyucudanDonusRef.current) {
-              nav(location.pathname, { replace: true, state: null });
-            }
-          } else {
-            setKurtarilacakTaslak(taslak);
-            setAutosaveDurum(
-              dersKitabindanGelenSayisi
-                ? `Açık sınavınız var · ${dersKitabindanGelenSayisi} soru ${aktarimKaynakEtiketi}'ndan seçiminizden sonra eklenecek.`
-                : "Açık sınavınız var.",
-            );
-          }
+          taslakYukleVeGecmisiSifirla(taslak);
+          setAutosaveHazir(true);
+          setAutosaveDurum("Sınav yüklendi.");
         } else {
-          if (aktifAktarimRef.current) {
-            await aktifAktarimiUygula(taslak ?? taslakOlustur());
-          } else {
-            setAutosaveHazir(true);
-            setAutosaveDurum(`Otomatik kayıt hazır.${dersKitabiDurumEki}`);
-          }
+          setAutosaveHazir(true);
+          setAutosaveDurum("Otomatik kayıt hazır.");
         }
       })
-      .catch((err) => {
+      .catch(() => {
         if (!iptal) {
-          if (aktifAktarimRef.current) {
-            setAktarimHatasi(err instanceof Error ? err.message : "Aktarım taslağa eklenemedi.");
-          } else {
-            setAutosaveHazir(true);
-            setAutosaveDurum(`Otomatik kayıt başlatılamadı; bu oturumda çalışmaya devam edebilirsiniz.${dersKitabiDurumEki}`);
-          }
+          setAutosaveHazir(true);
+          setAutosaveDurum("Otomatik kayıt başlatılamadı; bu oturumda çalışmaya devam edebilirsiniz.");
         }
       });
     return () => {
       iptal = true;
     };
-  }, [aktarimBaslatmaHazir]);
+  }, []);
 
   // E5 (2026-09 denetimi): açılışta hiçbir şey değişmeden "Taslak
   // kaydedilecek..." görünüp 2 sn içinde çıkışta "kaydedilmemiş değişiklik"
@@ -1677,21 +1348,21 @@ export function SinavOlusturucuScreen() {
     };
   }, []);
   useEffect(() => {
-    if (!autosaveHazir || aktarimIsleniyor) return undefined;
+    if (!autosaveHazir) return undefined;
     if (autosaveTabanRef.current === null) autosaveTabanRef.current = belge;
     if (autosaveTabanRef.current === belge) return undefined;
     ilkIcerikVarRef.current = true; // E5: ilk değişiklik — kayıt artık açılabilir
-    setAutosaveDurum(`Taslak kaydedilecek...${dersKitabiDurumEki}`);
+    setAutosaveDurum(`Taslak kaydedilecek...`);
     const kaydet = () => {
       aktifSinaviKaydet(taslakOlustur())
         .then(() => {
-          setAutosaveDurum(`Taslak otomatik kaydedildi.${dersKitabiDurumEki}`);
+          setAutosaveDurum(`Taslak otomatik kaydedildi.`);
           // Başlık alanları değişmiş olabilir (ya da Sınavlarım'dan yeniden
           // adlandırılmış olabilir) — üst bardaki ad metadata ile eşitlenir.
           const aktifId = aktifSinavIdRef.current;
           if (aktifId) setAktifSinavAdi(sinavBul(aktifId)?.ad ?? "");
         })
-        .catch(() => setAutosaveDurum(`Taslak otomatik kaydedilemedi.${dersKitabiDurumEki}`));
+        .catch(() => setAutosaveDurum(`Taslak otomatik kaydedilemedi.`));
     };
     // Kısa debounce (eskiden 2 sn: düzenlemeden hemen sonra F5/kapanışta son
     // değişiklik kayboluyordu). Bekleyen kayıt, sayfa gizlenirken/kapanırken
@@ -1716,7 +1387,7 @@ export function SinavOlusturucuScreen() {
     // vardı: `kaynakSecimSayaci` taslağa yazılıyor ama bu diziye hiç
     // konmamıştı (etkisi dardı, çünkü sayacı artıran akış hemen her zaman
     // `sorular`'ı da değiştirip autosave'i o yoldan tetikliyordu).
-  }, [autosaveHazir, belge, dersKitabiDurumEki, aktarimIsleniyor]);
+  }, [autosaveHazir, belge]);
 
   // Farklı bir taslağı (kurtarma, dosyadan içe aktarma) toptan yüklerken bunu
   // bir "düzenleme" gibi geri-al geçmişine yazmayız — aksi halde az önce boş
@@ -1739,113 +1410,6 @@ export function SinavOlusturucuScreen() {
         ...sonunaEklenecekSorular,
       ]);
       setSeciliSoruId(sonunaEklenecekSorular[0]?.id ?? null);
-    }
-  }
-
-  async function taslagaDevamEt() {
-    if (!kurtarilacakTaslak || aktarimIsleniyor) return;
-    try {
-      if (aktifAktarimRef.current) {
-        await aktifAktarimiUygula(kurtarilacakTaslak);
-      } else {
-        taslakYukleVeGecmisiSifirla(kurtarilacakTaslak);
-        setAutosaveHazir(true);
-        setAutosaveDurum(`Yarım kalan taslak yüklendi.${dersKitabiDurumEki}`);
-      }
-      setKurtarilacakTaslak(null);
-    } catch {
-      // Modal ve route state korunur; ayrıntılı hata üst banner'da gösterilir.
-    }
-  }
-
-  // VERİ KAYBI DÜZELTMESİ. Önceden burada yalnız `crypto.randomUUID()` ile yeni
-  // bir id üretiliyordu — ama `aktifSinaviKaydet` taslağın KENDİ id'sini yok
-  // sayıp her zaman `aktifSinavIdRef.current`'a yazar. Sonuç: "Yeni taslak"
-  // demek, boş taslağı AÇIK SINAVIN üstüne yazmak demekti; İçerik
-  // Hazırlama'dan soru gönderip "yeni sınav" seçen öğretmen eski sınavını
-  // kaybediyordu. Tek slot devrinden kalma bir varsayımdı (o zaman üzerine
-  // yazmak doğruydu); kütüphane geldikten sonra yanlış hâle geldi.
-  //
-  // Artık kütüphanenin kendi kapısından geçiliyor: yeni bir KAYIT açılır ve
-  // aktif işaretçi ona taşınır, eskisi kütüphanede olduğu gibi kalır.
-  async function yeniTaslaklaBasla() {
-    if (aktarimIsleniyor) return;
-    try {
-      // Sınır dolu olabilir; bu satır atarsa aktif sınav hiç değişmemiş olur
-      // (yeniSinavOlusturVeAktifYap yarım kayıt bırakmaz).
-      const kayit = await yeniSinavOlusturVeAktifYap();
-      aktifSinavIdRef.current = kayit.id;
-      sinavTaslakIdRef.current = kayit.id;
-      setAktifSinavAdi(kayit.ad);
-      // Başlık/sayfa düzeni korunur, yalnız sorular boşalır: öğretmen aynı
-      // ders ve sınıf için ikinci bir yazılı hazırlıyor olabilir.
-      const yeniTaslak = { ...taslakOlustur(), id: kayit.id, sorular: [] };
-      if (aktifAktarimRef.current) {
-        await aktifAktarimiUygula(yeniTaslak);
-      } else {
-        await aktifSinaviKaydet(yeniTaslak);
-        taslakYukleVeGecmisiSifirla(yeniTaslak);
-        setAutosaveHazir(true);
-        setAutosaveDurum("Yeni sınav başlatıldı; önceki sınav Sınavlarım'da duruyor.");
-      }
-      setKurtarilacakTaslak(null);
-    } catch (err) {
-      setAktarimHatasi(err instanceof Error ? err.message : "Yeni taslak başlatılamadı.");
-    }
-  }
-
-  /** Havuz seçicisi zarfı hazırladı: ekran DEĞİŞMEDEN uygula. Yol
-   *  `bekleyenAktarimiDevamEttir` ile aynı; router state'e hiç uğramıyoruz
-   *  çünkü zaten bu ekrandayız. */
-  async function havuzSeciminiUygula(transferId: string) {
-    setHavuzSeciciAcik(false);
-    setAktarimHatasi("");
-    try {
-      const zarf = await sinavAktarimOku(transferId);
-      if (!zarf?.payload) throw new Error("Aktarım zarfı bulunamadı veya süresi doldu.");
-      const secilen = { transferId: zarf.transferId, payload: zarf.payload, source: zarf.source };
-      aktifAktarimRef.current = secilen;
-      setAktifAktarim(secilen);
-      await aktifAktarimiUygula(taslakOlustur(), secilen);
-    } catch (err) {
-      setAktarimHatasi(err instanceof Error ? err.message : "Seçilen sorular eklenemedi.");
-    }
-  }
-
-  async function bekleyenAktarimiDevamEttir(zarf: SinavAktarimZarfi) {
-    if (!zarf.payload || aktarimIsleniyor || kurtarilacakTaslak) return;
-    const secilen = { transferId: zarf.transferId, payload: zarf.payload, source: zarf.source };
-    aktifAktarimRef.current = secilen;
-    setAktifAktarim(secilen);
-    try {
-      await aktifAktarimiUygula(taslakOlustur(), secilen);
-    } catch {
-      // Zarf pending kalır; hata banner'ındaki yeniden deneme kullanılabilir.
-    }
-  }
-
-  async function bekleyenAktarimiIptalEt(transferId: string) {
-    if (aktarimIsleniyor) return;
-    setAktarimHatasi("");
-    try {
-      await sinavAktarimDiscard(transferId);
-      if (aktifAktarimRef.current?.transferId === transferId) {
-        aktifAktarimRef.current = null;
-        setAktifAktarim(null);
-        nav(location.pathname, { replace: true, state: null });
-      }
-      await bekleyenAktarimlariYenile();
-    } catch (err) {
-      setAktarimHatasi(err instanceof Error ? err.message : "Bekleyen aktarım iptal edilemedi.");
-    }
-  }
-
-  async function aktifAktarimiYenidenDene() {
-    if (!aktifAktarimRef.current || aktarimIsleniyor || kurtarilacakTaslak) return;
-    try {
-      await aktifAktarimiUygula(taslakOlustur());
-    } catch {
-      // Ayrıntılı hata aktifAktarimiUygula tarafından korunur.
     }
   }
 
@@ -1986,8 +1550,19 @@ export function SinavOlusturucuScreen() {
   /** Yazdırmadan önceki yerleşim/puan uyarıları. Sınav ve "sınav + anahtar"
    *  yolları AYNI uyarıları göstermeli: anahtar eklemek sayfa sayısını
    *  artırabildiği için taşma riski orada daha da yüksek. */
-  function yazdirmaUyarilariniTopla(): string[] {
+  function yazdirmaUyarilariniTopla(hedef: "sinav" | "sinavVeAnahtar" | "anahtar"): string[] {
     const uyarilar: string[] = [];
+    // Cevap anahtarı basılacaksa (test kipi) işaretsiz sorular "—" çıkar;
+    // öğretmen bunu kâğıt elindeyken değil, yazdırmadan ÖNCE görmeli.
+    if (testModu && hedef !== "sinav" && isaretsizCevapSiralari.length > 0) {
+      const ornek = isaretsizCevapSiralari.slice(0, 10).join(", ");
+      const devam = isaretsizCevapSiralari.length > 10 ? "…" : "";
+      uyarilar.push(
+        `${isaretsizCevapSiralari.length} sorunun doğru şıkkı işaretlenmemiş (${ornek}${devam}); cevap anahtarında “${ISARETSIZ_CEVAP}” olarak basılacak.`,
+      );
+    }
+    // Yalnız anahtar basılıyorsa kâğıt yerleşimi/puan uyarıları anlamsız.
+    if (hedef === "anahtar") return uyarilar;
     // Sayfa aşımı uyarısı BEP görünümünde de kontrol edilir: BEP puntoyu
     // büyüttüğü ve tam genişliğe zorladığı için sayfaya sığmama riski BEP'te
     // de gerçek — diğer uyarılar (puan, metin darlığı) BEP'e özgü olmadığından
@@ -2003,7 +1578,17 @@ export function SinavOlusturucuScreen() {
         );
       });
     }
-    if (!bepAktif) {
+    if (bepAktif) {
+      // BEP kâğıdı da öğrenciye 100 tam puan üzerinden verilir. Eskiden BEP
+      // görünümünde puan denetimi tümüyle atlanıyordu; 10 sorudan 5'i seçilince
+      // kâğıt sessizce "50 puan" basılıyordu.
+      if (toplamPuan === 0 && gorunenSorular.length > 0)
+        uyarilar.push("BEP sorularına puan girilmemiş (Puan: 0/100); kâğıtta soru puanları görünmeyecek.");
+      else if (toplamPuan !== 100)
+        uyarilar.push(
+          `BEP kâğıdının toplam puanı 100 değil (${toplamPuan}). Çıktı bölümündeki “BEP puanlarını 100'e eşit dağıt” yalnız BEP sorularını puanlar, normal sınav puanları değişmez.`,
+        );
+    } else {
       if (metinDarUyarisiVar)
         uyarilar.push(
           `${metinDarSorular.length} soruda görselin yanındaki metin için yer kalmamış.`,
@@ -2021,9 +1606,13 @@ export function SinavOlusturucuScreen() {
   /** Uyarı onayı geçildikten SONRA çalışan asıl yazdırma. İki yol (sınav /
    *  sınav+anahtar) tek gövdeden geçsin diye ayrıldı: eskiden onay kontrolü
    *  iki yerde kopyalanıyordu ve birine eklenen adım ötekinde unutulabiliyordu. */
-  function yazdirmayiCalistir(hedef: "sinav" | "sinavVeAnahtar") {
+  function yazdirmayiCalistir(hedef: "sinav" | "sinavVeAnahtar" | "anahtar") {
     bSeedYazdirmaIsaretle();
     setYazdirmaHedefi(hedef);
+    if (hedef === "anahtar") {
+      void yazdirmaBaslat("Cevap anahtarı");
+      return;
+    }
     setOnizlemeModu("cikti");
     void yazdirmaBaslat();
   }
@@ -2045,8 +1634,8 @@ export function SinavOlusturucuScreen() {
    * yorumu: diyalog açılmadan ONAYLANMIŞ gibi davranıyor. İki platformda iki
    * farklı yanlış cevap, bu yüzden yasak platforma bağlı değil.)
    */
-  function yazdirmayiIste(hedef: "sinav" | "sinavVeAnahtar") {
-    const uyarilar = yazdirmaUyarilariniTopla();
+  function yazdirmayiIste(hedef: "sinav" | "sinavVeAnahtar" | "anahtar") {
+    const uyarilar = yazdirmaUyarilariniTopla(hedef);
     if (uyarilar.length === 0) {
       yazdirmayiCalistir(hedef);
       return;
@@ -2059,9 +1648,7 @@ export function SinavOlusturucuScreen() {
   }
 
   function cevapAnahtariYazdir() {
-    bSeedYazdirmaIsaretle();
-    setYazdirmaHedefi("anahtar");
-    void yazdirmaBaslat("Cevap anahtarı");
+    yazdirmayiIste("anahtar");
   }
 
   /** Sınav + testin sonunda cevap anahtarı, TEK yazdırmada. Sınav yazdırma
@@ -2075,6 +1662,12 @@ export function SinavOlusturucuScreen() {
     const butunGrupIdleri = mantiksalSoruGruplari(sorular)
       .filter((grup) => grup.some((soru) => secili.has(soru.id)))
       .flatMap((grup) => grup.map((soru) => soru.id));
+    // Seçim değiştiyse eski BEP puan dağıtımı artık 100 tutmaz: temizlenir
+    // (yalnız punto değiştiyse öğretmenin dağıtımı korunur).
+    const oncekiSecim = new Set(bepSeciliIds);
+    const secimDegisti =
+      oncekiSecim.size !== butunGrupIdleri.length || butunGrupIdleri.some((id) => !oncekiSecim.has(id));
+    if (secimDegisti) setSorular((mevcut) => bepPuanlariniTemizle(mevcut));
     ayarAyarla("bepSeciliIds", butunGrupIdleri);
     ayarAyarla("bepPuntoArtis", puntoArtis);
     ayarAyarla("bepAktif", butunGrupIdleri.length > 0);
@@ -2860,6 +2453,13 @@ export function SinavOlusturucuScreen() {
   }, []);
 
   function puanlariEsitDagit() {
+    // BEP görünümünde 100 puan YALNIZ BEP sorularına (`bepPuan`) dağıtılır;
+    // normal sınavın puanları bozulmaz. Eskiden tüm sorulara dağıtılıyor ve
+    // BEP kâğıdı ör. 10 sorudan 5'i seçiliyken 50 puanda kalıyordu.
+    if (bepAktif) {
+      setSorular((mevcut) => bepPuanlariniEsitDagit(mevcut, bepSeciliIds));
+      return;
+    }
     setSorular((mevcut) => puanlariMantiksalEsitDagit(mevcut));
   }
 
@@ -2903,10 +2503,6 @@ export function SinavOlusturucuScreen() {
   const seciliSoruKagitSirasi = seciliSoru
     ? gorunenSoruSiraHaritasi.get(seciliSoru.id) ?? null
     : null;
-  const kurtarilabilirAktarimlar = bekleyenAktarimlar.filter(
-    (zarf) => zarf.transferId !== aktifAktarim?.transferId,
-  );
-
   /** "Soru ekle" menüsü — geniş ve kompakt şerit AYNI listeyi kullanır.
    *  Bileşen değil fonksiyon: ekran içinde tanımlı bir bileşen her render'da
    *  yeniden bağlanır ve menüdeki odak her otomatik kayıt tikinde kaybolurdu. */
@@ -2914,7 +2510,6 @@ export function SinavOlusturucuScreen() {
     return (
       <div ref={ustMenuRef} role="menu" aria-label="Soru ekleme seçenekleri" style={menuKonumStili} className={`${menuKonumSinifi} absolute right-0 z-40 w-52 space-y-1 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white p-2 shadow-xl`}>
         {[
-          { etiket: "Soru Havuzundan", Ikon: FolderOpen, eylem: () => setHavuzSeciciAcik(true) },
           { etiket: "Görsel yükle", Ikon: FileImage, eylem: () => fileInputRef.current?.click() },
           { etiket: "Metin soru", Ikon: Type, eylem: () => setMetinModalAcik(true) },
           ...(GORSELDEN_METNE_AKTIF ? [{ etiket: "Görselden metne", Ikon: ScanText, eylem: () => setOcrModalAcik(true) }] : []),
@@ -3012,8 +2607,8 @@ export function SinavOlusturucuScreen() {
                 {testModu ? (
                   <>
                     <button type="button" role="menuitem" tabIndex={-1} className={menuOgesi} disabled={yazdirilamaz} onClick={() => { setUstMenu(null); pdfYazdir(); }}><Printer size={14} /> Yazdır: yalnız sınav</button>
-                    <button type="button" role="menuitem" tabIndex={-1} className={menuOgesi} disabled={yazdirilamaz || cevapAnahtari.length === 0} onClick={() => { setUstMenu(null); sinavVeAnahtarYazdir(); }}><FileDown size={14} /> Yazdır: sınav + anahtar</button>
-                    <button type="button" role="menuitem" tabIndex={-1} className={menuOgesi} disabled={yazdirilamaz || cevapAnahtari.length === 0} onClick={() => { setUstMenu(null); cevapAnahtariYazdir(); }}><FileDown size={14} /> Yazdır: yalnız cevap anahtarı</button>
+                    <button type="button" role="menuitem" tabIndex={-1} className={menuOgesi} disabled={yazdirilamaz || isaretliCevapSayisi === 0} onClick={() => { setUstMenu(null); sinavVeAnahtarYazdir(); }}><FileDown size={14} /> Yazdır: sınav + anahtar</button>
+                    <button type="button" role="menuitem" tabIndex={-1} className={menuOgesi} disabled={yazdirilamaz || isaretliCevapSayisi === 0} onClick={() => { setUstMenu(null); cevapAnahtariYazdir(); }}><FileDown size={14} /> Yazdır: yalnız cevap anahtarı</button>
                   </>
                 ) : (
                   <button type="button" role="menuitem" tabIndex={-1} className={menuOgesi} disabled={yazdirilamaz} onClick={() => { setUstMenu(null); pdfYazdir(); }}><Printer size={14} /> {yazdiriliyor ? "Hazırlanıyor…" : "Yazdır / PDF olarak kaydet"}</button>
@@ -3100,14 +2695,6 @@ export function SinavOlusturucuScreen() {
           >
             <FolderOpen size={15} /> Sınavlarım
           </button>
-          {ayrilanSayisi > 0 && (
-            // OA77: kitapta "Sınavda sor" denen ama henüz sınava alınmamış notlar.
-            <button type="button" onClick={() => { sinavlarimaGit(); window.setTimeout(() => document.getElementById("ayrilanlar")?.scrollIntoView({ behavior: "smooth" }), 400); }}
-              title="Kitap okurken “Sınavda sor” dediğin notlar"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100">
-              <BookOpen size={15} /> Ayırdıkların ({ayrilanSayisi})
-            </button>
-          )}
           <button
             type="button"
             onClick={() => void yeniSinavaBasla()}
@@ -3203,16 +2790,16 @@ export function SinavOlusturucuScreen() {
                   <button type="button" role="menuitem" tabIndex={-1} onClick={() => { setUstMenu(null); pdfYazdir(); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-600 hover:bg-slate-50">
                     <Printer size={14} /> Yalnız sınav (cevapsız)
                   </button>
-                  <button type="button" role="menuitem" tabIndex={-1} onClick={() => { setUstMenu(null); sinavVeAnahtarYazdir(); }} disabled={cevapAnahtari.length === 0} title={cevapAnahtari.length === 0 ? "Önce sorularda doğru şıkkı işaretleyin" : undefined} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40">
+                  <button type="button" role="menuitem" tabIndex={-1} onClick={() => { setUstMenu(null); sinavVeAnahtarYazdir(); }} disabled={isaretliCevapSayisi === 0} title={isaretliCevapSayisi === 0 ? "Önce sorularda doğru şıkkı işaretleyin" : undefined} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40">
                     <FileDown size={14} /> Sınav + anahtar (testin sonunda)
                   </button>
-                  <button type="button" role="menuitem" tabIndex={-1} onClick={() => { setUstMenu(null); cevapAnahtariYazdir(); }} disabled={cevapAnahtari.length === 0} title={cevapAnahtari.length === 0 ? "Önce sorularda doğru şıkkı işaretleyin" : undefined} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40">
+                  <button type="button" role="menuitem" tabIndex={-1} onClick={() => { setUstMenu(null); cevapAnahtariYazdir(); }} disabled={isaretliCevapSayisi === 0} title={isaretliCevapSayisi === 0 ? "Önce sorularda doğru şıkkı işaretleyin" : undefined} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40">
                     <FileDown size={14} /> Yalnız cevap anahtarı (ayrı sayfa)
                   </button>
                   <p className="px-3 pb-1 pt-1 text-[10px] leading-relaxed text-slate-400">
-                    {cevapAnahtari.length === 0
+                    {isaretliCevapSayisi === 0
                       ? "Hiçbir soruda doğru şık işaretli değil."
-                      : `${cevapAnahtari.length}/${mantiksalSoruSayisi} soruda doğru şık işaretli.`}
+                      : `${isaretliCevapSayisi}/${mantiksalSoruSayisi} soruda doğru şık işaretli.`}
                   </p>
                 </div>
               )}
@@ -3308,85 +2895,6 @@ export function SinavOlusturucuScreen() {
             className="rounded-lg bg-white px-3 py-1.5 font-bold ring-1 ring-rose-200 transition hover:bg-rose-100"
           >
             Tamam
-          </button>
-        </div>
-      )}
-
-      {aktarimHatasi && (
-        <div role="alert" className="mt-3 flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-900">
-          <AlertTriangle size={16} className="shrink-0" />
-          <span className="min-w-0 flex-1 font-semibold">{aktarimHatasi}</span>
-          {aktifAktarim && !kurtarilacakTaslak && (
-            <button type="button" disabled={aktarimIsleniyor} onClick={() => void aktifAktarimiYenidenDene()} className="rounded-lg bg-white px-3 py-1.5 font-bold ring-1 ring-rose-200 disabled:opacity-40">
-              Yeniden dene
-            </button>
-          )}
-          {aktifAktarim?.transferId && (
-            <button type="button" disabled={aktarimIsleniyor} onClick={() => void bekleyenAktarimiIptalEt(aktifAktarim.transferId!)} className="rounded-lg px-3 py-1.5 font-bold text-rose-700 disabled:opacity-40">
-              Aktarımı iptal et
-            </button>
-          )}
-        </div>
-      )}
-
-      {kurtarilabilirAktarimlar.length > 0 && (
-        <section aria-labelledby="bekleyen-aktarimlar-baslik" className="mt-3 shrink-0 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-950">
-          <h2 id="bekleyen-aktarimlar-baslik" className="font-bold">
-            Bekleyen {kurtarilabilirAktarimlar.length} aktarım var
-          </h2>
-          <p className="mt-1 text-amber-800">Aktarımlar otomatik birleştirilmez; devam ettirmek veya iptal etmek istediğinizi seçin.</p>
-          {kurtarilacakTaslak && <p className="mt-1 font-semibold text-amber-900">Önce yarım kalan taslak için “Devam et” veya “Yeni taslak” seçimini tamamlayın.</p>}
-          <ul className="mt-2 space-y-2">
-            {kurtarilabilirAktarimlar.map((zarf) => (
-              <li key={zarf.transferId} className="flex flex-wrap items-center gap-2 rounded-lg bg-white/80 px-3 py-2 ring-1 ring-amber-200">
-                <span className="min-w-0 flex-1 font-semibold">
-                  {zarf.payload?.iceAktarilacakGorseller.length ?? 0} soru · {zarf.source === "soru-havuzu" ? "Soru Havuzu" : "Ders Kitabı"} · {new Date(zarf.olusturma).toLocaleString("tr-TR")}
-                </span>
-                <button type="button" disabled={aktarimIsleniyor || !!kurtarilacakTaslak} onClick={() => void bekleyenAktarimiDevamEttir(zarf)} className="rounded-lg bg-amber-700 px-3 py-1.5 font-bold text-white disabled:opacity-40">Devam ettir</button>
-                <button type="button" disabled={aktarimIsleniyor} onClick={() => void bekleyenAktarimiIptalEt(zarf.transferId)} className="rounded-lg px-3 py-1.5 font-bold text-rose-700 disabled:opacity-40">İptal et</button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {(dersKitabindanGelenSayisi > 0 || gonderilemeyenler.length > 0 || atlananTekrarSayisi > 0) && kapatilanAktarimOzeti !== `${dersKitabindanGelenSayisi}:${gonderilemeyenSayisi}:${atlananTekrarSayisi}` && (
-        <div role="status" className={`relative shrink-0 rounded-xl border border-sky-200 bg-sky-50 text-xs text-sky-900 ${telefonDuzeni ? "mt-2 py-1.5 pl-3 pr-12" : "mt-3 px-4 py-3 pr-12"}`}>
-          <button type="button" aria-label="Aktarım özetini kapat" onClick={() => setKapatilanAktarimOzeti(`${dersKitabindanGelenSayisi}:${gonderilemeyenSayisi}:${atlananTekrarSayisi}`)}
-            className="absolute right-1 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-lg p-1.5 text-sky-700 hover:bg-sky-100">
-            <X size={14} />
-          </button>
-          <p className="font-bold">
-            {aktarimKaynakEtiketi} aktarımı: {Math.max(0, dersKitabindanGelenSayisi - atlananTekrarSayisi)} eklendi
-            {atlananTekrarSayisi > 0 ? ` · ${atlananTekrarSayisi} tekrar atlandı` : ""}
-            {gonderilemeyenSayisi > 0 ? ` · ${gonderilemeyenSayisi} gönderilemedi` : ""}
-          </p>
-          {gonderilemeyenler.length > 0 && (
-            <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sky-800">
-              {gonderilemeyenler.slice(0, 5).map((hata) => (
-                <li key={hata.kirpmaId}>{hata.kaynakAd}: {hata.neden}</li>
-              ))}
-              {gonderilemeyenler.length > 5 && <li>+{gonderilemeyenler.length - 5} başarısız soru daha</li>}
-            </ul>
-          )}
-        </div>
-      )}
-
-      {havuzdanGelebilecekCevaplar.length > 0 && (
-        <div
-          role="status"
-          className="mt-3 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-900"
-        >
-          <p className="font-bold">
-            Soru Havuzu'nda {havuzdanGelebilecekCevaplar.length} sorunun doğru
-            şıkkı işaretli, bu sınavda boş. Cevap anahtarına girmiyorlar.
-          </p>
-          <button
-            type="button"
-            onClick={havuzdakiCevaplariGetir}
-            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-emerald-700"
-          >
-            Havuzdaki cevapları getir
           </button>
         </div>
       )}
@@ -3491,7 +2999,6 @@ export function SinavOlusturucuScreen() {
               ciftSutun={ciftSutun}
               soruIcerikGenisligi={soruIcerikGenisligi}
               duzenlemePaneliGoster={false}
-              onKitaptaGoster={soruKaynaginiAc}
             />
             )}
           </section>
@@ -3567,19 +3074,19 @@ export function SinavOlusturucuScreen() {
                     const ilkEksik = gorunenSorular.find((soru) => !soru.dogruSik);
                     if (ilkEksik) setSeciliSoruId(ilkEksik.id);
                   }}
-                  disabled={cevapAnahtari.length === mantiksalSoruSayisi}
+                  disabled={isaretliCevapSayisi === mantiksalSoruSayisi}
                   title={
-                    cevapAnahtari.length === mantiksalSoruSayisi
+                    isaretliCevapSayisi === mantiksalSoruSayisi
                       ? "Tüm soruların doğru şıkkı işaretli"
                       : "İşaretsiz ilk soruya git"
                   }
                   className={`rounded-full px-2 py-0.5 font-semibold transition disabled:cursor-default ${
-                    cevapAnahtari.length === mantiksalSoruSayisi
+                    isaretliCevapSayisi === mantiksalSoruSayisi
                       ? "text-emerald-700"
                       : "text-amber-700 hover:bg-amber-50"
                   }`}
                 >
-                  Cevap anahtarı: {cevapAnahtari.length}/{mantiksalSoruSayisi}
+                  Cevap anahtarı: {isaretliCevapSayisi}/{mantiksalSoruSayisi}
                 </button>
               )}
               {/* Ölçek denetimi bilgi değil AYAR — §15.1'in ayrımı gereği
@@ -3642,10 +3149,9 @@ export function SinavOlusturucuScreen() {
               {/* Puan da bilgi — ama rengi anlam taşıyor (100 tam, üstü hata),
                   o yüzden hap değil, renkli metin. */}
               <span
+                title={bepAktif ? "BEP kâğıdının toplam puanı" : undefined}
                 className={
-                  bepAktif
-                    ? "text-slate-400"
-                    : toplamPuan === 100
+                  toplamPuan === 100
                       ? "text-emerald-700"
                       : toplamPuan > 100
                         ? "text-rose-700"
@@ -3971,6 +3477,7 @@ export function SinavOlusturucuScreen() {
                       }
                     }}
                     testModu={testModu}
+                    sikBicimi={sikBicimi}
                   />
                 ) : (
                   <p className="rounded-xl bg-slate-50 px-3 py-3 text-xs leading-relaxed text-slate-500">
@@ -4098,6 +3605,35 @@ export function SinavOlusturucuScreen() {
                       />
                     </label>
                   </div>
+                  {/* Tarih ve süre HER İKİ kipte de kâğıda basılıyor (SinavKagit
+                      antet satırı); bu yüzden giriş kutuları da iki kipte
+                      görünür. Eskiden tarih için hiç kutu yoktu, süre kutusu ise
+                      Test kipinde gizlenip yazılıda girilen değer test kâğıdına
+                      basılmaya devam ediyordu (öğretmen değiştiremiyordu). */}
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <label className="block">
+                      <AlanEtiket>Tarih (isteğe bağlı)</AlanEtiket>
+                      <input
+                        value={tarih ?? ""}
+                        onChange={(e) => baslikAyarla("tarih", e.target.value)}
+                        className={INPUT_CLASS}
+                        placeholder="GG.AA.YYYY"
+                        maxLength={50}
+                      />
+                    </label>
+                    <label className="block">
+                      <AlanEtiket>Süre dk (isteğe bağlı)</AlanEtiket>
+                      <input
+                        value={sureDakika ?? ""}
+                        onChange={(e) =>
+                          baslikAyarla("sureDakika", e.target.value.replace(/[^0-9]/g, ""))
+                        }
+                        className={INPUT_CLASS}
+                        placeholder="40"
+                        inputMode="numeric"
+                      />
+                    </label>
+                  </div>
               {testModu ? (
                 <div className="mt-2">
                 <label className="block">
@@ -4153,19 +3689,6 @@ export function SinavOlusturucuScreen() {
                           <option key={secim}>{secim}</option>
                         ))}
                       </select>
-                    </label>
-                  </div>
-                  <div className="mt-2">
-                    <label className="block">
-                      <AlanEtiket>Süre dk (isteğe bağlı)</AlanEtiket>
-                      <input
-                        value={sureDakika}
-                        onChange={(e) =>
-                          baslikAyarla("sureDakika", e.target.value.replace(/[^0-9]/g, ""))
-                        }
-                        className={INPUT_CLASS}
-                        placeholder="40"
-                      />
                     </label>
                   </div>
                   <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-500">
@@ -4279,7 +3802,7 @@ export function SinavOlusturucuScreen() {
                     aktif={(sikBicimi ?? (testModu ? "buyuk" : "kucuk")) === "buyuk"}
                     onClick={() => ayarAyarla("sikBicimi", "buyuk")}
                   >
-                    A) B) C) D) E)
+                    {testModu ? "A) B) C) D) E)" : "A) B) C) Ç) D)"}
                   </TogglePill>
                   <TogglePill
                     aktif={(sikBicimi ?? (testModu ? "buyuk" : "kucuk")) === "kucuk"}
@@ -4446,7 +3969,7 @@ export function SinavOlusturucuScreen() {
                 disabled={sorular.length === 0}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Puanları 100'e eşit dağıt
+                {bepAktif ? "BEP puanlarını 100'e eşit dağıt" : "Puanları 100'e eşit dağıt"}
               </button>
               {bepAktif && (
                 <p className="mb-2 rounded-lg bg-violet-50 px-2.5 py-2 text-[11px] font-semibold text-violet-700 ring-1 ring-violet-200">
@@ -4476,16 +3999,16 @@ export function SinavOlusturucuScreen() {
                 <button
                   type="button"
                   onClick={cevapAnahtariYazdir}
-                  disabled={cevapAnahtari.length === 0 || yazdiriliyor}
+                  disabled={isaretliCevapSayisi === 0 || yazdiriliyor}
                   title={
-                    cevapAnahtari.length === 0
+                    isaretliCevapSayisi === 0
                       ? "Önce sorularda doğru şıkkı işaretleyin"
                       : undefined
                   }
                   className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Cevap Anahtarı — Ayrı Sayfa
-                  {cevapAnahtari.length > 0 ? ` · ${cevapAnahtari.length}` : ""}
+                  {isaretliCevapSayisi > 0 ? ` · ${isaretliCevapSayisi}` : ""}
                 </button>
               )}
               {testModu && (
@@ -4494,18 +4017,18 @@ export function SinavOlusturucuScreen() {
                   onClick={sinavVeAnahtarYazdir}
                   disabled={
                     gorunenSorular.length === 0 ||
-                    cevapAnahtari.length === 0 ||
+                    isaretliCevapSayisi === 0 ||
                     yazdiriliyor
                   }
                   title={
-                    cevapAnahtari.length === 0
+                    isaretliCevapSayisi === 0
                       ? "Önce sorularda doğru şıkkı işaretleyin"
                       : undefined
                   }
                   className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Sınav + Anahtar (testin sonunda)
-                  {cevapAnahtari.length > 0 ? ` · ${cevapAnahtari.length}` : ""}
+                  {isaretliCevapSayisi > 0 ? ` · ${isaretliCevapSayisi}` : ""}
                 </button>
               )}
             </AcilirBolum>
@@ -4613,6 +4136,7 @@ export function SinavOlusturucuScreen() {
       {metinModalAcik && (
         <MetinSoruModal
           testModu={testModu}
+          sikBicimi={sikBicimi}
           varsayilanBosluk={varsayilanSoruBosluk}
           baslangicMetni={ocrBaslangicMetni}
           onClose={() => { setMetinModalAcik(false); setOcrBaslangicMetni(""); }}
@@ -4668,21 +4192,6 @@ export function SinavOlusturucuScreen() {
         <TemizleOnayModal
           onVazgec={() => setTemizleOnayAcik(false)}
           onOnayla={taslagiTemizle}
-        />
-      )}
-      {kurtarilacakTaslak && (
-        <TaslakKurtarmaModal
-          taslak={kurtarilacakTaslak}
-          dersKitabiSoruSayisi={dersKitabindanGelenSayisi}
-          onDevam={taslagaDevamEt}
-          onYeni={yeniTaslaklaBasla}
-          onDosyayaKaydet={() => setParolaIslemi({ kip: "kaydet", taslak: kurtarilacakTaslak })}
-        />
-      )}
-      {havuzSeciciAcik && (
-        <SoruSeciciModal
-          onKapat={() => setHavuzSeciciAcik(false)}
-          onSecildi={(transferId) => void havuzSeciminiUygula(transferId)}
         />
       )}
       {bekleyenIceAktarTaslak && (

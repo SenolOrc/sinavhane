@@ -14,10 +14,22 @@ import {
   yazdirmaKaynaklariniBekle,
 } from "../src/modules/sinav-olusturucu/dayaniklilik";
 import { gorselSoruYap } from "../src/modules/sinav-olusturucu/soruFabrikasi";
-import { maddeHarfi } from "../src/modules/sinav-olusturucu/utils";
 import {
-  eksikCevaplariUygula,
-  havuzdanEksikCevaplar,
+  bepPuaniniUygula,
+  bepPuanlariniEsitDagit,
+  bepPuanlariniTemizle,
+  cevapAnahtariOlustur,
+  deterministikKaristir,
+  ISARETSIZ_CEVAP,
+  maddeHarfi,
+  paketFarkindaKaristir,
+  puanlariMantiksalEsitDagit,
+  siklariKaristir,
+  bGrubuSiklariniKaristir,
+  soruPuani,
+  TEST_SIK_HARFLERI,
+} from "../src/modules/sinav-olusturucu/utils";
+import {
 } from "../src/modules/sinav-olusturucu/utils";
 import { parcaOzeti } from "../src/modules/sinav-olusturucu/denklemOzet";
 import { OPERATORLER, sembolGruplariniSuz } from "../src/modules/sinav-olusturucu/denklemSemboller";
@@ -253,7 +265,7 @@ function geriAlKapsamiSenaryolari() {
     "geçmiş efekti artık tek bağımlılık olarak `belge`'yi izlemiyor",
   );
   dogrula(
-    ekran.includes("[autosaveHazir, belge,"),
+    /\[autosaveHazir, belge[,\]]/.test(ekran),
     "autosave efekti artık tek bağımlılık olarak `belge`'yi izlemiyor",
   );
 
@@ -808,88 +820,6 @@ function soruAramasiTurkceSenaryolari() {
 }
 
 /**
- * Soru Havuzu → sınav doğru şık senkronu.
- *
- * KORUDUĞU ŞEY iki ayrı iddia:
- *  1) Havuzda sonradan işaretlenen şık sınava GELEBİLMELİ. `dogruSik` aktarım
- *     anında kopyalandığı için, cevapsız gönderilip sonra havuzda işaretlenen
- *     soru cevap anahtarına sessizce girmiyordu (öğretmenin bildirdiği kusur).
- *  2) Sınavda ELLE işaretlenmiş şıkkın üstüne YAZILMAMALI. Bu, §17'de senkron
- *     akışı için konmuş "elle girilenin üstüne sormadan yazılmaz" kuralının
- *     bu moduldeki karşılığı.
- *
- * TEST VERİSİ BİLEREK GENİŞ (§15.8: mutasyon veri darlığını da yakalar):
- * yalnız "boş + havuzda var" senaryosuyla test etseydik, ezme koruması hiç
- * sınanmamış olurdu — ikinci iddiayı düşüren bir mutasyon da geçerdi.
- */
-function havuzCevapSenkronuSenaryolari() {
-  const soru = (id: string, kirpmaId?: string, dogruSik?: string): SoruOgesi =>
-    ({
-      id, tur: "metin", metinHtml: id, metinKonumu: "alt", hizalama: "sol",
-      genislikMm: 190, boslukMm: 4, punto: 10, puan: null, maddeler: [],
-      maddeKolon: 1, tamGenislik: false,
-      ...(kirpmaId ? { kirpmaId } : {}),
-      ...(dogruSik ? { dogruSik } : {}),
-    }) as SoruOgesi;
-
-  const sorular = [
-    soru("bos-havuzda-var", "k1"),          // → gelmeli
-    soru("elle-isaretli", "k2", "A"),       // → DOKUNULMAMALI (havuzda B var)
-    soru("havuz-bagi-yok", undefined),      // → aday değil
-    soru("bos-havuzda-yok", "k4"),          // → aday değil
-  ];
-  const metalar = {
-    k1: { dogruSik: "C" },
-    k2: { dogruSik: "B" },
-    k4: { rozetIdler: [] } as { dogruSik?: string },
-  };
-
-  const eksikler = havuzdanEksikCevaplar(sorular, metalar);
-  dogrula(
-    eksikler.length === 1 && eksikler[0].soruId === "bos-havuzda-var" && eksikler[0].sik === "C",
-    `havuzda işaretli tek boş şık bulunmalı, gelen: ${JSON.stringify(eksikler)}`,
-  );
-
-  const sonra = eksikCevaplariUygula(sorular, eksikler);
-  const bul = (id: string) => sonra.find((s) => s.id === id);
-  dogrula(bul("bos-havuzda-var")?.dogruSik === "C", "havuzdaki şık boş soruya yazılmadı");
-  dogrula(
-    bul("elle-isaretli")?.dogruSik === "A",
-    "ELLE işaretlenmiş şık havuzdaki değerle EZİLDİ — senkron elle girileni bozmamalı",
-  );
-  dogrula(!bul("havuz-bagi-yok")?.dogruSik, "havuz bağı olmayan soruya şık uyduruldu");
-  dogrula(!bul("bos-havuzda-yok")?.dogruSik, "havuzda şıkkı olmayan soruya şık uyduruldu");
-
-  // UYGULAMANIN KENDİ KORUMASI ayrıca sınanıyor. Yukarıdaki tur onu
-  // TETİKLEMİYOR: liste zaten süzülmüş geliyor, yani `eksikCevaplariUygula`
-  // içindeki `!soru.dogruSik` kontrolü hiç çalışmıyor. (Mutasyonla ölçüldü:
-  // korumayı kaldırmak süiti düşürmüyordu.) Burada liste ELLE kirletiliyor —
-  // gerçekte bu, listenin üretildiği render ile "Getir" tıklamasının
-  // uygulandığı an arasında sorunun işaretlenmesi durumudur.
-  const kirliListe = [
-    { soruId: "bos-havuzda-var", sik: "C" },
-    { soruId: "elle-isaretli", sik: "B" },
-  ];
-  const kirliSonra = eksikCevaplariUygula(sorular, kirliListe);
-  dogrula(
-    kirliSonra.find((s) => s.id === "elle-isaretli")?.dogruSik === "A",
-    "eksikCevaplariUygula ELLE işaretlenmiş şıkkı eziyor — listede yer alsa bile dolu şıkka dokunmamalı",
-  );
-  dogrula(
-    kirliSonra.find((s) => s.id === "bos-havuzda-var")?.dogruSik === "C",
-    "kirli listede boş olan yine de doldurulmalı",
-  );
-
-  // İkinci tur: uygulama idempotent olmalı, yeni aday kalmamalı.
-  dogrula(
-    havuzdanEksikCevaplar(sonra, metalar).length === 0,
-    "senkron sonrası hâlâ aday görünüyor — banner kaybolmaz",
-  );
-
-  console.log("✓ Havuz→sınav cevap senkronu: boş olan doldu, ELLE işaretlenmiş korundu");
-}
-
-/**
  * İç içe ifade alan yeni alanlar (integral sınırı, limit alt yazısı, kök
  * derecesi, toplam/çarpım yazıları) ve küçültme tabanı.
  *
@@ -1041,6 +971,237 @@ function sikHarfiSenaryolari() {
   console.log("✓ Test şık harfleri cevap anahtarıyla aynı alfabede; yazılı alt maddeleri Türkçe");
 }
 
+/**
+ * Yazılı kipinde BÜYÜK harf de Türk alfabesidir (A B C Ç D …) ve sol panel
+ * kâğıtla AYNI harfi gösterir. Eskiden büyük harf İngilizce alfabeydi ve
+ * panel `sikBicimi`'ni almıyordu: panelde "ç)" görünürken kâğıda "D)" basılıyordu.
+ */
+function maddeHarfiBuyukTurkceSenaryolari() {
+  const yaziliBuyuk = [0, 1, 2, 3, 4].map((i) => maddeHarfi(i, false, "buyuk")).join("");
+  dogrula(yaziliBuyuk === "ABCÇD", `yazılı büyük harf Türk alfabesi olmalı, gelen: ${yaziliBuyuk}`);
+  const yaziliKucuk = [0, 1, 2, 3, 4].map((i) => maddeHarfi(i, false, "kucuk")).join("");
+  dogrula(yaziliKucuk === "abcçd", `yazılı küçük harf değişmemeli, gelen: ${yaziliKucuk}`);
+  // Büyük ve küçük aynı SIRADA: her index'te büyüğü küçüğün tr-TR büyüğü.
+  for (let i = 0; i < 29; i += 1) {
+    dogrula(
+      maddeHarfi(i, false, "buyuk") === maddeHarfi(i, false, "kucuk").toLocaleUpperCase("tr-TR"),
+      `yazılı ${i + 1}. maddede büyük/küçük harf ayrışıyor`,
+    );
+  }
+  dogrula(maddeHarfi(10, false, "buyuk") === "I" && maddeHarfi(11, false, "buyuk") === "İ", "ı/i büyük harfleri Türkçe (I/İ) olmalı");
+  // Test kipi DEĞİŞMEMELİ: A–E (anahtar) ve küçükte Latin a–e.
+  dogrula([0, 1, 2, 3, 4].map((i) => maddeHarfi(i, true, "buyuk")).join("") === "ABCDE", "test büyük harf A–E olmalı");
+  dogrula([0, 1, 2, 3, 4].map((i) => maddeHarfi(i, true, "kucuk")).join("") === "abcde", "test küçük harf a–e olmalı");
+
+  // Panel ve yeni-soru modalı kâğıdın sikBicimi'ni iletmeli (ayrışmanın kaynağı).
+  const panel = readFileSync(resolve("src/modules/sinav-olusturucu/components/SinavSoruPanel.tsx"), "utf8");
+  dogrula(/maddeHarfi\(index, testModu, sikBicimi\)/.test(panel), "MaddeSatiri maddeHarfi'ne sikBicimi iletmiyor");
+  dogrula(!/maddeHarfi\(index, testModu\)/.test(panel), "panelde sikBicimi'siz maddeHarfi çağrısı kaldı");
+  dogrula((panel.match(/sikBicimi=\{sikBicimi\}/g) ?? []).length >= 1, "InlineSoruDuzenlemePanel MaddeSatiri'ye sikBicimi geçmiyor");
+  const ekran = readFileSync(resolve("src/modules/sinav-olusturucu/SinavOlusturucuScreen.tsx"), "utf8");
+  dogrula((ekran.match(/sikBicimi=\{sikBicimi\}/g) ?? []).length >= 4, "ekran sikBicimi'ni panel/modal/kâğıda iletmiyor");
+  dogrula(ekran.includes('"A) B) C) Ç) D)"'), "yazılı kipte büyük harf düğme etiketi Türk alfabesini göstermiyor");
+  console.log("✓ Madde harfi: yazılıda büyük harf Türk alfabesi (ABCÇD), panel kâğıtla aynı sikBicimi'ni kullanıyor");
+}
+
+/**
+ * Test kipinde şıklar için "Cevap satırı" ve (boşsa) "Madde puanı" gösterilmez;
+ * başlık "Şıklar (A, B, C...)" olur. Yazılı kipi değişmez.
+ */
+async function testKipiMaddeAlanlariSenaryolari() {
+  const React = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { MaddeSatiri } = await import("../src/modules/sinav-olusturucu/components/SinavSoruPanel");
+  const ciz = (testModu: boolean, puan: number | null) =>
+    renderToStaticMarkup(
+      React.createElement(MaddeSatiri, {
+        madde: { id: "m1", metinHtml: "", puan, cevapSatir: 2 },
+        index: 3,
+        testModu,
+        sikBicimi: testModu ? undefined : "buyuk",
+        onChange: () => undefined,
+        onSil: () => undefined,
+      }),
+    );
+  const yazili = ciz(false, null);
+  dogrula(yazili.includes("Cevap satırı") && yazili.includes("Madde puanı"), "yazılı kipte cevap satırı/madde puanı kayboldu");
+  dogrula(yazili.includes("Ç)"), "yazılı büyük harfte 4. madde Ç) olmalı");
+  const test = ciz(true, null);
+  dogrula(!test.includes("Cevap satırı"), "test kipinde işlevsiz 'Cevap satırı' gösteriliyor");
+  dogrula(!test.includes("Madde puanı"), "test kipinde işlevsiz 'Madde puanı' gösteriliyor");
+  dogrula(test.includes("D)"), "test kipinde 4. şık D) olmalı");
+  // Yazılıdan kalma madde puanı Test kipinde de temizlenebilmeli (kâğıda basılıyor).
+  dogrula(ciz(true, 5).includes("Madde puanı"), "test kipinde dolu madde puanı temizlenemez hâle geldi");
+
+  const panel = readFileSync(resolve("src/modules/sinav-olusturucu/components/SinavSoruPanel.tsx"), "utf8");
+  dogrula(panel.includes('testModu ? "Şıklar (A, B, C...)" : "Maddeler (a, b, c...)"'), "satır içi panel başlığı test kipinde 'Şıklar' demiyor");
+  console.log("✓ Test kipinde cevap satırı / boş madde puanı gizli, başlık 'Şıklar'; yazılı kipi aynen");
+}
+
+function soruUret(id: string, ek: Partial<SoruOgesi> = {}): SoruOgesi {
+  return {
+    id, tur: "metin", metinHtml: `<p>${id}</p>`, metinKonumu: "alt", hizalama: "sol", genislikMm: 80,
+    boslukMm: 10, punto: 11, puan: null, maddeler: [], maddeKolon: 1, tamGenislik: false, ...ek,
+  } as SoruOgesi;
+}
+
+/**
+ * BEP görünümünde "Puanları 100'e eşit dağıt": yalnız BEP sorularına,
+ * `bepPuan` üzerinden. Normal sınavın puanları DEĞİŞMEZ; eski kayıtlar
+ * (bepPuan yok) normal puanla açılır.
+ */
+function bepPuanDagitimiSenaryolari() {
+  // 10 soru; 3 ve 4 aynı paket (tek mantıksal soru). Normal dağıtım: 10 × 10.
+  const ham = Array.from({ length: 11 }, (_, i) => soruUret(`s${i}`, i === 3 || i === 4 ? { paketId: "p1", paketSira: i - 3 } : {}));
+  const normal = puanlariMantiksalEsitDagit(ham);
+  const normalToplam = () => normal.reduce((t, s) => t + (soruPuani(s) ?? 0), 0);
+  dogrula(normalToplam() === 100, "ön koşul: normal dağıtım 100 olmalı");
+
+  // 5 mantıksal soru BEP'e seçili (paketin iki parçası dahil).
+  const bepSecili = ["s0", "s2", "s3", "s4", "s6", "s9"];
+  const sonra = bepPuanlariniEsitDagit(normal, bepSecili);
+  dogrula(sonra.every((s, i) => s.puan === normal[i].puan), "BEP dağıtımı normal sınav puanlarını değiştirdi");
+  dogrula(sonra.filter((s) => !bepSecili.includes(s.id)).every((s) => s.bepPuan === undefined), "BEP dışı soruya bepPuan yazıldı");
+  const secili = new Set(bepSecili);
+  const bepKagidi = sonra.filter((s) => secili.has(s.id)).map(bepPuaniniUygula);
+  const bepToplam = bepKagidi.reduce((t, s) => t + (soruPuani(s) ?? 0), 0);
+  dogrula(bepToplam === 100, `BEP kâğıdı 100 tutmuyor (${bepToplam}) — eski hata: 50'de kalıyordu`);
+  dogrula(sonra.find((s) => s.id === "s4")?.bepPuan === null, "paketin 2. parçası BEP'te ayrı puan almamalı");
+  dogrula(sonra.find((s) => s.id === "s3")?.bepPuan === 20, "paketin ilk parçası mantıksal sorunun BEP puanını taşımalı");
+  dogrula(normalToplam() === 100 && sonra.reduce((t, s) => t + (soruPuani(s) ?? 0), 0) === 100, "normal sınav toplamı bozuldu");
+
+  // 3 mantıksal soru: 34 + 33 + 33 (artan ilk sorulara).
+  const ucluk = bepPuanlariniEsitDagit(normal, ["s1", "s5", "s7"]);
+  dogrula(["s1", "s5", "s7"].map((id) => ucluk.find((s) => s.id === id)?.bepPuan).join(",") === "34,33,33", "kalan puan dağıtımı yanlış");
+
+  // Madde puanlı soru: BEP kâğıdında madde puanları BEP toplamına karışmamalı.
+  const maddeli = soruUret("mp", { maddeler: [{ id: "a", metinHtml: "", puan: 7, cevapSatir: 1 }, { id: "b", metinHtml: "", puan: 8, cevapSatir: 1 }] });
+  const maddeliBep = bepPuaniniUygula(bepPuanlariniEsitDagit([maddeli], ["mp"])[0]);
+  dogrula(soruPuani(maddeliBep) === 100, "madde puanlı soruda BEP puanı uygulanmadı");
+  dogrula(maddeli.maddeler[0].puan === 7, "BEP görünümü kaynak sorunun madde puanını değiştirdi");
+
+  // Eski kayıt: bepPuan alanı hiç yok → soru AYNEN (normal puan) kullanılır.
+  const eski = soruUret("eski", { puan: 15 });
+  dogrula(bepPuaniniUygula(eski) === eski && soruPuani(bepPuaniniUygula(eski)) === 15, "bepPuan'sız eski soru normal puanla açılmıyor");
+  // Hiç BEP sorusu seçili değilse dağıtım no-op.
+  dogrula(bepPuanlariniEsitDagit(normal, []) === normal, "boş BEP seçiminde dağıtım listeyi değiştirdi");
+  // Seçim değişince temizleme: alanlar kalkar, normal puan durur.
+  const temiz = bepPuanlariniTemizle(sonra);
+  dogrula(temiz.every((s) => !("bepPuan" in s)) && temiz.every((s, i) => s.puan === normal[i].puan), "BEP puanları temizlenemedi");
+  dogrula(bepPuanlariniTemizle(normal) === normal, "temizlenecek bir şey yokken liste yeniden üretildi");
+
+  // Ekran: BEP'te dağıtım yalnız BEP sorularına; yazdırmada BEP toplamı denetleniyor.
+  const ekran = readFileSync(resolve("src/modules/sinav-olusturucu/SinavOlusturucuScreen.tsx"), "utf8");
+  const dagit = ekran.slice(ekran.indexOf("function puanlariEsitDagit()"), ekran.indexOf("function taslagiTemizle()"));
+  dogrula(/if \(bepAktif\)[\s\S]*bepPuanlariniEsitDagit\(mevcut, bepSeciliIds\)/.test(dagit), "BEP görünümünde eşit dağıt BEP'e özel yola gitmiyor");
+  const uyari = ekran.slice(ekran.indexOf("function yazdirmaUyarilariniTopla("), ekran.indexOf("function yazdirmayiCalistir("));
+  dogrula(/if \(bepAktif\) \{[\s\S]*toplamPuan !== 100/.test(uyari), "BEP yazdırmasında 100 puan denetimi yok");
+  dogrula(/\.map\(bepPuaniniUygula\)/.test(ekran), "BEP görünümü bepPuan'ı kâğıda uygulamıyor");
+  console.log("✓ BEP puanı: 100 yalnız BEP sorularına dağıtılıyor, normal puanlar korunuyor, eski kayıtlar açılıyor");
+}
+
+/**
+ * B grubu (Test kipi) şık karıştırması: deterministik tohum (seed + soru.id),
+ * doğru şık eşlemesi, karıştırılmaması gereken durumlar ve A grubunun
+ * bozulmaması. Cevap anahtarında işaretsiz soru "—".
+ */
+function bGrubuSikKaristirmaSenaryolari() {
+  const sikli = (id: string, dogruSik?: string, adet = 5) =>
+    soruUret(id, {
+      maddeler: Array.from({ length: adet }, (_, i) => ({ id: `${id}-m${i}`, metinHtml: `<p>${id} şık ${i}</p>`, puan: null, cevapSatir: 0 })),
+      dogruSik,
+    });
+  const sorular = Array.from({ length: 30 }, (_, i) => sikli(`q${i}`, TEST_SIK_HARFLERI[i % 5]));
+  const seed = 1_731_000_000_123; // Date.now() ölçeğinde bSeed
+
+  // 1) Doğru şık eşlemesi: yeni harfteki şık, asıl doğru şıkla AYNI madde.
+  for (const soru of sorular) {
+    const k = siklariKaristir(soru, seed);
+    const eskiDogru = soru.maddeler[TEST_SIK_HARFLERI.indexOf(soru.dogruSik!)];
+    const yeniDogru = k.maddeler[TEST_SIK_HARFLERI.indexOf(k.dogruSik!)];
+    dogrula(yeniDogru.id === eskiDogru.id, `${soru.id}: B grubu anahtarı yanlış şıkkı gösteriyor`);
+    dogrula(
+      [...k.maddeler.map((m) => m.id)].sort().join() === [...soru.maddeler.map((m) => m.id)].sort().join(),
+      `${soru.id}: karıştırmada şık kayboldu/çoğaldı`,
+    );
+  }
+  // 2) Deterministik: aynı tohum aynı sıra; farklı tohum en az bir soruda farklı.
+  const a1 = bGrubuSiklariniKaristir(sorular, seed);
+  const a2 = bGrubuSiklariniKaristir(sorular, seed);
+  dogrula(JSON.stringify(a1) === JSON.stringify(a2), "aynı bSeed farklı şık sırası üretti (dağıtılan kâğıtla anahtar uyuşmaz)");
+  const b1 = bGrubuSiklariniKaristir(sorular, seed + 1);
+  dogrula(JSON.stringify(a1) !== JSON.stringify(b1), "bSeed değişince şık sırası değişmiyor");
+  // Soru başına tohum: tüm sorular aynı permütasyonla karışmamalı.
+  const permutasyonlar = new Set(a1.map((s) => s.maddeler.map((m) => m.id.split("-m")[1]).join("")));
+  dogrula(permutasyonlar.size > 3, "bütün sorular aynı şık permütasyonunu aldı (soru bazlı tohum yok)");
+  dogrula(a1.some((s, i) => s.dogruSik !== sorular[i].dogruSik), "hiçbir sorunun doğru şıkkı yer değiştirmedi");
+  // Kaynak sorular mutasyona uğramamalı (A grubu / normal kip aynı nesneleri kullanır).
+  dogrula(sorular[0].maddeler[0].id === "q0-m0" && sorular[0].dogruSik === "A", "karıştırma kaynak soruyu değiştirdi");
+
+  // 3) Karıştırılmayan durumlar.
+  const gorsel = soruUret("g", { tur: "gorsel", dogruSik: "C" }); // şıklar görselin içinde
+  dogrula(siklariKaristir(gorsel, seed) === gorsel, "şıksız (görsel) sorunun doğru şıkkı değiştirildi");
+  const uyumsuz = sikli("u", "E", 3); // 3 şık ama anahtar E
+  dogrula(siklariKaristir(uyumsuz, seed) === uyumsuz, "şık sayısı dışındaki anahtar karıştırmada bozuldu");
+  const cokSik = sikli("c", "B", 6);
+  dogrula(siklariKaristir(cokSik, seed) === cokSik, "A–E dışına taşan şık listesi karıştırıldı");
+  const tekSik = sikli("t", "A", 1);
+  dogrula(siklariKaristir(tekSik, seed) === tekSik, "tek şıklı soru karıştırıldı");
+  const isaretsiz = sikli("i", undefined, 4);
+  const isaretsizK = siklariKaristir(isaretsiz, seed);
+  dogrula(isaretsizK.dogruSik === undefined && isaretsizK.maddeler.length === 4, "işaretsiz soru karıştırmada anahtar kazandı");
+
+  // 4) Cevap anahtarı: tüm sorular; işaretsiz "—". B grubu anahtarı karışık sıraya göre.
+  const anahtarListe = [sikli("x1", "B"), sikli("x2"), sikli("x3", "D")];
+  const anahtar = cevapAnahtariOlustur(anahtarListe);
+  dogrula(anahtar.length === 3, "işaretsiz soru cevap anahtarından düştü");
+  dogrula(anahtar.map((s) => `${s.sira}${s.cevap}`).join(" ") === `1B 2${ISARETSIZ_CEVAP} 3D`, `anahtar yanlış: ${JSON.stringify(anahtar)}`);
+  dogrula(ISARETSIZ_CEVAP === "—", "işaretsiz cevap simgesi '—' olmalı");
+  const bListe = bGrubuSiklariniKaristir(paketFarkindaKaristir(sorular, seed), seed);
+  const bAnahtar = cevapAnahtariOlustur(bListe);
+  bAnahtar.forEach((satir, i) => {
+    const kagittaki = bListe[i];
+    const asil = sorular.find((s) => s.id === kagittaki.id)!;
+    const asilDogruId = asil.maddeler[TEST_SIK_HARFLERI.indexOf(asil.dogruSik!)].id;
+    dogrula(kagittaki.maddeler[TEST_SIK_HARFLERI.indexOf(satir.cevap)].id === asilDogruId, `B anahtarı ${satir.sira}. soruda kâğıtla uyuşmuyor`);
+  });
+
+  // 5) Ekran: şık karıştırma YALNIZ B grubu + Test kipinde; anahtar tüm soruları içeriyor.
+  const ekran = readFileSync(resolve("src/modules/sinav-olusturucu/SinavOlusturucuScreen.tsx"), "utf8");
+  const gorunen = ekran.slice(ekran.indexOf("const gorunenSorular = useMemo"), ekran.indexOf("const mantiksalSoruSayisi"));
+  dogrula(
+    /if \(bGrubuAktif && aktifGrup === "B"\) \{[\s\S]*if \(sinavTuru === "test"\) liste = bGrubuSiklariniKaristir\(liste, bSeed\);[\s\S]*\}/.test(gorunen),
+    "şık karıştırma B grubu + Test kipi koşuluna bağlı değil (A grubu/yazılı bozulabilir)",
+  );
+  dogrula(gorunen.includes("sinavTuru,"), "gorunenSorular memo'su sinavTuru değişimini izlemiyor");
+  dogrula(ekran.includes("cevapAnahtariOlustur(gorunenSorular)"), "cevap anahtarı görünen (karışık) sıradan üretilmiyor");
+  dogrula(!/\.filter\(\(x\) => Boolean\(x\.harf\)\)/.test(ekran), "işaretsiz sorular cevap anahtarından yine süzülüyor");
+  dogrula(/isaretsizCevapSiralari\.length > 0/.test(ekran), "işaretsiz soru için yazdırma uyarısı yok");
+  // Karıştırma fonksiyonunun kendisi değişmedi (A/B soru sırası eski tohumlarla aynı kalmalı).
+  dogrula(deterministikKaristir([1, 2, 3, 4, 5], 42).join("") === deterministikKaristir([1, 2, 3, 4, 5], 42).join(""), "deterministik karıştırma bozuldu");
+  console.log("✓ B grubu: şıklar soru bazlı tohumla karışıyor, anahtar yeni harfe eşleniyor; işaretsiz soru anahtarda '—'");
+}
+
+/**
+ * Başlık Bilgileri: "Tarih" kutusu var ve "Süre dk" kutusu Test kipinde de
+ * görünür (ikisi de kâğıda HER iki kipte basılıyor). Kutular yazılı/test
+ * dalının DIŞINDA, ortak bölümde olmalı.
+ */
+function baslikTarihSureSenaryolari() {
+  const ekran = readFileSync(resolve("src/modules/sinav-olusturucu/SinavOlusturucuScreen.tsx"), "utf8");
+  const bolum = ekran.slice(ekran.indexOf('baslik="Başlık Bilgileri"'), ekran.indexOf('baslik="Sınav Türü"'));
+  dogrula(bolum.length > 0, "Başlık Bilgileri bölümü bulunamadı — test hedefini kaybetti");
+  const dal = bolum.indexOf("{testModu ? (");
+  const tarihYeri = bolum.indexOf('baslikAyarla("tarih", e.target.value)');
+  const sureYeri = bolum.indexOf('baslikAyarla("sureDakika"');
+  dogrula(tarihYeri > 0, "Başlık Bilgileri'nde tarih giriş kutusu yok");
+  dogrula(bolum.includes('placeholder="GG.AA.YYYY"'), "tarih kutusunda GG.AA.YYYY ipucu yok");
+  dogrula(sureYeri > 0, "Başlık Bilgileri'nde süre giriş kutusu yok");
+  dogrula(tarihYeri < dal && sureYeri < dal, "tarih/süre kutusu yazılı/test dalının içinde — bir kipte gizleniyor");
+  dogrula((bolum.match(/baslikAyarla\("sureDakika"/g) ?? []).length === 1, "süre kutusu iki kez çiziliyor");
+  console.log("✓ Başlık Bilgileri: tarih ve süre kutuları iki kipte de görünür");
+}
+
 async function main() {
   let aktif = 0;
   let enYuksek = 0;
@@ -1102,9 +1263,13 @@ async function main() {
   parcaAramaSenaryolari();
   soruAramasiTurkceSenaryolari();
 
-  havuzCevapSenkronuSenaryolari();
   denklemIcIceAlanSenaryolari();
   sikHarfiSenaryolari();
+  maddeHarfiBuyukTurkceSenaryolari();
+  baslikTarihSureSenaryolari();
+  await testKipiMaddeAlanlariSenaryolari();
+  bepPuanDagitimiSenaryolari();
+  bGrubuSikKaristirmaSenaryolari();
 
   {
   const cz = (id: string, ek: Record<string, unknown> = {}) => ({

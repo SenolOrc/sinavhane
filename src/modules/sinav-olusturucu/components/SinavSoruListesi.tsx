@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { ArrowDown, ArrowUp, BookOpen, Copy, FileImage, GripVertical, Type } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, FileImage, GripVertical, Type } from "lucide-react";
 import { useDokunmatik } from "@/lib/dokunmatik";
 import type { SoruOgesi } from "../types";
 
@@ -30,7 +30,6 @@ export function SoruListesi({
   onSil,
   onSirala,
   onCogalt,
-  onKitaptaGoster,
   ciftSutun,
   soruIcerikGenisligi,
   duzenlemePaneliGoster = true,
@@ -45,7 +44,6 @@ export function SoruListesi({
   onSil: (id: string) => void;
   onSirala?: (kaynakId: string, hedefId: string) => void;
   onCogalt?: (id: string) => void;
-  onKitaptaGoster?: (soru: SoruOgesi) => void;
   ciftSutun: boolean;
   soruIcerikGenisligi: (soru: SoruOgesi) => number;
   duzenlemePaneliGoster?: boolean;
@@ -235,19 +233,6 @@ export function SoruListesi({
                   </span>
                 )}
               </button>
-              {onKitaptaGoster && soru.kaynakKitapId && (soru.kaynakSayfa ?? soru.kaynakSayfaNo) && (
-                <button
-                  type="button"
-                  onClick={() => onKitaptaGoster(soru)}
-                  title={`${soru.kaynakAd ?? "Kaynak"} · Kitapta göster`}
-                  aria-label={`${siraMap.get(soru.id) ?? index + 1}. soruyu kitapta göster`}
-                  className={`shrink-0 rounded-lg border border-sky-200 bg-sky-50 p-1.5 text-sky-700 transition hover:bg-sky-100 focus:opacity-100 ${
-                    secili ? "opacity-100" : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
-                  }`}
-                >
-                  <BookOpen size={13} />
-                </button>
-              )}
               {onCogalt && (
                 <button
                   type="button"

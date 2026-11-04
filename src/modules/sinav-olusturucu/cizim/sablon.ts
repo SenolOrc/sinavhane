@@ -6,7 +6,7 @@
 // (`GECERLI_SEKIL_TURLERI`) ve alan alan kontrol var.
 
 import type { CizimSekli, KullaniciSablonu } from "./tipler";
-import { GECERLI_SEKIL_TURLERI } from "./sabitler";
+import { GECERLI_SEKIL_TURLERI, RENK_DESENI } from "./sabitler";
 import { fizikNesnesiGecerliMi } from "./fizik";
 import { grafikVerisiGecerliMi } from "./grafik";
 import { istatistikVerisiGecerliMi } from "./istatistik";
@@ -45,6 +45,11 @@ export function sekilGecerliMi(sekil: unknown): sekil is CizimSekli {
     if (s.geo !== undefined && !geometriVerisiGecerliMi(s.geo)) return false;
     if (s.ek !== undefined && !fizikEkGecerliMi(s.ek)) return false;
     if (s.seviye !== undefined && !(typeof s.seviye === "number" && s.seviye >= 0 && s.seviye <= 1)) return false;
+  }
+  // Temel şekillerin rengi/dolgusu yalnız #rrggbb (serbest metin çizime ulaşmasın).
+  if (["dogru", "dikdortgen", "elips", "ucgen", "cokgen", "dalga", "serbest", "metin"].includes(s.tur)) {
+    if (s.renk !== undefined && !RENK_DESENI.test(String(s.renk))) return false;
+    if (s.dolgu !== undefined && !RENK_DESENI.test(String(s.dolgu))) return false;
   }
   if (s.tur === "baglayici" && s.renk !== undefined && !/^#[0-9a-fA-F]{6}$/.test(String(s.renk))) return false;
   if (s.tur === "baglayici" && s.stil !== undefined && !["dik", "duz", "yay", "vektor"].includes(String(s.stil))) return false;

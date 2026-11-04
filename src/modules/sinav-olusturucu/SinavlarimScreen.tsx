@@ -2,10 +2,8 @@
 //
 // Kütüphane (aşama 1) veritabanında çalışıyordu ama arayüzden GÖRÜNMÜYORDU —
 // yeni sınav açılamıyor, aralarında geçilemiyor, arşivlenemiyordu (bkz. DEVAM.md
-// §5). Bu ekran o eksik yüzü kapatır. Alt rota olduğu için app/navigation.ts'teki
-// 20 ana menü rotasına EKLENMEZ (ders-kitabi/foyler ile aynı kalıp;
-// getNavigationContext üst bardaki bağlamı startsWith ile zaten "Sınav
-// Oluşturucu"ya bağlar).
+// §5). Bu ekran o eksik yüzü kapatır; app/Layout.tsx'teki "Sınavlarım"
+// sekmesinden açılır.
 //
 // Liste İÇERİĞE HİÇ DOKUNMADAN çizilir: soru/sayfa sayısı ve boyut
 // db.sinavlar'da önbelleklidir (bkz. lib/sinavKutuphanesi.ts metadataTuret).
@@ -30,7 +28,6 @@ import {
 } from "lucide-react";
 import type { SinavKaydi } from "@shared/types";
 import { AZAMI_AKTIF_SINAV, sinavArsivle, sinavGeriYukle, sinavSil, sinavlarGetir } from "@/db/repo";
-import { SinavIcinAyrilanlar } from "./components/SinavIcinAyrilanlar";
 import { GeriButon } from "@/components/GeriButon";
 import { BosDurum } from "@/components/BosDurum";
 import {
@@ -215,9 +212,6 @@ export function SinavlarimScreen() {
           {islemHatasi}
         </p>
       )}
-
-      {/* OA77: kitap okurken "Sınavda sor" denen notlar (telefonda işaretlenenler dahil). */}
-      <SinavIcinAyrilanlar />
 
       {!aktifListe.length ? (
         <BosDurum

@@ -566,7 +566,9 @@ console.log("✓ Görselin serbest yüksekliği ilk boyama tahminine yansıyor")
 
 // ─── Şık harf biçimi, otomatik şık dizilimi, çizim ölçek alt sınırı ────────
 {
-  verify([0, 1, 2, 3, 4].map((i) => maddeHarfi(i, false, "buyuk")).join("") === "ABCDE", "yazılıda A) B) C) D) E) seçilebilmeli");
+  // Yazılıda büyük harf de Türk alfabesi: küçük harfle (a b c ç d) aynı sıra,
+  // yoksa aynı madde biçime göre "ç)" ya da "D)" oluyordu.
+  verify([0, 1, 2, 3, 4].map((i) => maddeHarfi(i, false, "buyuk")).join("") === "ABCÇD", "yazılıda büyük harf A) B) C) Ç) D) olmalı");
   verify([0, 1, 2, 3, 4].map((i) => maddeHarfi(i)).join("") === "abcçd", "yazılı varsayılanı Türkçe a b c ç d kalmalı");
   verify([0, 1, 2, 3, 4].map((i) => maddeHarfi(i, true)).join("") === "ABCDE", "test varsayılanı A–E kalmalı");
   verify([0, 1, 2, 3, 4].map((i) => maddeHarfi(i, true, "kucuk")).join("") === "abcde", "test küçük harfte anahtarla aynı Latin sıra");

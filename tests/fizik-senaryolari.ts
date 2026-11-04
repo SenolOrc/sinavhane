@@ -39,7 +39,7 @@ import {
 import { ayniXUyarisi, ekstremumNoktalari, noktalariOkuAyrinti, sayiYazDuyarli, adliNoktalariOku, adliNoktalariYaz, dogrusalRegresyon, hizliMatematik, kesisimNoktalari, MAT_GRAFIK_SABLONLARI, tegetDogrusu } from "../src/modules/sinav-olusturucu/cizim/grafik";
 import {
   ELEMENT_KUTLELERI, ELEMENT_SEMBOLLERI, KIMYA_ATOM_SABLONLARI, KIMYA_GRAFIK_SABLONLARI, KIMYA_LAB_NESNELERI, KIMYA_MOLEKUL_SABLONLARI, KIMYA_PERIYODIK_SABLONLARI,
-  MOLEKULLER, elementKonumu, elementListesiOku, kabukDizilimi, kimyaBoyutu, kimyaCiz, kimyaVerisiGecerliMi, periyodikGoruluyor,
+  MOLEKULLER, elementKonumu, elementListesiOku, enBolKutleNumarasi, kabukDizilimi, kimyaBoyutu, kimyaCiz, kimyaVerisiGecerliMi, periyodikGoruluyor,
 } from "../src/modules/sinav-olusturucu/cizim/kimya";
 import { GECERLI_SEKIL_TURLERI } from "../src/modules/sinav-olusturucu/cizim/sabitler";
 import {
@@ -537,7 +537,14 @@ test("istatistik: hesaplar", () => {
   yakin(b.min, 12, "min"); yakin(b.q1, 17, "Q1"); yakin(b.med, 21, "ortanca"); yakin(b.q3, 26, "Q3"); yakin(b.max, 41, "maks");
   dogrula(besSayiOzeti([1, 2, 3, 4, 5, 6, 7, 8, 9, 100])!.aykiri.includes(100), "aykırı değer");
   const o = ozetSayilar([2, 4, 4, 4, 5, 5, 7, 9])!;
-  yakin(o.ortalama, 5, "ortalama"); yakin(o.sapma, 2, "standart sapma"); yakin(o.medyan, 4.5, "medyan"); dogrula(o.tepe[0] === 4, "tepe değer");
+  // Örneklem standart sapması (n − 1): Σ(x − 5)² = 32 → √(32/7) ≈ 2,138 (anakütle tanımı 2 verirdi).
+  yakin(o.ortalama, 5, "ortalama"); yakin(o.sapma, Math.sqrt(32 / 7), "standart sapma (n−1)", 1e-9); yakin(o.medyan, 4.5, "medyan"); dogrula(o.tepe.join() === "4", "tepe değer");
+  yakin(ozetSayilar([2, 4, 6])!.sapma, 2, "standart sapma: √((4+0+4)/2) = 2", 1e-9);
+  dogrula(ozetSayilar([7])!.sapma === 0, "tek veride standart sapma 0 (n−1 = 0'a bölme yok)");
+  dogrula(ozetSayilar([10, 10, 20, 20, 30, 30])!.tepe.length === 0, "tüm değerler eşit sıklıkta → tepe değer yok");
+  dogrula(ozetSayilar([1, 2, 3])!.tepe.length === 0, "hiç tekrar yok → tepe değer yok");
+  dogrula(ozetSayilar([1, 1, 2, 2, 3])!.tepe.join() === "1,2", "iki tepe değer");
+  dogrula(ozetSayilar([5, 5, 5])!.tepe.join() === "5", "tek farklı değer → tepe değer o değerdir");
   dogrula(ozetSayilar([]) === null, "boş veri");
   const s = siniflandir([3, 7, 10, 12, 18, 20, 29, 30], 10, 0);
   dogrula(s.length === 4 && s.map((x) => x.v[0]).join() === "2,3,2,1", `[a,b) sınıfları: 30 → 30-40 `+`sınıflar ${JSON.stringify(s.map((x) => x.v[0]))}`);
@@ -614,6 +621,42 @@ test("kimya: elektron dizilimi (kabuklar, iyonlar, istisnalar)", () => {
   dogrula(d(11, 1) === "2,8" && d(17, -1) === "2,8,8" && d(8, -2) === "2,8" && d(12, 2) === "2,8" && d(13, 3) === "2,8", "iyonlar (Na⁺, Cl⁻, O²⁻, Mg²⁺, Al³⁺)");
   dogrula(d(26) === "2,8,14,2" && d(26, 3) === "2,8,13" && d(24) === "2,8,13,1" && d(29) === "2,8,18,1" && d(21) === "2,8,9,2" && d(36) === "2,8,18,8", "geçiş elementleri ve istisnalar");
   for (let z = 1; z <= 118; z += 1) dogrula(kabukDizilimi(z).reduce((a, b) => a + b, 0) === z, `Z=${z} elektron toplamı`);
+  // Küresel simetri istisnaları: Mo, Ag, Au (ve iyonlarında dış kabuktan eksilme).
+  dogrula(d(42) === "2,8,18,13,1" && d(47) === "2,8,18,18,1" && d(79) === "2,8,18,32,18,1", `Mo/Ag/Au istisnaları: ${d(42)} | ${d(47)} | ${d(79)}`);
+  dogrula(d(47, 1) === "2,8,18,18" && d(79, 1) === "2,8,18,32,18", `Ag⁺ / Au⁺: ${d(47, 1)} | ${d(79, 1)}`);
+});
+
+test("kimya: Bohr çekirdeğinde nötron sayısı en bol kararlı izotoptan", () => {
+  const A = enBolKutleNumarasi;
+  // Yuvarlanmış ortalama kütlenin YANLIŞ izotop verdiği elementler.
+  dogrula(A(29) === 63 && A(35) === 79 && A(47) === 107 && A(51) === 121 && A(77) === 193 && A(28) === 58 && A(30) === 64 && A(82) === 208,
+    `Cu-63, Br-79, Ag-107, Sb-121, Ir-193, Ni-58, Zn-64, Pb-208: ${[29, 35, 47, 51, 77, 28, 30, 82].map(A).join(",")}`);
+  // Yuvarlamanın doğru olduğu elementler değişmemeli.
+  dogrula(A(1) === 1 && A(5) === 11 && A(17) === 35 && A(26) === 56 && A(18) === 40 && A(79) === 197 && A(92) === 238 && A(43) === 98,
+    `H-1, B-11, Cl-35, Fe-56, Ar-40, Au-197, U-238, Tc-98: ${[1, 5, 17, 26, 18, 79, 92, 43].map(A).join(",")}`);
+  for (let z = 1; z <= 118; z += 1) {
+    const fark = A(z) - Math.round(ELEMENT_KUTLELERI[z - 1]);
+    dogrula(A(z) >= z && Math.abs(fark) <= 3, `Z=${z}: kütle numarası ${A(z)} ortalama kütleden çok uzak`);
+  }
+  // Çizimde: Cu çekirdeği "29p 34n" (35n değil), Br "35p 44n".
+  const yazilar = (z: number) => {
+    const metinler: string[] = [];
+    const ozellikler: Record<string, unknown> = { font: "", lineWidth: 1 };
+    const ctx = new Proxy(ozellikler, {
+      get(h, ad: string) {
+        if (ad === "measureText") return (m: string) => ({ width: [...m].length * 10 });
+        if (ad === "fillText") return (m: string) => { metinler.push(m); };
+        if (ad in h) return h[ad];
+        return () => undefined;
+      },
+      set(h, ad: string, deger) { h[ad] = deger; return true; },
+    }) as unknown as CanvasRenderingContext2D;
+    const v = { tur: "atom", z, yuk: 0, cekirdek: "pn", kabukAdi: false } as const;
+    kimyaCiz(ctx, { id: "a", tur: "fizik", nesne: "kimya", kalinlik: 2, x: 0, y: 0, w: 200, h: 200, kimya: v } as Extract<Sekil, { tur: "fizik" }>);
+    return metinler.join(" ");
+  };
+  dogrula(yazilar(29).includes("34") && !yazilar(29).includes("35"), `Cu çekirdeği: ${yazilar(29)}`);
+  dogrula(yazilar(35).includes("44") && !yazilar(35).includes("45"), `Br çekirdeği: ${yazilar(35)}`);
 });
 
 test("kimya: periyodik tablo konumları ve element verisi", () => {
@@ -1015,6 +1058,11 @@ test("kimya: orbital kutu-ok (Aufbau + Hund), iyonlar, istisnalar", () => {
   dogrula(ozet(17, -1) === "1s^2 2s^2 2p^6 3s^2 3p^6", "Cl⁻ = Ar dizilimi");
   dogrula(ozet(11, 1) === "1s^2 2s^2 2p^6" && ozet(8, -2) === ozet(10), "Na⁺ ve O²⁻ = Ne dizilimi");
   dogrula(ozet(24).includes("3d^5") && ozet(24).includes("4s^1") && ozet(29).includes("3d^10") && ozet(29).includes("4s^1"), "Cr ve Cu istisnaları");
+  dogrula(ozet(42).endsWith("4s^2 3d^10 4p^6 5s^1 4d^5"), `Mo: [Kr] 5s¹ 4d⁵ → ${ozet(42)}`);
+  dogrula(ozet(47).endsWith("4s^2 3d^10 4p^6 5s^1 4d^10"), `Ag: [Kr] 5s¹ 4d¹⁰ → ${ozet(47)}`);
+  dogrula(ozet(79).endsWith("5p^6 6s^1 4f^14 5d^10"), `Au: [Xe] 6s¹ 4f¹⁴ 5d¹⁰ → ${ozet(79)}`);
+  dogrula(ozet(47, 1).endsWith("4p^6 4d^10") && !ozet(47, 1).includes("5s"), `Ag⁺: 5s boşalır → ${ozet(47, 1)}`);
+  dogrula(orbitalDizilimi(42).find((a) => a.ad === "4d")!.kutular.every((k) => k === "yukari"), "Mo 4d: beş tek elektron (yarı dolu)");
   const toplam = (z: number, y = 0) => orbitalDizilimi(z, y).reduce((t, a) => t + a.e, 0);
   for (let z = 1; z <= 86; z += 1) dogrula(toplam(z) === z, `Z=${z} elektron toplamı ${toplam(z)}`);
   // Hund: N → 2p üç kutuda birer yukarı ok; O → bir çift + iki tek; Ne → üç çift
@@ -1164,6 +1212,45 @@ test("bağlayıcı: şekle yapışma kapatılabilir ayarı (serbest uç) veri mo
   const { ctx, cagrilar } = sahteCtx();
   sekilleriCiz(ctx, [cisim, ok]);
   dogrula(cagrilar.length > 10, "çizilir");
+});
+
+test("PNG dışa aktarım: enerji düzeyi ve geometri yazıları kırpılmaz (gerçek tuval pikseli)", () => {
+  // Gerçek rasterleştirici gerekiyor: sahte ctx yazının NEREYE düştüğünü bilmez.
+  // @napi-rs/canvas, pdfjs-dist'in isteğe bağlı bağımlılığı; kurulu değilse atlanır.
+  let tuvalUret: ((w: number, h: number) => { getContext(t: "2d"): unknown }) | null = null;
+  try { tuvalUret = require("@napi-rs/canvas").createCanvas; } catch { /* yok */ }
+  if (!tuvalUret) { console.log("  (atlandı: @napi-rs/canvas yok)"); return; }
+  const W = 1400, H = 1000;
+  const sekil = (nesne: FizikNesnesi, ek: Partial<Extract<Sekil, { tur: "fizik" }>> = {}): Sekil => ({
+    ...fizikSekli(nesne), x: 560, y: 420, ...ek,
+  } as Sekil);
+  const ucgen = UCGEN_SABLONLARI[0].olustur() as Extract<GeometriVerisi, { tur: "ucgen" }>;
+  const durumlar: [string, Sekil][] = [
+    ["enerji düzeyi (uzun adlar)", sekil("enerjiDuzeyi", { ek: { metin: "n=1 (temel):-13,6; n=2:-3,4; n=3:-1,51; n=∞ (iyon):0" } })],
+    ["enerji düzeyi (dar kutu)", sekil("enerjiDuzeyi", { w: 160, h: 115 })],
+    ["enerji düzeyi (90°)", sekil("enerjiDuzeyi", { donus: 90, ek: { metin: "n=1 (temel):-13,6; n=2:-3,4; n=∞ (iyon):0" } })],
+    ["üçgen ABC (koordinatlı adlar)", sekil("ucgenABC", { geo: { ...ucgen, adlar: ["A(−12,15)", "B(100,−20)", "C(40,70)"] } })],
+    ["üçgen ABC (koordinatlı adlar, 90°)", sekil("ucgenABC", { donus: 90, geo: { ...ucgen, adlar: ["A(−12,15)", "B(100,−20)", "C(40,70)"] } })],
+  ];
+  for (const [ad, s] of durumlar) {
+    const tuval = tuvalUret(W, H);
+    const ctx = tuval.getContext("2d") as CanvasRenderingContext2D;
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+    sekilleriCiz(ctx, [s]);
+    const veri = ctx.getImageData(0, 0, W, H).data;
+    let x0 = W, y0 = H, x1 = -1, y1 = -1;
+    for (let y = 0; y < H; y += 1) for (let x = 0; x < W; x += 1) {
+      const i = (y * W + x) * 4;
+      if (veri[i] < 245 || veri[i + 1] < 245 || veri[i + 2] < 245) {
+        if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      }
+    }
+    dogrula(x1 >= 0, `${ad}: hiç çizilmedi`);
+    // Dışa aktarımla aynı çağrı (CizimEditoruModal: pay 14).
+    const b = cizimIcerikSiniri(ctx, [s], 14, { w: W, h: H });
+    dogrula(x0 >= b.x && y0 >= b.y && x1 + 1 <= b.x + b.w && y1 + 1 <= b.y + b.h,
+      `${ad}: mürekkep [${x0},${y0}–${x1},${y1}] içerik sınırının [${b.x},${b.y} ${b.w}×${b.h}] dışında — PNG'de kırpılır`);
+  }
 });
 
 console.log("TÜM FİZİK SENARYOLARI BAŞARILI");

@@ -81,9 +81,13 @@ import {
   sigdirmaOrani,
   AKIS_VARSAYILAN_W,
   AKIS_DOLGU_PALETI,
+  TEMEL_RENK_PALETI,
+  MUREKKEP,
+  TEMEL_DOLGU_PALETI,
   ASGARI_CIZIM_PX,
 } from "../cizim/sabitler";
 import type { TuvalOlcusu } from "../cizim/sabitler";
+
 import {
   cokgenNoktalariUret,
   dalgaNoktalariUret,
@@ -98,6 +102,10 @@ import {
   sekilId,
   taslagiKesinlestir,
   sekilTasi,
+  seciliBaglayicilarlaGenislet,
+  disUclariSerbestBirak,
+  kimlikleriYenile,
+  birlikteTasinanBaglayicilar,
   ucgenNoktalari,
 } from "../cizim/geometri";
 import {
@@ -128,6 +136,9 @@ import { sablonGecerliMi } from "../cizim/sablon";
 import { sekilleriCiz, tuvaleCiz } from "../cizim/ciz";
 import { kisayol } from "../lib/kisayol";
 
+/** Geri/ileri al yığınlarının bir adımı: şekiller + o anki tuval ölçüsü. */
+type GecmisKaydi = { sekiller: Sekil[]; tuvalOlcu: TuvalOlcusu };
+
 const AKIS_ARACLARI: { sekil: AkisSekli; etiket: string; ipucu: string }[] = [
   { sekil: "baslangic", etiket: "Başla/Bitir", ipucu: "Yuvarlatılmış uç kutusu" },
   { sekil: "surec", etiket: "İşlem", ipucu: "Dikdörtgen işlem adımı" },
@@ -157,6 +168,10 @@ function AkisSimge({ sekil }: { sekil: AkisSekli }) {
  * akış şemasında kullanılmıyor ve tuvalin üstünü kaplıyordu.
  * "metin" duruyor: kutuya sığmayan bir açıklamayı kenara yazmak isteyen olur.
  */
+/** Renk seçicinin uygulandığı temel şekiller; dolgu yalnız kapalı olanlarda. */
+const TEMEL_RENKLI_TURLER: string[] = ["dogru", "dikdortgen", "elips", "ucgen", "cokgen", "dalga", "serbest", "metin"];
+const TEMEL_DOLGULU_TURLER: string[] = ["dikdortgen", "elips", "ucgen", "cokgen"];
+
 const AKIS_KIPI_ARACLARI: CizimAraci[] = ["sec", "silgi", "metin"];
 
 const ARAC_TANIMLARI: { arac: CizimAraci; etiket: string; ipucu?: string; icon: typeof Minus }[] = [
@@ -243,8 +258,11 @@ export function CizimEditoruModal({
   // React 18 StrictMode dev modunda updater'lar iki kez çalıştığından tek bir
   // Ctrl+Z aynı durumu ileri yığınına iki kez itiyordu. Updater'lar artık saf;
   // buton disabled durumu ve "Geçmiş X/80" sayacı için hafif sayaç state'leri var.
-  const gecmisRef = useRef<Sekil[][]>([]);
-  const ileriRef = useRef<Sekil[][]>([]);
+  // Her kayıt şekillerle birlikte TUVAL ÖLÇÜSÜNÜ de taşır: ölçü değişikliği
+  // geçmişe yazılıyor ama yalnız şekiller saklandığından Ctrl+Z ölçüyü geri
+  // almıyor, boşa bir adım harcıyordu.
+  const gecmisRef = useRef<GecmisKaydi[]>([]);
+  const ileriRef = useRef<GecmisKaydi[]>([]);
   const [gecmisSayisi, setGecmisSayisi] = useState(0);
   const [ileriSayisi, setIleriSayisi] = useState(0);
   const [arac, setArac] = useState<CizimAraci>("dogru");
@@ -268,6 +286,10 @@ export function CizimEditoruModal({
     w: baslangicBelgesi?.genislik || CANVAS_W,
     h: baslangicBelgesi?.yukseklik || CANVAS_H,
   }));
+  /** Mount'ta bir kez kurulan klavye dinleyicisi (oklar, Ctrl+D) ve geçmiş
+   *  kaydı güncel ölçüyü buradan okur; yoksa mount anındaki 960×600'de donar. */
+  const tuvalOlcuRef = useRef(tuvalOlcu);
+  tuvalOlcuRef.current = tuvalOlcu;
   const [zoom, setZoom] = useState(100);
   const [seciliId, setSeciliId] = useState<string | null>(null);
   const [seciliIds, setSeciliIds] = useState<string[]>([]);
@@ -404,7 +426,9 @@ export function CizimEditoruModal({
     if (!ctx) return;
     sekillerRef.current = sekiller;
     tuvaleCiz(ctx, sekiller, taslak, seciliIds, true, izgaraGoster, secimKutusu, hizalamaCizgileri, tuvalOlcu);
-  }, [sekiller, taslak, seciliIds, izgaraGoster, secimKutusu, hizalamaCizgileri]);
+    // tuvalOlcu bağımlılıkta OLMALI: <canvas width/height> değişince tarayıcı
+    // tuvali siler; yeniden çizilmezse ölçü değişiminden sonra tuval boş kalır.
+  }, [sekiller, taslak, seciliIds, izgaraGoster, secimKutusu, hizalamaCizgileri, tuvalOlcu]);
 
   // Seçim değişince özellik panelini araç çubuğunun görünür alanına getir.
   // `scrollIntoView` jsdom'da tanımsız olabiliyor — testler bileşeni gerçek
@@ -459,7 +483,11 @@ export function CizimEditoruModal({
         const dx = e.key === "ArrowLeft" ? -adim : e.key === "ArrowRight" ? adim : 0;
         const dy = e.key === "ArrowUp" ? -adim : e.key === "ArrowDown" ? adim : 0;
         tarihceyeKaydet();
-        setSekiller((liste) => liste.map((s) => seciliIdsRef.current.includes(s.id) ? sekilTasiSinirli(ctx, s, dx, dy, tuvalOlcu) : s));
+        const tasinanIds = new Set([
+          ...seciliIdsRef.current,
+          ...birlikteTasinanBaglayicilar(sekillerRef.current, seciliIdsRef.current).map((s) => s.id),
+        ]);
+        setSekiller((liste) => liste.map((s) => tasinanIds.has(s.id) ? sekilTasiSinirli(ctx, s, dx, dy, tuvalOlcuRef.current) : s));
       }
     }
     window.addEventListener("keydown", tus);
@@ -496,7 +524,7 @@ export function CizimEditoruModal({
   const iptalRef = useRef<() => void>(() => {});
 
   function tarihceyeKaydet(anlik: Sekil[] = sekillerRef.current) {
-    gecmisRef.current = [...gecmisRef.current, anlik].slice(-GECMIS_LIMITI);
+    gecmisRef.current = [...gecmisRef.current, { sekiller: anlik, tuvalOlcu: tuvalOlcuRef.current }].slice(-GECMIS_LIMITI);
     ileriRef.current = [];
     setGecmisSayisi(gecmisRef.current.length);
     setIleriSayisi(0);
@@ -521,8 +549,9 @@ export function CizimEditoruModal({
     if (gecmisRef.current.length === 0) return;
     const son = gecmisRef.current[gecmisRef.current.length - 1];
     gecmisRef.current = gecmisRef.current.slice(0, -1);
-    ileriRef.current = [...ileriRef.current, sekillerRef.current].slice(-GECMIS_LIMITI);
-    setSekiller(son);
+    ileriRef.current = [...ileriRef.current, { sekiller: sekillerRef.current, tuvalOlcu: tuvalOlcuRef.current }].slice(-GECMIS_LIMITI);
+    setSekiller(son.sekiller);
+    setTuvalOlcu(son.tuvalOlcu);
     secimAyarla([]);
     setGecmisSayisi(gecmisRef.current.length);
     setIleriSayisi(ileriRef.current.length);
@@ -532,8 +561,9 @@ export function CizimEditoruModal({
     if (ileriRef.current.length === 0) return;
     const son = ileriRef.current[ileriRef.current.length - 1];
     ileriRef.current = ileriRef.current.slice(0, -1);
-    gecmisRef.current = [...gecmisRef.current, sekillerRef.current].slice(-GECMIS_LIMITI);
-    setSekiller(son);
+    gecmisRef.current = [...gecmisRef.current, { sekiller: sekillerRef.current, tuvalOlcu: tuvalOlcuRef.current }].slice(-GECMIS_LIMITI);
+    setSekiller(son.sekiller);
+    setTuvalOlcu(son.tuvalOlcu);
     secimAyarla([]);
     setGecmisSayisi(gecmisRef.current.length);
     setIleriSayisi(ileriRef.current.length);
@@ -583,21 +613,19 @@ export function CizimEditoruModal({
     // [] bağımlılıkla mount'ta bir kez kurulan global Ctrl+D dinleyicisinden de
     // çağrılıyor, orada state kapanışı mount anındaki değerde donar kalırdı.
     const guncelSekiller = sekillerRef.current;
-    const secilenler = guncelSekiller.filter((s) => seciliIdsRef.current.includes(s.id));
+    if (!seciliIdsRef.current.length) return;
+    // Seçili şekiller arasındaki bağlayıcılar (seçim dikdörtgeni onları
+    // yakalamıyor) kendiliğinden kopyalanır; kimlikler + bağlayıcı uçları
+    // aynı eşlemeyle yenilenir, seçim dışındaki şekle tutunan uç serbest
+    // noktaya döner (kopya ok asıl şekle bağlı kalmasın).
+    const ids = new Set(seciliBaglayicilarlaGenislet(seciliIdsRef.current, guncelSekiller));
+    const secilenler = guncelSekiller.filter((s) => ids.has(s.id));
     if (!secilenler.length) return;
     const ctx = canvasRef.current?.getContext("2d");
-    const grupMap = new Map<string, string>();
-    const yeniler = secilenler.map((s) => {
-      let grupId = s.grupId;
-      if (grupId) {
-        if (!grupMap.has(grupId)) grupMap.set(grupId, `grup-${sekilId()}`);
-        grupId = grupMap.get(grupId);
-      }
+    const yeniler = kimlikleriYenile(disUclariSerbestBirak(secilenler, guncelSekiller)).map((s) =>
       // sekilTasi yerine sekilTasiSinirli: kenardaki bir şekil çoğaltılınca
       // tuval dışına taşmasın (ctx alınamazsa eski davranışa düşülür).
-      const tasinan = ctx ? sekilTasiSinirli(ctx, s, 16, 16, tuvalOlcu) : sekilTasi(s, 16, 16);
-      return { ...tasinan, id: sekilId(), grupId } as Sekil;
-    });
+      ctx ? sekilTasiSinirli(ctx, s, 16, 16, tuvalOlcuRef.current) : sekilTasi(s, 16, 16));
     degisiklikUygula([...guncelSekiller, ...yeniler]);
     window.setTimeout(() => secimAyarla(yeniler.map((s) => s.id)), 0);
   }
@@ -660,9 +688,15 @@ export function CizimEditoruModal({
 
   function kullaniciSablonuKaydet() {
     const ad = sablonAdi.trim().slice(0, SABLON_ADI_SINIRI);
-    const secilenler = sekiller.filter((s) => seciliIds.includes(s.id));
+    // Seçili şekiller arasındaki teller/ipler/oklar da şablona girer; şablon
+    // dışındaki bir şekle tutunan uç serbest noktaya çevrilir (eklendiği
+    // tuvalde o şekil yok, yol hesaplanamaz ve bağlayıcı görünmezdi).
+    const ids = new Set(seciliBaglayicilarlaGenislet(seciliIds, sekiller));
+    const secilenler = disUclariSerbestBirak(sekiller.filter((s) => ids.has(s.id)), sekiller);
     if (!ad || !secilenler.length) return;
-    const kutular = secilenler.map(sekilGeometriKutusu);
+    // Bağlayıcının kutusu tuval dışında (-1e6): sol/üst hesabına katılmaz.
+    const kutular = secilenler.filter((s) => s.tur !== "baglayici").map(sekilGeometriKutusu);
+    if (!kutular.length) return;
     const sol = Math.min(...kutular.map((k) => k.x)), ust = Math.min(...kutular.map((k) => k.y));
     const kopyalar = secilenler.map((s) => sekilTasi(s, 40 - sol, 40 - ust));
     kullaniciSablonlariniSakla([...kullaniciSablonlari, { id: sekilId(), ad, sekiller: kopyalar }]);
@@ -670,15 +704,10 @@ export function CizimEditoruModal({
   }
 
   function kullaniciSablonuEkle(sablon: KullaniciSablonu) {
-    const grupMap = new Map<string, string>();
-    const yeniler = sablon.sekiller.map((s) => {
-      let grupId = s.grupId;
-      if (grupId) {
-        if (!grupMap.has(grupId)) grupMap.set(grupId, `grup-${sekilId()}`);
-        grupId = grupMap.get(grupId);
-      }
-      return { ...s, id: sekilId(), grupId } as Sekil;
-    });
+    // Bağlayıcı uçları da yeni kimliklere eşlenir. Eski sürümün kaydettiği
+    // şablonlarda şablon içi kimlikler aynen durduğundan kopuk teller burada
+    // geri bağlanır.
+    const yeniler = kimlikleriYenile(sablon.sekiller);
     tarihceyeKaydet();
     setSekiller((liste) => [...liste, ...yeniler]);
     setArac("sec");
@@ -924,7 +953,10 @@ export function CizimEditoruModal({
         secimAyarla(yeniSecim);
         islemOncesiRef.current = sekiller;
         islemDegistiRef.current = false;
-        const tasinacaklar = sekiller.filter((s) => yeniSecim.includes(s.id));
+        const seciliTasinan = sekiller.filter((s) => yeniSecim.includes(s.id));
+        // Cisme tek ucundan tutunan kuvvet vektörünün SERBEST ucu da cisimle
+        // gelir; yoksa cisim taşınınca vektörün yönü/boyu bozulurdu.
+        const tasinacaklar = [...seciliTasinan, ...birlikteTasinanBaglayicilar(sekiller, yeniSecim)];
         surukleBaslangici.current = { nokta, sekiller: tasinacaklar };
         aktifHizalamaXRef.current = null;
         aktifHizalamaYRef.current = null;
@@ -1339,6 +1371,8 @@ export function CizimEditoruModal({
    */
   function tuvalOlcusunuDegistir(yeni: TuvalOlcusu) {
     if (yeni.w > EN_BUYUK_TUVAL.w || yeni.h > EN_BUYUK_TUVAL.h) return;
+    // Aynı ölçüye tıklamak geçmişe boş bir adım yazmasın.
+    if (yeni.w === tuvalOlcu.w && yeni.h === tuvalOlcu.h) return;
     const ctx = canvasRef.current?.getContext("2d");
     if (ctx && (yeni.w < tuvalOlcu.w || yeni.h < tuvalOlcu.h)) {
       const disarida = sekiller.filter((sk) => {
@@ -1354,6 +1388,7 @@ export function CizimEditoruModal({
       }
     }
     setHata("");
+    // Geçmiş kaydı artık ölçüyü de taşıyor: Ctrl+Z eski ölçüye döner.
     tarihceyeKaydet();
     setTuvalOlcu(yeni);
   }
@@ -2069,7 +2104,7 @@ export function CizimEditoruModal({
             <span className="mr-1 text-[11px] font-bold uppercase tracking-wide text-emerald-700">Şablonlarım</span>
             {kullaniciSablonlari.map((sablon) => (
               <span key={sablon.id} className="inline-flex overflow-hidden rounded-lg border border-emerald-200 bg-white">
-                <button type="button" onClick={() => kullaniciSablonuEkle(sablon)} className="px-2.5 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50">{sablon.ad}</button>
+                <button type="button" title={sablon.ad} onClick={() => kullaniciSablonuEkle(sablon)} className="max-w-[14rem] truncate px-2.5 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50">{sablon.ad}</button>
                 <button type="button" aria-label={`${sablon.ad} şablonunu sil`} title="Şablonu sil"
                   onClick={() => setSilinecekSablon(sablon)}
                   className="border-l border-emerald-100 px-2 text-rose-500 hover:bg-rose-50">×</button>
@@ -2286,6 +2321,59 @@ export function CizimEditoruModal({
             <span className="pb-1 text-[10px] text-slate-400">px · açı derece</span>
             </div>
           </details>
+        );
+      })()}
+
+      {/* SEÇİLİ TEMEL ŞEKİL(LER): çizgi rengi ve (kapalı şekillerde) iç dolgu.
+          Seçimdeki temel şekillerin hepsine uygulanır. "Siyah"/"Dolgusuz"
+          alanı SİLER: eski belge biçimi aynen korunur. */}
+      {(() => {
+        const temeller = sekiller.filter((x) => seciliIds.includes(x.id) && TEMEL_RENKLI_TURLER.includes(x.tur));
+        if (!temeller.length) return null;
+        const kapalilar = temeller.filter((x) => TEMEL_DOLGULU_TURLER.includes(x.tur));
+        const ilk = temeller[temeller.length - 1] as { renk?: string };
+        const ilkKapali = kapalilar[kapalilar.length - 1] as { dolgu?: string } | undefined;
+        const boyaUygula = (alan: "renk" | "dolgu", deger: string | undefined) => {
+          const turler = alan === "renk" ? TEMEL_RENKLI_TURLER : TEMEL_DOLGULU_TURLER;
+          tarihceyeKaydet();
+          setSekiller((mevcut) => mevcut.map((x) => {
+            if (!seciliIds.includes(x.id) || !turler.includes(x.tur)) return x;
+            const kopya = { ...x } as Record<string, unknown>;
+            if (deger) kopya[alan] = deger; else delete kopya[alan];
+            return kopya as Sekil;
+          }));
+        };
+        const kutuSinifi = (secili: boolean) => `h-6 w-6 rounded-md border transition ${secili ? "border-brand-500 ring-2 ring-brand-200" : "border-slate-300 hover:border-slate-400"}`;
+        return (
+          <div aria-label="Renk ve dolgu" className="mb-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="w-12 shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-500">Renk</span>
+              {TEMEL_RENK_PALETI.map((r) => (
+                <button key={r.ad} type="button" title={r.ad} aria-label={`Renk: ${r.ad}`}
+                  aria-pressed={(ilk.renk ?? undefined) === r.deger}
+                  onClick={() => boyaUygula("renk", r.deger)}
+                  className={kutuSinifi((ilk.renk ?? undefined) === r.deger)}
+                  style={{ background: r.deger ?? MUREKKEP }} />
+              ))}
+            </div>
+            {ilkKapali && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                <span className="w-12 shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-500">Dolgu</span>
+                {TEMEL_DOLGU_PALETI.map((r) => (
+                  <button key={r.ad} type="button" title={r.ad} aria-label={`Dolgu: ${r.ad}`}
+                    aria-pressed={(ilkKapali.dolgu ?? undefined) === r.deger}
+                    onClick={() => boyaUygula("dolgu", r.deger)}
+                    className={kutuSinifi((ilkKapali.dolgu ?? undefined) === r.deger)}
+                    style={{
+                      background: r.deger ?? "#ffffff",
+                      backgroundImage: r.deger ? undefined : "linear-gradient(45deg, #e2e8f0 25%, transparent 25%, transparent 75%, #e2e8f0 75%)",
+                      backgroundSize: r.deger ? undefined : "8px 8px",
+                    }} />
+                ))}
+                <span className="text-[10px] text-slate-400">Taralı dolgu: üstteki “Tarama”.</span>
+              </div>
+            )}
+          </div>
         );
       })()}
 

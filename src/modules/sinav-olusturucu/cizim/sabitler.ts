@@ -58,7 +58,8 @@ export const GECMIS_LIMITI = 80;
 
 export const KULLANICI_SABLONLARI_ANAHTARI = "ogretmen-asistani:cizim-sablonlari:v1";
 
-export const SABLON_ADI_SINIRI = 12;
+// 12 idi: "Eğik Düzlem Sürtünmeli" gibi adlar kesiliyordu.
+export const SABLON_ADI_SINIRI = 32;
 
 // YENİ ŞEKİL TÜRÜ EKLEYEN BURAYI DA GÜNCELLEMELİ: bu liste kullanıcı
 // şablonlarının beyaz listesi (`sablon.ts`). Eksik kalırsa şablona kaydedilen
@@ -118,6 +119,31 @@ export const AKIS_VARSAYILAN_METIN: Record<string, string> = {
   hazirlik: "Hazırlık",
   belge: "Çıktı belgesi",
 };
+
+/** Renk değerleri yalnız #rrggbb: depodan/taslaktan gelen serbest metin
+ *  çizime ulaşmaz (bkz. `temelRenk`, `sablon.ts`). */
+export const RENK_DESENI = /^#[0-9a-fA-F]{6}$/;
+
+/** Temel şekillerin (doğru, dikdörtgen, elips, üçgen, çokgen, dalga, serbest,
+ *  metin) çizgi rengi. Baskı çoğunlukla siyah-beyaz: koyu, gri tonda da
+ *  okunan tonlar. `undefined` = siyah mürekkep (alan yazılmaz). */
+export const TEMEL_RENK_PALETI = [
+  { ad: "Siyah", deger: undefined },
+  { ad: "Mavi", deger: "#1d4ed8" },
+  { ad: "Kırmızı", deger: "#b91c1c" },
+  { ad: "Yeşil", deger: "#15803d" },
+  { ad: "Gri", deger: "#64748b" },
+] as const;
+
+/** Kapalı temel şekillerin iç dolgusu. AÇIK tonlar: gri baskıda çizgi ve
+ *  yazı okunur kalsın. Taralı dolgu ayrı ("Tarama": çapraz / nokta). */
+export const TEMEL_DOLGU_PALETI = [
+  { ad: "Dolgusuz", deger: undefined },
+  { ad: "Açık gri", deger: "#e2e8f0" },
+  { ad: "Mavi", deger: "#dbeafe" },
+  { ad: "Sarı", deger: "#fef9c3" },
+  { ad: "Kırmızı", deger: "#fee2e2" },
+] as const;
 
 /** Akış kutusu dolgu paleti. Baskı çoğunlukla siyah-beyaz olduğu için tonlar
  *  AÇIK seçildi: gri tonlamaya düştüğünde metin okunur kalsın. */

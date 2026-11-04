@@ -159,7 +159,13 @@ export function boyutlandirmaAdaylari(
 // sürükleme BAŞINDA (isaretciAsagi, susturma hesabı için) hem her karede
 // (isaretciHareket) aynı hesap kullanılsın diye tek yerde.
 export function tasimaKenarDegerleri(ctx: CanvasRenderingContext2D, sekiller: Sekil[]) {
-  const sinirlar = sekiller.map((s) => sekilTamKutusu(ctx, s));
+  // Bağlayıcının kutusu tuval dışında (-1e6) tutuluyor; sınıra katılırsa
+  // taşıma sınırlaması onu "içeri itmek" için 1e6 px'lik bir kayma üretiyordu.
+  // Bağlayıcıdan yalnız SERBEST uçlar sayılır (şekle tutunan uç şekille gelir).
+  const sinirlar = sekiller.flatMap((s) => s.tur === "baglayici"
+    ? [s.kaynak, s.hedef].flatMap((u) => ("sekilId" in u ? [] : [{ x: u.x, y: u.y, w: 0, h: 0 }]))
+    : [sekilTamKutusu(ctx, s)]);
+  if (!sinirlar.length) return { sol: 0, ust: 0, sag: 0, alt: 0 };
   const sol = Math.min(...sinirlar.map((s) => s.x));
   const ust = Math.min(...sinirlar.map((s) => s.y));
   const sag = Math.max(...sinirlar.map((s) => s.x + s.w));

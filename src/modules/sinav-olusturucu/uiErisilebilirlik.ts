@@ -1,5 +1,3 @@
-import type { SoruOgesi } from "./types";
-
 const ODAKLANABILIR_SECICI = [
   "button:not([disabled])",
   "a[href]",
@@ -74,16 +72,4 @@ export function menuKlavyesiniYonet(
   e.preventDefault();
   ogeler[hedefIndex].focus();
   return true;
-}
-
-export function kitapKaynakHedefi(soru: SoruOgesi): {
-  yol: string;
-  state: { hedefSayfa: number; vurguId?: string; from: "sinav-olusturucu" };
-} | null {
-  const sayfa = soru.kaynakSayfa ?? soru.kaynakSayfaNo;
-  if (!soru.kaynakKitapId || !sayfa) return null;
-  return {
-    yol: `/ders-kitabi/${soru.kaynakKitapId}`,
-    state: { hedefSayfa: sayfa, vurguId: soru.kirpmaId, from: "sinav-olusturucu" },
-  };
 }

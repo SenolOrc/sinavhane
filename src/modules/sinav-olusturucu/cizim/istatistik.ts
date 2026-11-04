@@ -97,7 +97,18 @@ export function besSayiOzeti(veri: number[]) {
   };
 }
 
-/** Ortalama, ortanca (medyan), tepe değer(ler), açıklık, standart sapma (anakütle). */
+/**
+ * Ortalama, ortanca (medyan), tepe değer(ler), açıklık, standart sapma.
+ *
+ * Standart sapma ÖRNEKLEM tanımıyla (payda n − 1) hesaplanır: MEB ortaöğretim
+ * matematik programı s = √(Σ(xᵢ − x̄)² / (n − 1)) kullanır. Tek veride 0.
+ *
+ * Tepe değer: en çok tekrar eden değer(ler). Hiçbir değer tekrar etmiyorsa
+ * (1, 2, 3) ya da birden fazla farklı değerin HEPSİ eşit sayıda tekrar
+ * ediyorsa (10, 10, 20, 20, 30, 30) tepe değer yoktur → []. Tek farklı
+ * değerden oluşan dizide (5, 5, 5) o değer en çok tekrar eden olduğundan
+ * tepe değer 5 kabul edilir.
+ */
 export function ozetSayilar(veri: number[]) {
   const v = sirala(veri);
   const n = v.length;
@@ -107,10 +118,11 @@ export function ozetSayilar(veri: number[]) {
   for (const x of v) sayac.set(x, (sayac.get(x) ?? 0) + 1);
   let enCok = 0;
   for (const k of sayac.values()) if (k > enCok) enCok = k;
+  const hepsiEsit = sayac.size > 1 && [...sayac.values()].every((k) => k === enCok);
   return {
     n, ortalama: ort, medyan: medyan(v), aciklik: v[n - 1] - v[0],
-    tepe: enCok > 1 ? [...sayac.entries()].filter(([, k]) => k === enCok).map(([x]) => x) : [],
-    sapma: Math.sqrt(v.reduce((t, x) => t + (x - ort) ** 2, 0) / n),
+    tepe: enCok > 1 && !hepsiEsit ? [...sayac.entries()].filter(([, k]) => k === enCok).map(([x]) => x) : [],
+    sapma: n > 1 ? Math.sqrt(v.reduce((t, x) => t + (x - ort) ** 2, 0) / (n - 1)) : 0,
   };
 }
 

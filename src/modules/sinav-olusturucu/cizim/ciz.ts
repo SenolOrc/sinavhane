@@ -18,6 +18,7 @@ import {
   VARSAYILAN_TUVAL,
   IZGARA_ARALIK,
   MUREKKEP,
+  RENK_DESENI,
   TUTAMAC_BOYUT,
 } from "./sabitler";
 import type { TuvalOlcusu } from "./sabitler";
@@ -106,6 +107,27 @@ export function taramaCiz(
   ctx.restore();
 }
 
+/** Temel şeklin çizgi rengi: yalnız #rrggbb kabul edilir, gerisi siyah. */
+export function temelRenk(sekil: Sekil): string {
+  if (sekil.tur === "fizik" || sekil.tur === "akis" || sekil.tur === "baglayici") return MUREKKEP;
+  return sekil.renk && RENK_DESENI.test(sekil.renk) ? sekil.renk : MUREKKEP;
+}
+
+/** Kapalı temel şeklin iç dolgusu (#rrggbb) ya da null. */
+export function temelDolgu(sekil: Sekil): string | null {
+  if (sekil.tur !== "dikdortgen" && sekil.tur !== "elips" && sekil.tur !== "ucgen" && sekil.tur !== "cokgen") return null;
+  return sekil.dolgu && RENK_DESENI.test(sekil.dolgu) ? sekil.dolgu : null;
+}
+
+/** Geçerli yolu dolgu rengiyle boyar (çizgiden ÖNCE: kenar dolgunun üstünde kalsın). */
+function dolguBoya(ctx: CanvasRenderingContext2D, dolgu: string | null) {
+  if (!dolgu) return;
+  ctx.save();
+  ctx.fillStyle = dolgu;
+  ctx.fill();
+  ctx.restore();
+}
+
 export function sekilCiz(ctx: CanvasRenderingContext2D, sekil: Sekil) {
   // Fizik nesnesi dönüşü KENDİ yönetir: gövde döner ama etiket düz kalır.
   if (sekil.tur === "fizik") {
@@ -123,8 +145,11 @@ export function sekilCiz(ctx: CanvasRenderingContext2D, sekil: Sekil) {
     ctx.restore();
     return;
   }
-  ctx.strokeStyle = MUREKKEP;
-  ctx.fillStyle = MUREKKEP;
+  // Renk alanı olmayan (eski) çizimde temelRenk = MUREKKEP: görünüm değişmez.
+  const renk = temelRenk(sekil);
+  const dolgu = temelDolgu(sekil);
+  ctx.strokeStyle = renk;
+  ctx.fillStyle = renk;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.setLineDash(sekil.tur !== "metin" && sekil.cizgiTipi === "kesik" ? [8, 5] : []);
@@ -155,6 +180,7 @@ export function sekilCiz(ctx: CanvasRenderingContext2D, sekil: Sekil) {
       }
     };
     yolCiz();
+    dolguBoya(ctx, dolgu);
     ctx.stroke();
     yolCiz();
     taramaCiz(ctx, sekil.tarama, koseler ? noktaListesiKutusu(koseler) : { x: sekil.x, y: sekil.y, w: sekil.w, h: sekil.h });
@@ -172,6 +198,7 @@ export function sekilCiz(ctx: CanvasRenderingContext2D, sekil: Sekil) {
       0,
       Math.PI * 2,
     );
+    dolguBoya(ctx, dolgu);
     ctx.stroke();
     ctx.beginPath();
     ctx.ellipse(sekil.x + sekil.w / 2, sekil.y + sekil.h / 2, Math.max(1, sekil.w / 2), Math.max(1, sekil.h / 2), 0, 0, Math.PI * 2);
@@ -185,6 +212,7 @@ export function sekilCiz(ctx: CanvasRenderingContext2D, sekil: Sekil) {
     ctx.lineTo(sekil.x2, sekil.y2);
     ctx.lineTo(sekil.x3, sekil.y3);
     ctx.closePath();
+    dolguBoya(ctx, dolgu);
     ctx.stroke();
     ctx.beginPath(); ctx.moveTo(sekil.x1, sekil.y1); ctx.lineTo(sekil.x2, sekil.y2); ctx.lineTo(sekil.x3, sekil.y3); ctx.closePath();
     taramaCiz(ctx, sekil.tarama, sekilGeometriKutusu(sekil));
@@ -199,6 +227,7 @@ export function sekilCiz(ctx: CanvasRenderingContext2D, sekil: Sekil) {
       ctx.closePath();
     };
     yolCiz();
+    dolguBoya(ctx, dolgu);
     ctx.stroke();
     yolCiz();
     taramaCiz(ctx, sekil.tarama, noktaListesiKutusu(sekil.noktalar));

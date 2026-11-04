@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { FilePlus2, FolderOpen } from "lucide-react";
+import { GeriAlToast } from "@/components/GeriAlToast";
 
 const baglanti = ({ isActive }: { isActive: boolean }) =>
   `inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition ${
@@ -20,6 +21,9 @@ export function Layout() {
       <main className="min-h-0 flex-1 overflow-auto">
         <Outlet />
       </main>
+      {/* Tek, kalıcı "Geri al" bildirimi (bkz. lib/geriAlKuyrugu.ts): ekran
+          değişse de görünür kalsın diye kabukta bir kez render edilir. */}
+      <GeriAlToast />
     </div>
   );
 }

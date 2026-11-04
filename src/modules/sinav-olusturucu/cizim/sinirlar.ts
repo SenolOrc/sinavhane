@@ -14,6 +14,8 @@ import { grafikEtiketPayi } from "./grafik";
 import { istatistikPayi } from "./istatistik";
 import { semaPayi } from "./sema";
 import { kimyaPayi } from "./kimya";
+import { enerjiDuzeyiDisPayi } from "./fizikEk";
+import { geometriDisPayi, geometriMi } from "./geometriSekilleri";
 import {
   baglayiciYolu,
   noktaDondur,
@@ -192,6 +194,36 @@ function fizikEtiketSiniri(ctx: CanvasRenderingContext2D, s: Extract<Sekil, { tu
   return { x: nokta.x - olcu.w / 2 - PAY, y: nokta.y - olcu.h / 2 - PAY, w: olcu.w + PAY * 2, h: olcu.h + PAY * 2 };
 }
 
+/**
+ * Kutunun DIŞINA yazı taşıran (grafik/istatistik/şema/kimya dışındaki) fizik
+ * nesnelerinin dış payı, dönüş uygulanmış kutu olarak.
+ *
+ * ÖLÇÜLDÜ (@napi-rs/canvas, tüm şablonlar × varsayılan/0,55 ölçek/30°/90°):
+ * - enerjiDuzeyi: düzey adı ve eV yazıları kutu dışına çıkıyor, PNG'de 13–39 px
+ *   kırpılıyordu → yazılar ölçülerek kesin pay (`enerjiDuzeyiDisPayi`).
+ * - geometri şekilleri: varsayılan adlarda 14 px kırpma payı yetiyor, koordinatlı
+ *   adlarda ("A(−12,15)") 11 px kırpılıyordu → en uzun yazıdan üst sınır
+ *   (`geometriDisPayi`).
+ * - diğer ek şekiller (isinOk, halkaAkim, solenoid, telAlan, alanNokta,
+ *   dalgaGirisim): mürekkep `sekilSinirlari` + 14 px içinde, pay gerekmedi.
+ */
+function fizikDisPayKutusu(ctx: CanvasRenderingContext2D, s: Extract<Sekil, { tur: "fizik" }>) {
+  const pay = s.nesne === "enerjiDuzeyi" ? enerjiDuzeyiDisPayi(ctx, s)
+    : geometriMi(s.nesne) ? geometriDisPayi(ctx, s)
+    : null;
+  if (!pay) return null;
+  const ham = { x: s.x - pay.sol, y: s.y - pay.ust, w: s.w + pay.sol + pay.sag, h: s.h + pay.ust + pay.alt };
+  const derece = s.donus ?? 0;
+  if (Math.abs(derece) < 0.01) return ham;
+  const merkez = { x: s.x + s.w / 2, y: s.y + s.h / 2 };
+  const koseler = [
+    { x: ham.x, y: ham.y }, { x: ham.x + ham.w, y: ham.y },
+    { x: ham.x + ham.w, y: ham.y + ham.h }, { x: ham.x, y: ham.y + ham.h },
+  ].map((n) => noktaDondur(n, merkez, derece));
+  const x = Math.min(...koseler.map((n) => n.x)), y = Math.min(...koseler.map((n) => n.y));
+  return { x, y, w: Math.max(...koseler.map((n) => n.x)) - x, h: Math.max(...koseler.map((n) => n.y)) - y };
+}
+
 export function cizimIcerikSiniri(
   ctx: CanvasRenderingContext2D,
   sekiller: Sekil[],
@@ -204,7 +236,7 @@ export function cizimIcerikSiniri(
       if (s.tur === "baglayici") return [baglayiciSiniri(sekiller, s)];
       // Fizik etiketi kutunun DIŞINA yazılabilir ("R" direncin üstünde): içerik
       // sınırına katılmazsa soruya eklenen görselde kırpılırdı.
-      if (s.tur === "fizik") return [sekilSinirlari(ctx, s), fizikEtiketSiniri(ctx, s)];
+      if (s.tur === "fizik") return [sekilSinirlari(ctx, s), fizikEtiketSiniri(ctx, s), fizikDisPayKutusu(ctx, s)];
       return [sekilSinirlari(ctx, s)];
     })
     .filter((s): s is NonNullable<typeof s> => s !== null);
@@ -237,6 +269,16 @@ export function sekilTasiSinirli(
   dy: number,
   olcu: TuvalOlcusu = VARSAYILAN_TUVAL,
 ): Sekil {
+  // Bağlayıcının kutusu bilerek tuval dışında (-1e6); genel yol onu "içeri
+  // itmek" için serbest uçlarını 1e6 px kaydırıyordu (seçili kuvvet vektörü
+  // ok tuşu/Ctrl+D ile ekrandan kayboluyordu). Yalnız serbest uçlar taşınır
+  // ve tuval içinde tutulur; şekle tutunan uçlar zaten şekille gelir.
+  if (sekil.tur === "baglayici") {
+    const tasinan = sekilTasi(sekil, dx, dy) as typeof sekil;
+    const sinirla = (u: typeof sekil.kaynak) => ("sekilId" in u ? u
+      : { x: Math.max(0, Math.min(olcu.w, u.x)), y: Math.max(0, Math.min(olcu.h, u.y)) });
+    return { ...tasinan, kaynak: sinirla(tasinan.kaynak), hedef: sinirla(tasinan.hedef) };
+  }
   const ilk = sekilTasi(sekil, dx, dy);
   const sinir = sekilSinirlari(ctx, ilk);
   const duzeltX = sinir.x < 0 ? -sinir.x : sinir.x + sinir.w > olcu.w ? olcu.w - (sinir.x + sinir.w) : 0;

@@ -8,12 +8,12 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Plus } from "lucide-react";
-import type { GorselTaslak, Madde, MetinTaslak, SoruOgesi } from "../types";
+import type { GorselTaslak, Madde, MetinTaslak } from "../types";
 
 import { useDokunmatik } from "@/lib/dokunmatik";
 import { AlanEtiket, KaydedilmemisUyarisi, ModalAlt, ModalKabuk, OnayDugmesi, TogglePill, VazgecDugmesi } from "./ModalParcalari";
 import { useKapatmaOnayi } from "../hooks/useKapatmaOnayi";
-import { govdeGorselMaxMm, htmlToText, metinKonumuYanYanaMi, sayiSinirla, yeniId } from "../utils";
+import { govdeGorselMaxMm, htmlToText, metinKonumuYanYanaMi, sayiSinirla, yeniId, type SikBicimi } from "../utils";
 
 import { RichTextEditor } from "./SinavZenginMetin";
 import { MmInput } from "./SinavPanelParcalari";
@@ -25,6 +25,7 @@ export function MetinSoruModal({
   onClose,
   onSave,
   testModu,
+  sikBicimi,
   baslangicMetni = "",
 }: {
   varsayilanBosluk: number;
@@ -32,6 +33,8 @@ export function MetinSoruModal({
   onSave: (taslak: MetinTaslak, devamMi: boolean) => void;
   /** Şık harfleri kâğıtla aynı alfabeden gelsin (test kipinde A–E). */
   testModu?: boolean;
+  /** Kâğıdın şık harf biçimi; modal da aynı harfi göstersin. */
+  sikBicimi?: SikBicimi;
   baslangicMetni?: string;
 }) {
   const [html, setHtml] = useState(() => baslangicMetni
@@ -119,6 +122,7 @@ export function MetinSoruModal({
                 madde={madde}
                 index={index}
                 testModu={testModu}
+                sikBicimi={sikBicimi}
                 odakla={madde.id === odakMaddeId}
                 onChange={(patch) => maddeGuncelle(madde.id, patch)}
                 onSil={() => maddeSil(madde.id)}
@@ -340,46 +344,6 @@ export function GorselSoruModal({
       <ModalAlt>
         <VazgecDugmesi onClick={onClose} />
         <OnayDugmesi onClick={() => onSave(taslak)}>Soruyu Ekle</OnayDugmesi>
-      </ModalAlt>
-    </ModalKabuk>
-  );
-}
-
-export function TaslakKurtarmaModal({
-  taslak,
-  dersKitabiSoruSayisi = 0,
-  onDevam,
-  onYeni,
-  onDosyayaKaydet,
-}: {
-  taslak: { kayitZamani: string; sorular: SoruOgesi[] };
-  dersKitabiSoruSayisi?: number;
-  onDevam: () => void;
-  onYeni: () => void;
-  /** "Yeni Başla" onayından çıkış yolu: bulunan taslağı .json olarak indirir. */
-  onDosyayaKaydet?: () => void | Promise<void>;
-}) {
-  const tarih = new Date(taslak.kayitZamani).toLocaleString("tr-TR");
-  // 2026-09 denetimi: burada eskiden "Yeni Başla → bulunan taslak KALICI olarak
-  // silinecek, geri dönüşü yok" deniyordu — tek slot devrinden kalma metin. Kütüphane
-  // geldiğinden beri yeni sınav eskisini SİLMİYOR (yeniTaslaklaBasla, Sınavlarım'da
-  // duruyor). Korkutucu metin yüzünden öğretmen 9-B sorularını 9-A yazılısına ekliyordu.
-  void onDosyayaKaydet;
-  const gelen = dersKitabiSoruSayisi > 0;
-  return (
-    <ModalKabuk baslik={gelen ? `Gelen ${dersKitabiSoruSayisi} soruyu nereye ekleyelim?` : "Açık bir sınavınız var"} onClose={onDevam}>
-      <p className="text-sm leading-relaxed text-slate-600">
-        {tarih} tarihinde kaydedilmiş <b>{taslak.sorular.length} soruluk</b> bir sınav açık.
-        {gelen
-          ? " Gelen soruları bu sınavın sonuna ekleyebilir ya da yeni bir sınav başlatabilirsiniz."
-          : " Kaldığınız yerden devam edebilir ya da yeni bir sınav başlatabilirsiniz."}
-      </p>
-      <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600 ring-1 ring-slate-200">
-        Yeni sınav başlatmak açık sınavı <b>silmez</b>; o sınav Sınavlarım'da durur ve istediğiniz zaman açabilirsiniz.
-      </p>
-      <ModalAlt>
-        <VazgecDugmesi onClick={gelen ? onDevam : onYeni} etiket={gelen ? "Açık sınavın sonuna ekle" : "Yeni sınav başlat"} />
-        <OnayDugmesi onClick={gelen ? onYeni : onDevam}>{gelen ? "Yeni sınav başlat" : "Devam et"}</OnayDugmesi>
       </ModalAlt>
     </ModalKabuk>
   );

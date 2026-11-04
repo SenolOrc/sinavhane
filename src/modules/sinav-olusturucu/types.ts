@@ -67,7 +67,7 @@ export type SoruOgesi = {
   kaynakKonu?: string;
   logicalQuestionId?: string; // paket parçalarında ortak; eski/tek soruda id'ye düşer
   // Ders Kitabı'nda tam sayfa/sayfa aralığı tek mantıksal soru olarak kaydedildiğinde
-  // parçaları ilişkilendirir (bkz. packages/shared/types.ts DersKitabiGorselAktarimi).
+  // parçaları ilişkilendirir (eski Ders Kitabı aktarımından gelen kayıtlarda bulunur).
   // B Grubu karıştırmasında parçalar birbirinden ayrılmasın diye kullanılır.
   paketId?: string;
   paketSira?: number;
@@ -76,6 +76,14 @@ export type SoruOgesi = {
   boslukMm: number;
   punto: number;
   puan: number | null;
+  /**
+   * BEP kâğıdındaki puan. Yalnız BEP görünümünde "Puanları 100'e eşit dağıt"
+   * ile yazılır; normal sınavın `puan`ına DOKUNULMAZ (10 sorudan 5'i BEP'e
+   * seçildiğinde 100 puan iki kâğıtta da tam çıksın diye). `undefined` = BEP
+   * için ayrı puan yok, normal puan kullanılır (eski kayıtlar böyle açılır);
+   * `null` = paket sorunun ilk parçası dışındaki parçalar (puan gösterilmez).
+   */
+  bepPuan?: number | null;
   maddeler: Madde[];
   maddeKolon: 1 | 2 | 3;
   tamGenislik: boolean;

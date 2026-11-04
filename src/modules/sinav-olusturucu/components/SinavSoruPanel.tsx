@@ -31,6 +31,7 @@ import {
   htmlToText,
   maddeHarfi,
   METIN_ALANI_DAR_ESIK_MM,
+  type SikBicimi,
   sayiSinirla,
   soruPuani,
   yeniId,
@@ -57,6 +58,7 @@ export function InlineSoruDuzenlemePanel({
   onDenklemDuzenle,
   onEkDenklemDuzenle,
   testModu = false,
+  sikBicimi,
 }: {
   soru: SoruOgesi;
   sira: number;
@@ -77,6 +79,8 @@ export function InlineSoruDuzenlemePanel({
   onDenklemDuzenle?: () => void;
   onEkDenklemDuzenle?: (parcaId: string) => void;
   testModu?: boolean;
+  /** Kâğıttaki şık harf biçimi (Sayfa Düzeni → Şık harfleri); panel aynı harfi göstersin. */
+  sikBicimi?: SikBicimi;
 }) {
   const [acik, setAcik] = useState(true);
   // İçerik ve Görsel/Yerleşim TEK sekmede: ayrı olduklarında birbirlerine üç
@@ -311,7 +315,7 @@ export function InlineSoruDuzenlemePanel({
 
               <div className="mt-3">
                 <div className="flex items-center justify-between">
-                  <AlanEtiket>Maddeler (a, b, c...)</AlanEtiket>
+                  <AlanEtiket>{testModu ? "Şıklar (A, B, C...)" : "Maddeler (a, b, c...)"}</AlanEtiket>
                   {soru.maddeler.length > 1 && (
                     <div className="flex gap-1">
                       {([1, 2, 3] as const).map((kolon) => (
@@ -331,6 +335,7 @@ export function InlineSoruDuzenlemePanel({
                     {soru.maddeler.map((madde, index) => (
                       <MaddeSatiri
                         testModu={testModu}
+                        sikBicimi={sikBicimi}
                         odakla={madde.id === odakMaddeId}
                         key={madde.id}
                         madde={madde}
@@ -724,6 +729,7 @@ export function MaddeSatiri({
   onYukari,
   onAsagi,
   testModu,
+  sikBicimi,
   odakla,
 }: {
   odakla?: boolean;
@@ -736,12 +742,21 @@ export function MaddeSatiri({
   /** Panel de kâğıtla AYNI harfi göstermeli; ayrışırsa öğretmen panelde "ç"
    *  görüp kâğıtta "D" arar. */
   testModu?: boolean;
+  /** Kâğıda iletilen şık harf biçimi; verilmezse kipin varsayılanı. */
+  sikBicimi?: SikBicimi;
 }) {
+  const harf = maddeHarfi(index, testModu, sikBicimi);
+  // Test kipinde şıkların altına cevap satırı basılmaz ve şık başına puan
+  // verilmez (SinavKagit): bu alanlar orada işlevsizdi. Yazılıdan kalma bir
+  // madde puanı varsa kutu yine gösterilir — yoksa öğretmen kâğıda basılan ve
+  // soru puanını kilitleyen değeri Test kipinde temizleyemezdi.
+  const maddePuaniGoster = !testModu || madde.puan != null;
+  const cevapSatiriGoster = !testModu;
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-2">
       <div className="flex items-center justify-between">
         <span className="text-xs font-bold text-slate-600">
-          {maddeHarfi(index, testModu)})
+          {harf})
         </span>
         <div className="flex gap-1">
           {onYukari && (
@@ -762,12 +777,14 @@ export function MaddeSatiri({
       <RichTextEditor
         value={madde.metinHtml}
         onChange={(html) => onChange({ metinHtml: htmlTemizle(html) })}
-        placeholder={`Madde ${maddeHarfi(index, testModu)}) metni...`}
+        placeholder={`${testModu ? "Şık" : "Madde"} ${harf}) metni...`}
         minHeight="42px"
         kompakt
         autoFocus={odakla}
       />
+      {(maddePuaniGoster || cevapSatiriGoster) && (
       <div className="mt-2 grid grid-cols-2 gap-2">
+        {maddePuaniGoster && (
         <div>
           <AlanEtiket>Madde puanı</AlanEtiket>
           <PuanInput
@@ -775,6 +792,8 @@ export function MaddeSatiri({
             onChange={(puan) => onChange({ puan })}
           />
         </div>
+        )}
+        {cevapSatiriGoster && (
         <div>
           <AlanEtiket>Cevap satırı</AlanEtiket>
           <div className="flex items-end gap-2">
@@ -799,7 +818,9 @@ export function MaddeSatiri({
             </span>
           </div>
         </div>
+        )}
       </div>
+      )}
     </div>
   );
 }

@@ -259,4 +259,33 @@ test("Her örnek çözülüyor, her parça geçerli ve motor çizebiliyor", () =
   void denklemiCiz;
 });
 
+test("Vektör içi alt/üst simge (\\vec{F_1}, vec(v_0)) yapılı çiziliyor", () => {
+  const yazilan: string[] = [];
+  const bos = () => {};
+  const ctx = {
+    font: "", textAlign: "left", textBaseline: "alphabetic", fillStyle: "", strokeStyle: "", lineWidth: 1,
+    measureText(m: string) { return { width: [...m].length * 8, actualBoundingBoxAscent: 10, actualBoundingBoxDescent: 3 }; },
+    fillText(m: string) { yazilan.push(m); },
+    moveTo: bos, lineTo: bos, beginPath: bos, stroke: bos, fill: bos, arc: bos, fillRect: bos, save: bos, restore: bos,
+  } as unknown as CanvasRenderingContext2D;
+  for (const [girdi, taban, alt] of [["\\vec{F_1}", "F", "1"], ["vec(v_0)", "v", "0"]] as const) {
+    yazilan.length = 0;
+    const p = coz(girdi).parcalar;
+    dogrula(p.length === 1 && p[0].tur === "vektor", `${girdi}: tek vektör parçası beklenir`);
+    const v = p[0] as Extract<DenklemParcasi, { tur: "vektor" }>;
+    dogrula(v.stil === "ok", `${girdi}: ok stili`);
+    dogrula(v.ifadeParcalari && ozet(v.ifadeParcalari) === `us(${taban}|^|_${alt})`,
+      `${girdi}: iç parça alt simgeli olmalı → ${v.ifadeParcalari ? ozet(v.ifadeParcalari) : "yok"}`);
+    denklemiCiz(ctx, 18, p, 0, 0);
+    dogrula(!yazilan.some((m) => m.includes("_")), `${girdi}: ham alt çizgi basılmamalı → ${yazilan.join("|")}`);
+    dogrula(yazilan.includes(taban) && yazilan.includes(alt), `${girdi}: taban ve alt simge ayrı basılmalı → ${yazilan.join("|")}`);
+  }
+  // Üst simgeli içerikte ok, üssün üstüne çıkmalı (düz vektörden daha yukarı).
+  const duzOlcu = denklemOlcusu(ctx, 18, coz("\\vec{v}").parcalar);
+  const usOlcu = denklemOlcusu(ctx, 18, coz("\\vec{v^2}").parcalar);
+  dogrula(usOlcu.h >= duzOlcu.h, "üslü vektör en az düz vektör kadar yüksek olmalı");
+  dogrula(denklemOlcusu(ctx, 18, coz("\\vec{F_1}").parcalar).w > denklemOlcusu(ctx, 18, coz("\\vec{F}").parcalar).w,
+    "alt simgeli vektör daha geniş ölçülmeli");
+});
+
 console.log("TÜM DENKLEM YAZIM SENARYOLARI BAŞARILI");

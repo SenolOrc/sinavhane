@@ -1,13 +1,13 @@
 // Node altında çalışan testler için asgari tarayıcı depolama stub'ı.
 //
 // `db/repo.ts` modül gövdesinde `let db = localYukle()` çalıştırıyor; dolayısıyla
-// repo'yu (doğrudan ya da `app/navigation` gibi dolaylı olarak) import eden HER
+// repo'yu (doğrudan ya da dolaylı olarak) import eden HER
 // test, import değerlendirilirken localStorage'a ihtiyaç duyar. ES import'ları
 // hoist edildiği için stub aynı dosyanın gövdesine yazılamaz — bu modül, ilgili
 // testin İLK import'u olarak yan etkisiyle kurulmalıdır:
 //
 //     import "./_tarayici-ortami";
-//     import { NAVIGATION_GROUPS } from "../src/app/navigation";
+//     import * as repo from "../src/db/repo";
 //
 // Kalıcılık gerektiren testler kendi zengin sahtelerini kurmaya devam edebilir
 // (bkz. tam-yedek-senaryolari.ts); burası yalnızca "import patlamasın" içindir.

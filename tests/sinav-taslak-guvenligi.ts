@@ -81,4 +81,26 @@ dogrula(SINAV_TASLAK_DOSYA_AZAMI_BAYT === 25 * 1024 * 1024, "dosya tavanı deği
 dogrula(parolaliSinavMi('{"format":"oa27-encrypted-exam","version":1}'), "parolalı sınav zarfı tanınmadı");
 dogrula(!parolaliSinavMi('{"format":"oa27-encrypted-backup","version":1}'), "yedek zarfı sınav zarfı sanıldı");
 
+// BEP puanı (bepPuan): eski kayıtlarda hiç yok; yeni kayıtlarda sayı ya da
+// (paket parçası için) null olabilir. Geçersiz tür ve aralık reddedilir.
+dogrula(!("bepPuan" in sinavTaslaginiDogrula(gecerliTaslak()).sorular[0]), "bepPuan'sız eski taslak bozuldu");
+for (const deger of [20, 0, null]) {
+  const bepli = structuredClone(gecerliTaslak()) as ReturnType<typeof gecerliTaslak> & { sorular: Array<Record<string, unknown>> };
+  bepli.sorular[0].bepPuan = deger;
+  dogrula(sinavTaslaginiDogrula(bepli).sorular[0].bepPuan === deger, `geçerli bepPuan (${String(deger)}) reddedildi veya kayboldu`);
+}
+for (const deger of ["20", -1, 1_001, Number.NaN]) {
+  const bozuk = structuredClone(gecerliTaslak()) as ReturnType<typeof gecerliTaslak> & { sorular: Array<Record<string, unknown>> };
+  bozuk.sorular[0].bepPuan = deger;
+  dogrula(reddedilir(bozuk), `geçersiz bepPuan (${String(deger)}) kabul edildi`);
+}
+
+// Başlıktaki tarih/süre (artık iki kipte de panelden girilebiliyor) dosyada korunur.
+const tarihli = structuredClone(gecerliTaslak()) as ReturnType<typeof gecerliTaslak> & { baslik: Record<string, unknown> };
+tarihli.baslik.tarih = "12.11.2026";
+tarihli.baslik.sureDakika = "40";
+const tarihliSonuc = sinavTaslaginiDogrula(tarihli);
+dogrula(tarihliSonuc.baslik.tarih === "12.11.2026" && tarihliSonuc.baslik.sureDakika === "40", "başlık tarihi/süresi dosyada korunmadı");
+
 console.log("✓ Sınav taslağı tam yapı, boyut, derinlik, kimlik ve zararlı alan kontrolleri doğru");
+console.log("✓ bepPuan: eski kayıt (alan yok) açılıyor, sayı/null kabul, geçersiz değer reddediliyor; tarih/süre korunuyor");

@@ -257,11 +257,17 @@ export type FizikEtiketYeri = "ic" | "ust" | "alt" | "sag" | "sol";
  */
 export type BaglayiciStili = "dik" | "duz" | "yay" | "vektor";
 
+/** Temel şekillerin isteğe bağlı çizgi rengi (#rrggbb). Yoksa siyah mürekkep —
+ *  eski kayıtlı çizimler bu alan olmadan AYNI görünür. */
+export type TemelRenk = { renk?: string };
+/** Kapalı temel şekillerin isteğe bağlı iç dolgusu (#rrggbb). Yoksa dolgusuz. */
+export type TemelDolgu = { dolgu?: string };
+
 export type CizimSekliGovdesi =
-  | { id: string; tur: "dogru"; kalinlik: number; cizgiTipi?: CizgiTipi; okUcu?: "yok" | "son" | "cift"; x1: number; y1: number; x2: number; y2: number }
-  | { id: string; tur: "dikdortgen"; kalinlik: number; cizgiTipi?: CizgiTipi; x: number; y: number; w: number; h: number; serbestKoseler?: Nokta[] }
-  | { id: string; tur: "elips"; kalinlik: number; cizgiTipi?: CizgiTipi; x: number; y: number; w: number; h: number }
-  | {
+  | ({ id: string; tur: "dogru"; kalinlik: number; cizgiTipi?: CizgiTipi; okUcu?: "yok" | "son" | "cift"; x1: number; y1: number; x2: number; y2: number } & TemelRenk)
+  | ({ id: string; tur: "dikdortgen"; kalinlik: number; cizgiTipi?: CizgiTipi; x: number; y: number; w: number; h: number; serbestKoseler?: Nokta[] } & TemelRenk & TemelDolgu)
+  | ({ id: string; tur: "elips"; kalinlik: number; cizgiTipi?: CizgiTipi; x: number; y: number; w: number; h: number } & TemelRenk & TemelDolgu)
+  | ({
       id: string;
       tur: "ucgen";
       kalinlik: number;
@@ -272,11 +278,11 @@ export type CizimSekliGovdesi =
       y2: number;
       x3: number;
       y3: number;
-    }
-  | { id: string; tur: "cokgen"; kalinlik: number; cizgiTipi?: CizgiTipi; noktalar: Nokta[] }
-  | { id: string; tur: "dalga"; kalinlik: number; cizgiTipi?: CizgiTipi; noktalar: Nokta[] }
-  | { id: string; tur: "serbest"; kalinlik: number; cizgiTipi?: CizgiTipi; noktalar: Nokta[] }
-  | { id: string; tur: "metin"; metin: string; punto?: number; satirAraligi?: number; x: number; y: number }
+    } & TemelRenk & TemelDolgu)
+  | ({ id: string; tur: "cokgen"; kalinlik: number; cizgiTipi?: CizgiTipi; noktalar: Nokta[] } & TemelRenk & TemelDolgu)
+  | ({ id: string; tur: "dalga"; kalinlik: number; cizgiTipi?: CizgiTipi; noktalar: Nokta[] } & TemelRenk)
+  | ({ id: string; tur: "serbest"; kalinlik: number; cizgiTipi?: CizgiTipi; noktalar: Nokta[] } & TemelRenk)
+  | ({ id: string; tur: "metin"; metin: string; punto?: number; satirAraligi?: number; x: number; y: number } & TemelRenk)
   /**
    * Fizik nesnesi (kütle, makara, direnç, mercek…). Etiket `fizik.ts`'in küçük
    * yazım diliyle yazılır: `m_1`, `v^2`, `\theta`. Bağlayıcılar buna da

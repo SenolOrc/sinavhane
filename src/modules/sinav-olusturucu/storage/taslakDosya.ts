@@ -229,12 +229,14 @@ function soruDogrula(deger: unknown): boolean {
     "genislikMm", "gorselOran", "gorselYukseklikMm", "ekGorseller", "kaynakSecimNo", "kaynakSayfaNo",
     "kaynakAd", "kirpmaId", "kaynakAktarimId", "kaynakKitapId", "kaynakSayfa", "kaynakSinif", "kaynakDers",
     "kaynakKonu", "logicalQuestionId", "paketId", "paketSira", "paketParcaSayisi", "paketBasligi", "boslukMm",
-    "punto", "puan", "maddeler", "maddeKolon", "tamGenislik", "tamSayfa", "kazanim", "dogruSik", "bolumBasligi",
+    "punto", "puan", "bepPuan", "maddeler", "maddeKolon", "tamGenislik", "tamSayfa", "kazanim", "dogruSik", "bolumBasligi",
     "cizimVerisi", "denklemVerisi",
   ])) return false;
   if (!metinMi(deger.metinKonumu, 10, false) || !["ust", "alt", "sag", "sol", "yok"].includes(deger.metinKonumu)) return false;
   if (!metinMi(deger.hizalama, 10, false) || !["sol", "orta", "sag"].includes(deger.hizalama)) return false;
   if (!sayiMi(deger.genislikMm, 5, 200) || !sayiMi(deger.boslukMm, 0, 300) || !sayiMi(deger.punto, 6, 72)) return false;
+  // `bepPuan` isteğe bağlı: eski dosyalarda hiç yok (undefined), paket parçalarında null.
+  if (!(deger.bepPuan === undefined || deger.bepPuan === null || sayiMi(deger.bepPuan, 0, 1_000))) return false;
   if (!(deger.puan === null || sayiMi(deger.puan, 0, 1_000)) || ![1, 2, 3].includes(deger.maddeKolon as number) || typeof deger.tamGenislik !== "boolean") return false;
   if (!Array.isArray(deger.maddeler) || deger.maddeler.length > AZAMI_MADDE || !deger.maddeler.every(maddeDogrula)) return false;
   if (deger.tur === "metin" && !metinMi(deger.metinHtml, 500_000)) return false;

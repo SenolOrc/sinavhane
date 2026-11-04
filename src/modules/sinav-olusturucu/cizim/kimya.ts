@@ -380,6 +380,26 @@ export const ELEMENT_KUTLELERI = [
   267, 268, 269, 270, 277, 278, 281, 282, 285, 286, 289, 290, 293, 294, 294,
 ];
 
+/**
+ * Ortalama atom kütlesini yuvarlamanın doğada en bol bulunan izotopu VERMEDİĞİ
+ * elementler (Z → en bol izotopun kütle numarası). Ör. Cu 63,546 → 64 değil
+ * ⁶³Cu; Br 79,904 → 80 değil ⁷⁹Br (⁶⁴Cu ve ⁸⁰Br radyoaktif, doğada yok).
+ * Z = 1–83 aralığındaki tüm elementler doğal izotop bolluklarıyla (IUPAC)
+ * karşılaştırıldı; burada OLMAYAN Z'lerde yuvarlanmış kütle zaten en bol
+ * izotoptur. Z ≥ 84 ile Tc (43) ve Pm (61) için tablodaki tam sayı (uzun
+ * ömürlü izotop) kullanılır.
+ */
+const EN_BOL_KUTLE_NO: Record<number, number> = {
+  28: 58, 29: 63, 30: 64, 31: 69, 32: 74, 34: 80, 35: 79, 40: 90, 42: 98, 44: 102, 47: 107, 48: 114, 50: 120, 51: 121,
+  52: 130, 54: 132, 56: 138, 60: 142, 62: 152, 63: 153, 64: 158, 66: 164, 68: 166, 70: 174, 72: 180, 75: 187, 76: 192,
+  77: 193, 80: 202, 81: 205, 82: 208,
+};
+
+/** Atom çiziminde varsayılan kütle numarası: doğada en bol bulunan izotop. */
+export function enBolKutleNumarasi(z: number): number {
+  return EN_BOL_KUTLE_NO[z] ?? Math.round(ELEMENT_KUTLELERI[z - 1] ?? z);
+}
+
 /** Elementin tablodaki konumu: satır 0–6 (periyot−1), sütun 0–17 (grup−1). İç geçiş (f) elementleri 8. ve 9. satırda. */
 export function elementKonumu(z: number): { satir: number; sutun: number } {
   if (z === 1) return { satir: 0, sutun: 0 };
@@ -427,7 +447,14 @@ export const elementListesiYaz = (liste: number[]) => liste.map((z) => ELEMENT_S
 const ORBITALLER: [number, number][] = [
   [1, 2], [2, 2], [2, 6], [3, 2], [3, 6], [4, 2], [3, 10], [4, 6], [5, 2], [4, 10], [5, 6], [6, 2], [4, 14], [5, 10], [6, 6], [7, 2], [5, 14], [6, 10], [7, 6],
 ];
-const KABUK_ISTISNALARI: Record<number, number[]> = { 24: [2, 8, 13, 1], 29: [2, 8, 18, 1] };
+/** Nötr atomda Aufbau'dan sapan, müfredatta geçen istisnalar (yarı dolu / tam dolu d). */
+const KABUK_ISTISNALARI: Record<number, number[]> = {
+  24: [2, 8, 13, 1], // Cr: [Ar] 4s¹ 3d⁵
+  29: [2, 8, 18, 1], // Cu: [Ar] 4s¹ 3d¹⁰
+  42: [2, 8, 18, 13, 1], // Mo: [Kr] 5s¹ 4d⁵
+  47: [2, 8, 18, 18, 1], // Ag: [Kr] 5s¹ 4d¹⁰
+  79: [2, 8, 18, 32, 18, 1], // Au: [Xe] 4f¹⁴ 6s¹ 5d¹⁰
+};
 
 /** Elektron dizilimi kabuk kabuk (K, L, M…): iyonlar için kation dış kabuktan eksilir. */
 export function kabukDizilimi(z: number, yuk = 0): number[] {
@@ -474,7 +501,7 @@ function atomCiz(ctx: CanvasRenderingContext2D, v: Extract<KimyaVerisi, { tur: "
   ctx.beginPath(); ctx.arc(cx, cy, r0, 0, Math.PI * 2); ctx.stroke();
   const sembol = ELEMENT_SEMBOLLERI[v.z - 1] ?? "?";
   if (v.cekirdek === "pn") {
-    const nt = v.notron ?? Math.max(0, Math.round(ELEMENT_KUTLELERI[v.z - 1] ?? v.z) - v.z);
+    const nt = v.notron ?? Math.max(0, enBolKutleNumarasi(v.z) - v.z);
     fizikMetniCiz(ctx, `${v.z}p\n${nt}n`, cx, cy, 11);
   } else if (v.cekirdek === "sembol") fizikMetniCiz(ctx, sembol, cx, cy, 15);
   else fizikMetniCiz(ctx, `+${v.z}`, cx, cy, 14);
@@ -880,6 +907,7 @@ const AUFBAU: [string, number, number][] = [
 /** Nötr atomda Aufbau'dan sapan yaygın istisnalar (alt kabuk → elektron). */
 const ORBITAL_ISTISNALARI: Record<number, Record<string, number>> = {
   24: { "4s": 1, "3d": 5 }, 29: { "4s": 1, "3d": 10 },
+  42: { "5s": 1, "4d": 5 }, 47: { "5s": 1, "4d": 10 }, 79: { "6s": 1, "5d": 10 },
 };
 
 /**
