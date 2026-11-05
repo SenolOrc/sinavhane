@@ -10,96 +10,30 @@
 
 import type { FizikEk, GeoAciIsareti, GeometriVerisi, Nokta, Sekil } from "./tipler";
 import { MUREKKEP } from "./sabitler";
-import { fizikMetniCiz, fizikMetniOlcu } from "./fizik";
+import { FIZIK_TANIMLARI, fizikMetniCiz, fizikMetniOlcu } from "./fizik";
+import { aciNormu, aciYayiCiz, dikAciIsaretiCiz, dilimTara, dogru, ince, koseAdi, noktaCiz, tirtikCiz } from "./geometriYardimci";
+import {
+  DORTGEN_TIPLERI, KATI_TURLERI, ekGeoCiz, ekGeoGecerliMi, ekGeoMu, ekGeoYazilari,
+  varsayilanDogruAci, varsayilanDortgen, varsayilanKati, varsayilanKatlama,
+} from "./geometriEk";
+
+export { aciYayiCiz, dikAciIsaretiCiz, tirtikCiz };
 
 type FizikSekli = Extract<Sekil, { tur: "fizik" }>;
 type UcgenVerisi = Extract<GeometriVerisi, { tur: "ucgen" }>;
 type CemberVerisi = Extract<GeometriVerisi, { tur: "cember" }>;
 type BenzerVerisi = Extract<GeometriVerisi, { tur: "benzer" }>;
 type CokgenVerisi = Extract<GeometriVerisi, { tur: "cokgen" }>;
+type Kutu = { x: number; y: number; w: number; h: number };
 
-export const GEOMETRI_NESNELERI = ["ucgenABC", "dikUcgen", "benzerUcgen", "cemberGeo", "cokgenAd"] as const;
+export const GEOMETRI_NESNELERI = ["ucgenABC", "dikUcgen", "benzerUcgen", "cemberGeo", "cokgenAd", "dogrudaAcilar", "dortgenGeo", "katiCisim", "kagitKatlama"] as const;
 export const geometriMi = (nesne: string) => (GEOMETRI_NESNELERI as readonly string[]).includes(nesne);
 /** `ek` ayarlarıyla çizilen basit işaretler. */
 export const GEOMETRI_ISARETLERI = ["aciYayi", "dikAci", "esIsaret"] as const;
 
 const RAD = Math.PI / 180;
 const TAM = Math.PI * 2;
-
-// ── Çizim yardımcıları ─────────────────────────────────────────────────────
-
-function dogru(ctx: CanvasRenderingContext2D, a: Nokta, b: Nokta) {
-  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-}
-
-function ince<T>(ctx: CanvasRenderingContext2D, k: number, ciz: () => T): T {
-  ctx.save();
-  ctx.lineWidth = Math.max(0.9, ctx.lineWidth * k);
-  const r = ciz();
-  ctx.restore();
-  return r;
-}
-
-const norm = (a: number) => { let v = a % TAM; if (v <= -Math.PI) v += TAM; if (v > Math.PI) v -= TAM; return v; };
-
-/** Köşede (V) iki ışın (P1, P2) arasındaki iç açının yayı; `adet` kadar iç içe yay. Yayın orta açısını döndürür. */
-export function aciYayiCiz(ctx: CanvasRenderingContext2D, V: Nokta, P1: Nokta, P2: Nokta, r: number, adet = 1): number {
-  const t1 = Math.atan2(P1.y - V.y, P1.x - V.x);
-  const t2 = Math.atan2(P2.y - V.y, P2.x - V.x);
-  const fark = norm(t2 - t1);
-  ince(ctx, 0.85, () => {
-    for (let i = 0; i < Math.max(1, adet); i += 1) {
-      ctx.beginPath();
-      ctx.arc(V.x, V.y, r + i * 4, t1, t1 + fark, fark < 0);
-      ctx.stroke();
-    }
-  });
-  return t1 + fark / 2;
-}
-
-/** Köşede dik açı işareti: iki kenar boyunca küçük kare. */
-export function dikAciIsaretiCiz(ctx: CanvasRenderingContext2D, V: Nokta, P1: Nokta, P2: Nokta, boy: number) {
-  const l1 = Math.hypot(P1.x - V.x, P1.y - V.y) || 1;
-  const l2 = Math.hypot(P2.x - V.x, P2.y - V.y) || 1;
-  const u = { x: ((P1.x - V.x) / l1) * boy, y: ((P1.y - V.y) / l1) * boy };
-  const v = { x: ((P2.x - V.x) / l2) * boy, y: ((P2.y - V.y) / l2) * boy };
-  ince(ctx, 0.85, () => {
-    ctx.beginPath();
-    ctx.moveTo(V.x + u.x, V.y + u.y);
-    ctx.lineTo(V.x + u.x + v.x, V.y + u.y + v.y);
-    ctx.lineTo(V.x + v.x, V.y + v.y);
-    ctx.stroke();
-  });
-}
-
-/** Doğru parçası ortasına eş kenar işareti (tırtık): `adet` kadar kısa dik çizgi. */
-export function tirtikCiz(ctx: CanvasRenderingContext2D, a: Nokta, b: Nokta, adet: number, boy = 6) {
-  const L = Math.hypot(b.x - a.x, b.y - a.y);
-  if (L < 1e-6 || adet < 1) return;
-  const ux = (b.x - a.x) / L, uy = (b.y - a.y) / L;
-  const o = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-  const aralik = 4;
-  ince(ctx, 0.9, () => {
-    for (let i = 0; i < adet; i += 1) {
-      const t = (i - (adet - 1) / 2) * aralik;
-      const cx = o.x + ux * t, cy = o.y + uy * t;
-      // Hafif eğik "/" tırtık (ders kitabı gösterimi): dikten biraz yatık.
-      ctx.beginPath();
-      ctx.moveTo(cx - uy * boy + ux * 2, cy + ux * boy + uy * 2);
-      ctx.lineTo(cx + uy * boy - ux * 2, cy - ux * boy - uy * 2);
-      ctx.stroke();
-    }
-  });
-}
-
-/** Köşe adı / etiketi: `merkez` noktasından köşeye doğru uzaklaşan yönde `uzak` kadar dışarıda. */
-function koseAdi(ctx: CanvasRenderingContext2D, ad: string, kose: Nokta, merkez: Nokta, uzak: number, punto = 18) {
-  const t = ad.trim();
-  if (!t) return;
-  const dx = kose.x - merkez.x, dy = kose.y - merkez.y;
-  const L = Math.hypot(dx, dy) || 1;
-  fizikMetniCiz(ctx, t, kose.x + (dx / L) * uzak, kose.y + (dy / L) * uzak, punto);
-}
+const norm = aciNormu;
 
 // ── Üçgen ──────────────────────────────────────────────────────────────────
 
@@ -149,11 +83,87 @@ const ayakNoktasi = (P: Nokta, A: Nokta, B: Nokta): Nokta => {
   return { x: A.x + t * dx, y: A.y + t * dy };
 };
 
-function ucgenCiz(ctx: CanvasRenderingContext2D, v: UcgenVerisi, k: { x: number; y: number; w: number; h: number }) {
+const d2 = (p: Nokta, q: Nokta) => Math.hypot(p.x - q.x, p.y - q.y);
+
+/** Ağırlık merkezi G: köşelerin ortalaması (kenarortayların kesişimi). */
+export function agirlikMerkezi(K: Nokta[]): Nokta {
+  return { x: (K[0].x + K[1].x + K[2].x) / 3, y: (K[0].y + K[1].y + K[2].y) / 3 };
+}
+
+/** İç teğet çemberin merkezi I (açıortayların kesişimi) ve yarıçapı r = Alan / u (u: yarı çevre). */
+export function icTegetCemberi(K: Nokta[]): { merkez: Nokta; r: number } {
+  const [A, B, C] = K;
+  const a = d2(B, C), b = d2(C, A), c = d2(A, B), t = a + b + c || 1;
+  const alan = Math.abs((B.x - A.x) * (C.y - A.y) - (C.x - A.x) * (B.y - A.y)) / 2;
+  return { merkez: { x: (a * A.x + b * B.x + c * C.x) / t, y: (a * A.y + b * B.y + c * C.y) / t }, r: alan / (t / 2) };
+}
+
+/** Çevrel çemberin merkezi (kenar orta dikmelerinin kesişimi) ve yarıçapı R = abc / (4·Alan). */
+export function cevrelCemberi(K: Nokta[]): { merkez: Nokta; r: number } | null {
+  const [A, B, C] = K;
+  const D = 2 * (A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y));
+  if (Math.abs(D) < 1e-12) return null;
+  const a2 = A.x * A.x + A.y * A.y, b2 = B.x * B.x + B.y * B.y, c2 = C.x * C.x + C.y * C.y;
+  const merkez = { x: (a2 * (B.y - C.y) + b2 * (C.y - A.y) + c2 * (A.y - B.y)) / D, y: (a2 * (C.x - B.x) + b2 * (A.x - C.x) + c2 * (B.x - A.x)) / D };
+  return { merkez, r: d2(merkez, A) };
+}
+
+/** i köşesinden çizilen açıortayın karşı kenardaki ayağı: BN / NC = c / b (iç açıortay teoremi). */
+export function aciortayAyagi(K: Nokta[], i: number): Nokta {
+  const V = K[i], P1 = K[(i + 1) % 3], P2 = K[(i + 2) % 3];
+  const l1 = d2(V, P1), l2 = d2(V, P2), t = l1 + l2 || 1;
+  return { x: (l2 * P1.x + l1 * P2.x) / t, y: (l2 * P1.y + l1 * P2.y) / t };
+}
+
+/** i köşesindeki dış açının uzantı ucu: önceki köşeden (i+2) bu köşeye doğru kenarın uzantısı. */
+export function disAciUzantisi(K: Nokta[], i: number, oran = 0.45): Nokta {
+  const V = K[i], O = K[(i + 2) % 3];
+  return { x: V.x + (V.x - O.x) * oran, y: V.y + (V.y - O.y) * oran };
+}
+
+const KOSE_HARF = ["A", "B", "C"] as const;
+
+/** Üçgenin TUVALDEKİ köşeleri — çizimle aynı yerleşim (sığdırma ya da `sabitKutu`). */
+export function ucgenYerlesimi(v: UcgenVerisi, k: Kutu): Nokta[] {
+  if (v.mod === "serbest" && v.sabitKutu && v.kose.length === 3) return v.kose.map((p) => ({ x: k.x + p.x * k.w, y: k.y + p.y * k.h }));
   const ham = ucgenKoseleri(v) ?? ucgenKoseleri(varsayilanUcgen())!;
-  const P = kutuyaSigdir(ham, k, 30);
+  // Çevrel çember ve dış açı uzantıları da kutuya sığsın diye sığdırmaya katılır.
+  const ek: Nokta[] = [];
+  if (v.cevrelCember) {
+    const c = cevrelCemberi(ham);
+    if (c) ek.push({ x: c.merkez.x - c.r, y: c.merkez.y - c.r }, { x: c.merkez.x + c.r, y: c.merkez.y + c.r });
+  }
+  for (const h of v.disAci ?? []) { const i = KOSE_HARF.indexOf(h); if (i >= 0) ek.push(disAciUzantisi(ham, i)); }
+  return kutuyaSigdir([...ham, ...ek], k, 30).slice(0, 3);
+}
+
+/** Yayın ortasına küçük dik çizgi (açıortayın eş yarılarını ayırt etmek için). */
+function yayTiki(ctx: CanvasRenderingContext2D, V: Nokta, aci: number, r: number) {
+  ince(ctx, 0.85, () => dogru(ctx, { x: V.x + Math.cos(aci) * (r - 4), y: V.y + Math.sin(aci) * (r - 4) }, { x: V.x + Math.cos(aci) * (r + 4), y: V.y + Math.sin(aci) * (r + 4) }));
+}
+
+function ucgenCiz(ctx: CanvasRenderingContext2D, v: UcgenVerisi, k: Kutu) {
+  const P = ucgenYerlesimi(v, k);
   const [A, B, C] = P;
   const merkez = { x: (A.x + B.x + C.x) / 3, y: (A.y + B.y + C.y) / 3 };
+
+  if (v.cevrelCember) {
+    const c = cevrelCemberi(P);
+    if (c) {
+      ince(ctx, 0.85, () => { ctx.beginPath(); ctx.arc(c.merkez.x, c.merkez.y, c.r, 0, TAM); ctx.stroke(); });
+      noktaCiz(ctx, c.merkez, 2.4);
+      const ad = (v.cevrelMerkezAdi ?? "O").trim();
+      if (ad) fizikMetniCiz(ctx, ad, c.merkez.x + 11, c.merkez.y + 12, 16);
+    }
+  }
+  if (v.icTegetCember) {
+    const c = icTegetCemberi(P);
+    ince(ctx, 0.85, () => { ctx.beginPath(); ctx.arc(c.merkez.x, c.merkez.y, c.r, 0, TAM); ctx.stroke(); });
+    noktaCiz(ctx, c.merkez, 2.4);
+    const ad = (v.icMerkezAdi ?? "I").trim();
+    if (ad) fizikMetniCiz(ctx, ad, c.merkez.x + 9, c.merkez.y - 9, 15);
+  }
+
   ctx.beginPath();
   ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.lineTo(C.x, C.y); ctx.closePath();
   ctx.stroke();
@@ -178,6 +188,55 @@ function ucgenCiz(ctx: CanvasRenderingContext2D, v: UcgenVerisi, k: { x: number;
       const yonu = ((o.x - merkez.x) * nx + (o.y - merkez.y) * ny) >= 0 ? 1 : -1;
       fizikMetniCiz(ctx, v.yukseklikEtiket.trim(), o.x + (yonu * nx / nl) * 12, o.y + (yonu * ny / nl) * 12, 16);
     }
+  }
+
+  // Açıortay: köşeden karşı kenara; açının iki eş yarısı tikli yaylarla.
+  const ai = KOSE_HARF.indexOf((v.aciortay ?? "yok") as "A");
+  if (ai >= 0) {
+    const V = P[ai], P1 = P[(ai + 1) % 3], P2 = P[(ai + 2) % 3];
+    const N = aciortayAyagi(P, ai);
+    ince(ctx, 0.85, () => dogru(ctx, V, N));
+    noktaCiz(ctx, N, 2.2);
+    const r = Math.max(14, Math.min(26, d2(V, P1) * 0.28, d2(V, P2) * 0.28));
+    yayTiki(ctx, V, aciYayiCiz(ctx, V, P1, N, r, 1), r);
+    yayTiki(ctx, V, aciYayiCiz(ctx, V, N, P2, r, 1), r);
+    const ad = (v.aciortayAdi ?? "N").trim();
+    if (ad) { const L = d2(N, V) || 1; fizikMetniCiz(ctx, ad, N.x + ((N.x - V.x) / L) * 14, N.y + ((N.y - V.y) / L) * 14, 16); }
+  }
+
+  // Kenarortay(lar): karşı kenarın orta noktasına; yarılar eş tırtıklı. Üçü birden: ağırlık merkezi G.
+  const ko = v.kenarortay ?? "yok";
+  const koListe = ko === "hepsi" ? [0, 1, 2] : ko === "yok" ? [] : [KOSE_HARF.indexOf(ko)];
+  for (const i of koListe) {
+    const V = P[i], P1 = P[(i + 1) % 3], P2 = P[(i + 2) % 3];
+    const M = { x: (P1.x + P2.x) / 2, y: (P1.y + P2.y) / 2 };
+    ince(ctx, 0.85, () => dogru(ctx, V, M));
+    noktaCiz(ctx, M, 2.2);
+    const adet = ko === "hepsi" ? i + 1 : 1;
+    tirtikCiz(ctx, P1, M, adet, 5);
+    tirtikCiz(ctx, M, P2, adet, 5);
+    if (ko !== "hepsi") {
+      const ad = (v.kenarortayAdi ?? "V").trim();
+      if (ad) { const L = d2(M, V) || 1; fizikMetniCiz(ctx, ad, M.x + ((M.x - V.x) / L) * 14, M.y + ((M.y - V.y) / L) * 14, 16); }
+    }
+  }
+  if (ko === "hepsi") {
+    const G = agirlikMerkezi(P);
+    noktaCiz(ctx, G, 2.8);
+    const ad = (v.agirlikAdi ?? "G").trim();
+    if (ad) fizikMetniCiz(ctx, ad, G.x + 11, G.y - 10, 16);
+  }
+
+  // Dış açılar: kenar uzantısı + yay + etiket.
+  for (const h of v.disAci ?? []) {
+    const i = KOSE_HARF.indexOf(h);
+    if (i < 0) continue;
+    const V = P[i], U = disAciUzantisi(P, i), Q = P[(i + 1) % 3];
+    ince(ctx, 0.85, () => dogru(ctx, V, U));
+    const r = Math.max(12, Math.min(20, d2(V, U) * 0.4));
+    const orta = aciYayiCiz(ctx, V, U, Q, r, 1);
+    const t = (v.disAciEtiket?.[i] ?? "").trim();
+    if (t) fizikMetniCiz(ctx, t, V.x + Math.cos(orta) * (r + 15), V.y + Math.sin(orta) * (r + 15), 15);
   }
 
   // Açı işaretleri ve etiketleri: A, B, C köşeleri
@@ -218,13 +277,63 @@ function ucgenCiz(ctx: CanvasRenderingContext2D, v: UcgenVerisi, k: { x: number;
 
 // ── Çember ─────────────────────────────────────────────────────────────────
 
-function cemberCiz(ctx: CanvasRenderingContext2D, v: CemberVerisi, k: { x: number; y: number; w: number; h: number }) {
-  const O = { x: k.x + k.w / 2, y: k.y + k.h / 2 };
-  const R = Math.max(10, Math.min(k.w, k.h) / 2 - 26);
+/** Çemberin tuvaldeki yerleşimi: merkez O, yarıçap R, dış nokta P (varsa). Dış açı yoksa eski yerleşimin AYNISI. */
+export function cemberYerlesimi(v: CemberVerisi, k: Kutu): { O: Nokta; R: number; P: Nokta | null; nokta: (aci: number) => Nokta } {
+  const disVar = (v.disAci ?? "yok") !== "yok";
+  const pAci = (v.disNokta?.aci ?? 0) * RAD;
+  const pUz = Math.max(1.25, Math.min(3, v.disNokta?.uzaklik ?? 1.9));
+  const bx0 = Math.min(-1, disVar ? pUz * Math.cos(pAci) : -1), bx1 = Math.max(1, disVar ? pUz * Math.cos(pAci) : 1);
+  const by0 = Math.min(-1, disVar ? -pUz * Math.sin(pAci) : -1), by1 = Math.max(1, disVar ? -pUz * Math.sin(pAci) : 1);
+  const R = disVar
+    ? Math.max(10, Math.min((k.w - 52) / (bx1 - bx0), (k.h - 52) / (by1 - by0)))
+    : Math.max(10, Math.min(k.w, k.h) / 2 - 26);
+  const O = disVar
+    ? { x: k.x + k.w / 2 - ((bx0 + bx1) / 2) * R, y: k.y + k.h / 2 - ((by0 + by1) / 2) * R }
+    : { x: k.x + k.w / 2, y: k.y + k.h / 2 };
   const nokta = (aci: number): Nokta => ({ x: O.x + R * Math.cos(aci * RAD), y: O.y - R * Math.sin(aci * RAD) });
+  const P = disVar ? { x: O.x + R * pUz * Math.cos(pAci), y: O.y - R * pUz * Math.sin(pAci) } : null;
+  return { O, R, P, nokta };
+}
+
+/** P'den geçen doğrunun çemberle İKİNCİ kesişimi (X çember üstünde). Teğetse X'in kendisi. */
+export function ikinciKesisim(O: Nokta, P: Nokta, X: Nokta): Nokta {
+  const dx = X.x - P.x, dy = X.y - P.y;
+  const a = dx * dx + dy * dy || 1;
+  // t = 1 bir kök (X); kökler çarpımı c/a → diğer kök.
+  const c = (P.x - O.x) ** 2 + (P.y - O.y) ** 2 - ((X.x - O.x) ** 2 + (X.y - O.y) ** 2);
+  const t2 = c / a;
+  return { x: P.x + dx * t2, y: P.y + dy * t2 };
+}
+
+/** P dış noktasından çembere çizilen iki teğetin değme noktaları. */
+export function tegetNoktalari(O: Nokta, R: number, P: Nokta): [Nokta, Nokta] | null {
+  const d = Math.hypot(P.x - O.x, P.y - O.y);
+  if (d <= R + 1e-9) return null;
+  const t = Math.atan2(P.y - O.y, P.x - O.x), f = Math.acos(R / d);
+  return [{ x: O.x + R * Math.cos(t + f), y: O.y + R * Math.sin(t + f) }, { x: O.x + R * Math.cos(t - f), y: O.y + R * Math.sin(t - f) }];
+}
+
+/** İki doğru parçasının (AB, CD) iç kesişimi; yoksa null. */
+function parcaKesisimi(A: Nokta, B: Nokta, C: Nokta, D: Nokta): Nokta | null {
+  const r = { x: B.x - A.x, y: B.y - A.y }, q = { x: D.x - C.x, y: D.y - C.y };
+  const den = r.x * q.y - r.y * q.x;
+  if (Math.abs(den) < 1e-12) return null;
+  const t = ((C.x - A.x) * q.y - (C.y - A.y) * q.x) / den, u = ((C.x - A.x) * r.y - (C.y - A.y) * r.x) / den;
+  if (t <= 1e-6 || t >= 1 - 1e-6 || u <= 1e-6 || u >= 1 - 1e-6) return null;
+  return { x: A.x + t * r.x, y: A.y + t * r.y };
+}
+
+function cemberCiz(ctx: CanvasRenderingContext2D, v: CemberVerisi, k: Kutu) {
+  const { O, R, P, nokta } = cemberYerlesimi(v, k);
+  if (v.dilimTarama) {
+    const [A0, B0] = (v.konum.length >= 2 ? v.konum : [200, 340]).map(nokta);
+    const t1 = Math.atan2(A0.y - O.y, A0.x - O.x), fark = norm(Math.atan2(B0.y - O.y, B0.x - O.x) - t1);
+    dilimTara(ctx, O, R, t1, fark);
+  }
   ctx.beginPath(); ctx.arc(O.x, O.y, R, 0, TAM); ctx.stroke();
   const [A, B, C, T] = (v.konum.length >= 4 ? v.konum : [200, 340, 90, 300]).map(nokta);
-  const nok = (p: Nokta, r = 2.6) => { ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAM); ctx.fill(); };
+  const D = nokta(v.konum[4] ?? 290);
+  const nok = (p: Nokta, r = 2.6) => noktaCiz(ctx, p, r);
   const ad = (i: number) => (v.adlar[i] ?? "").trim();
 
   if (v.cap) {
@@ -235,9 +344,11 @@ function cemberCiz(ctx: CanvasRenderingContext2D, v: CemberVerisi, k: { x: numbe
   }
   if (v.kiris) dogru(ctx, A, B);
   if (v.yaricap) dogru(ctx, O, A);
-  if (v.merkezAci) {
+  if (v.merkezAci || v.dilimTarama) {
     dogru(ctx, O, A);
     dogru(ctx, O, B);
+  }
+  if (v.merkezAci) {
     const orta = aciYayiCiz(ctx, O, A, B, Math.max(12, R * 0.22), 1);
     const t = v.merkezAciEtiket.trim();
     if (t) fizikMetniCiz(ctx, t, O.x + Math.cos(orta) * (R * 0.22 + 20), O.y + Math.sin(orta) * (R * 0.22 + 20), 15);
@@ -248,6 +359,67 @@ function cemberCiz(ctx: CanvasRenderingContext2D, v: CemberVerisi, k: { x: numbe
     const orta = aciYayiCiz(ctx, C, A, B, 15, 1);
     const t = v.cevreAciEtiket.trim();
     if (t) fizikMetniCiz(ctx, t, C.x + Math.cos(orta) * 34, C.y + Math.sin(orta) * 34, 15);
+  }
+  if (v.icAci) {
+    // İki kiriş AB ve CD; E kesişimi. AEC açısı = (AC yayı + BD yayı) / 2.
+    dogru(ctx, A, B); dogru(ctx, C, D);
+    const E = parcaKesisimi(A, B, C, D);
+    if (E) {
+      const orta = aciYayiCiz(ctx, E, A, C, 14, 1);
+      const t = (v.icAciEtiket ?? "").trim();
+      if (t) fizikMetniCiz(ctx, t, E.x + Math.cos(orta) * 30, E.y + Math.sin(orta) * 30, 15);
+      nok(E, 2.4);
+      const t2 = orta + Math.PI;
+      if (ad(6)) fizikMetniCiz(ctx, ad(6), E.x + Math.cos(t2) * 15, E.y + Math.sin(t2) * 15, 16);
+    }
+    nok(D); koseAdi(ctx, ad(5), D, O, 15);
+  }
+  const disAdi = (i: number) => (v.disAdlar?.[i] ?? ["P", "C", "D"][i]).trim();
+  if (P && v.disAci === "kesen") {
+    // P'den A ve B üzerinden iki kesen; ikinci kesişimler yakın/uzak noktalar.
+    const ikinci = [A, B].map((X) => ikinciKesisim(O, P, X));
+    [A, B].forEach((X, i) => {
+      const Y = ikinci[i];
+      const uzak = Math.hypot(X.x - P.x, X.y - P.y) >= Math.hypot(Y.x - P.x, Y.y - P.y) ? X : Y;
+      dogru(ctx, P, uzak);
+      nok(Y); koseAdi(ctx, disAdi(i + 1), Y, O, 15);
+    });
+    const orta = aciYayiCiz(ctx, P, A, B, 20, 1);
+    const t = (v.disAciEtiket ?? "").trim();
+    if (t) fizikMetniCiz(ctx, t, P.x + Math.cos(orta) * 36, P.y + Math.sin(orta) * 36, 15);
+  }
+  if (P && v.disAci === "teget") {
+    const tn = tegetNoktalari(O, R, P);
+    if (tn) {
+      tn.forEach((Tn, i) => {
+        dogru(ctx, P, Tn);
+        ince(ctx, 0.8, () => dogru(ctx, O, Tn));
+        dikAciIsaretiCiz(ctx, Tn, O, P, 7);
+        tirtikCiz(ctx, P, Tn, 1);
+        nok(Tn); koseAdi(ctx, disAdi(i + 1), Tn, O, 15);
+      });
+      const orta = aciYayiCiz(ctx, P, tn[0], tn[1], 20, 1);
+      const t = (v.disAciEtiket ?? "").trim();
+      if (t) fizikMetniCiz(ctx, t, P.x + Math.cos(orta) * 36, P.y + Math.sin(orta) * 36, 15);
+    }
+  }
+  if (P && (v.disAci === "kesen" || v.disAci === "teget")) {
+    nok(P);
+    const L = Math.hypot(P.x - O.x, P.y - O.y) || 1;
+    if (disAdi(0)) fizikMetniCiz(ctx, disAdi(0), P.x + ((P.x - O.x) / L) * 14, P.y + ((P.y - O.y) / L) * 14, 17);
+  }
+  if (v.tegetKiris) {
+    // T'deki teğet + TA kirişi; açı, kirişle AYNI yana bakan teğet ışınıyla (yarısı TA yayı).
+    const dx = T.x - O.x, dy = T.y - O.y, L = Math.hypot(dx, dy) || 1;
+    let tx = -dy / L, ty = dx / L;
+    if (tx * (A.x - T.x) + ty * (A.y - T.y) < 0) { tx = -tx; ty = -ty; }
+    const uzun = Math.min(R * 0.9, 80);
+    dogru(ctx, { x: T.x - tx * uzun, y: T.y - ty * uzun }, { x: T.x + tx * uzun, y: T.y + ty * uzun });
+    dogru(ctx, T, A);
+    const orta = aciYayiCiz(ctx, T, { x: T.x + tx, y: T.y + ty }, A, 18, 1);
+    const t = (v.tegetKirisEtiket ?? "").trim();
+    if (t) fizikMetniCiz(ctx, t, T.x + Math.cos(orta) * 34, T.y + Math.sin(orta) * 34, 15);
+    nok(T); koseAdi(ctx, ad(4), T, O, 15);
   }
   if (v.teget) {
     // Teğet noktasında yarıçapa dik doğru + dik açı işareti
@@ -262,9 +434,11 @@ function cemberCiz(ctx: CanvasRenderingContext2D, v: CemberVerisi, k: { x: numbe
   }
   if (v.merkez) { nok(O, 3); fizikMetniCiz(ctx, ad(0), O.x + 12, O.y + 14, 17); }
   // Kiriş / yarıçap / merkez açı gösterildiyse A, B; çevre açıda C
-  if (v.kiris || v.merkezAci || v.cevreAci || v.cap || v.yaricap) { nok(A); koseAdi(ctx, ad(1), A, O, 15); }
-  if (v.kiris || v.merkezAci || v.cevreAci) { nok(B); koseAdi(ctx, ad(2), B, O, 15); }
-  if (v.cevreAci) { nok(C); koseAdi(ctx, ad(3), C, O, 15); }
+  const aGor = v.kiris || v.merkezAci || v.cevreAci || v.cap || v.yaricap || v.icAci || v.disAci === "kesen" || v.tegetKiris || v.dilimTarama;
+  const bGor = v.kiris || v.merkezAci || v.cevreAci || v.icAci || v.disAci === "kesen" || v.dilimTarama;
+  if (aGor) { nok(A); koseAdi(ctx, ad(1), A, O, 15); }
+  if (bGor) { nok(B); koseAdi(ctx, ad(2), B, O, 15); }
+  if (v.cevreAci || v.icAci) { nok(C); koseAdi(ctx, ad(3), C, O, 15); }
 }
 
 // ── Benzer üçgenler ────────────────────────────────────────────────────────
@@ -349,7 +523,7 @@ function cokgenCiz(ctx: CanvasRenderingContext2D, v: CokgenVerisi, k: { x: numbe
 // ── Dışa açık çizim ────────────────────────────────────────────────────────
 
 export function geometriCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
-  const v = s.geo && geometriVerisiGecerliMi(s.geo) ? s.geo : varsayilanGeometri(s.nesne);
+  const v = s.geo && geometriVerisiGecerliMi(s.geo) && geometriNesneyeUygun(s.nesne, s.geo) ? s.geo : varsayilanGeometri(s.nesne);
   const k = { x: s.x, y: s.y, w: s.w, h: s.h };
   ctx.save();
   ctx.strokeStyle = MUREKKEP;
@@ -357,11 +531,36 @@ export function geometriCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
   ctx.lineWidth = Math.max(1.4, Math.min(2.4, s.kalinlik * 0.85));
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  if (v.tur === "ucgen") ucgenCiz(ctx, v, k);
+  if (ekGeoMu(v)) ekGeoCiz(ctx, v, k);
+  else if (v.tur === "ucgen") ucgenCiz(ctx, v, k);
   else if (v.tur === "cember") cemberCiz(ctx, v, k);
   else if (v.tur === "benzer") benzerCiz(ctx, v, k);
   else cokgenCiz(ctx, v, k);
   ctx.restore();
+}
+
+/**
+ * Kütüphane kartı / panel için küçük önizleme: verilen geometri verisini nesnenin varsayılan
+ * kutusunda çizip (w×h) alana sığdırır. Gerçek çizim rutini kullanılır.
+ */
+export function geometriOnizlemeCiz(ctx: CanvasRenderingContext2D, nesne: string, geo: GeometriVerisi, w: number, h: number) {
+  const t = (FIZIK_TANIMLARI as Record<string, { w: number; h: number } | undefined>)[nesne] ?? { w: 220, h: 170 };
+  // Yazılar kutu dışına taşabildiği için çevresine pay bırakılır.
+  const payX = 30, payY = 26;
+  const olcek = Math.min(w / (t.w + 2 * payX), h / (t.h + 2 * payY));
+  ctx.save();
+  ctx.clearRect(0, 0, w, h);
+  ctx.translate((w - (t.w + 2 * payX) * olcek) / 2, (h - (t.h + 2 * payY) * olcek) / 2);
+  ctx.scale(olcek, olcek);
+  geometriCiz(ctx, { id: "onizleme", tur: "fizik", nesne: nesne as FizikSekli["nesne"], kalinlik: Math.max(1.6, 1.4 / olcek), x: payX, y: payY, w: t.w, h: t.h, geo });
+  ctx.restore();
+}
+
+/** Şablon önizlemesi (sol kütüphane): `sb.nesne` yoksa veri türünden tahmin edilir. */
+export function geometriSablonOnizlemeCiz(ctx: CanvasRenderingContext2D, sb: GeometriSablonu, w: number, h: number) {
+  const geo = sb.olustur();
+  const nesne = sb.nesne ?? ({ ucgen: "ucgenABC", cember: "cemberGeo", benzer: "benzerUcgen", cokgen: "cokgenAd", dogruAci: "dogrudaAcilar", dortgen: "dortgenGeo", kati: "katiCisim", katlama: "kagitKatlama" } as const)[geo.tur];
+  geometriOnizlemeCiz(ctx, nesne, geo, w, h);
 }
 
 /** Açı yayı, dik açı işareti, eş kenar işareti (`ek` ayarlı basit işaretler). */
@@ -420,18 +619,35 @@ export function varsayilanUcgen(ek: Partial<UcgenVerisi> = {}): UcgenVerisi {
   };
 }
 
-export type GeometriSablonu = { id: string; ad: string; ipucu: string; olustur: () => GeometriVerisi };
+/**
+ * Hazır geometri şablonu. `aramaKelimeleri`: sol kütüphane aramasında (Türkçe karakter duyarsız)
+ * kullanılan anahtar sözcükler. `nesne`: şablonun eklendiği fizik nesnesi (kütüphane için).
+ */
+export type GeometriSablonu = { id: string; ad: string; ipucu: string; olustur: () => GeometriVerisi; aramaKelimeleri?: string[]; nesne?: string };
 
 export const UCGEN_SABLONLARI: GeometriSablonu[] = [
-  { id: "g-genel", ad: "Genel üçgen", ipucu: "a, b, c uzunluklarıyla (6, 5, 4)", olustur: () => varsayilanUcgen() },
-  { id: "g-dik-yukseklik", ad: "Dik üçgen + yükseklik", ipucu: "A'da dik açı, hipotenüse AH yüksekliği",
+  { id: "g-genel", ad: "Genel üçgen", ipucu: "a, b, c uzunluklarıyla (6, 5, 4)", olustur: () => varsayilanUcgen(), nesne: "ucgenABC", aramaKelimeleri: ["üçgen", "abc", "kenar", "çeşitkenar"] },
+  { id: "g-dik-yukseklik", ad: "Dik üçgen + yükseklik", ipucu: "A'da dik açı, hipotenüse AH yüksekliği", nesne: "dikUcgen", aramaKelimeleri: ["dik üçgen", "yükseklik", "öklid", "hipotenüs", "pisagor"],
     olustur: () => varsayilanUcgen({ mod: "aci", olcu: [4, 3, 90], aciIsareti: ["dik", "yok", "yok"], yukseklik: "A", yukseklikEtiket: "h", ayakAdi: "H" }) },
-  { id: "g-ikizkenar", ad: "İkizkenar", ipucu: "b = c; eş kenar ve eş taban açıları işaretli",
+  { id: "g-ikizkenar", ad: "İkizkenar", ipucu: "b = c; eş kenar ve eş taban açıları işaretli", nesne: "ucgenABC", aramaKelimeleri: ["ikizkenar üçgen", "eş kenar", "taban açısı"],
     olustur: () => varsayilanUcgen({ olcu: [4, 5, 5], esKenar: [0, 1, 1], esAci: [0, 1, 1] }) },
-  { id: "g-eskenar", ad: "Eşkenar", ipucu: "Üç kenar ve üç açı eş işaretli",
+  { id: "g-eskenar", ad: "Eşkenar", ipucu: "Üç kenar ve üç açı eş işaretli", nesne: "ucgenABC", aramaKelimeleri: ["eşkenar üçgen", "60 derece"],
     olustur: () => varsayilanUcgen({ olcu: [5, 5, 5], esKenar: [1, 1, 1], esAci: [1, 1, 1], acilar: ["60°", "60°", "60°"] }) },
-  { id: "g-iki-kenar-aci", ad: "İki kenar + açı", ipucu: "b, c kenarları ve aralarındaki A açısı (120°)",
+  { id: "g-iki-kenar-aci", ad: "İki kenar + açı", ipucu: "b, c kenarları ve aralarındaki A açısı (120°)", nesne: "ucgenABC", aramaKelimeleri: ["kosinüs teoremi", "geniş açılı üçgen"],
     olustur: () => varsayilanUcgen({ mod: "aci", olcu: [4, 5, 120], aciIsareti: ["yay", "yok", "yok"], acilar: ["120°", "", ""] }) },
+  // v1.2 yardımcı elemanlar
+  { id: "g-aciortay", ad: "Açıortay", ipucu: "A açısının açıortayı AN; iki eş açı", nesne: "ucgenABC", aramaKelimeleri: ["açıortay", "iç açıortay teoremi", "an"],
+    olustur: () => varsayilanUcgen({ olcu: [6, 4, 5], kenarlar: ["", "b", "c"], aciortay: "A", aciortayAdi: "N" }) },
+  { id: "g-kenarortay", ad: "Kenarortay", ipucu: "A'dan BC'nin orta noktası V'ye kenarortay", nesne: "ucgenABC", aramaKelimeleri: ["kenarortay", "orta nokta", "av"],
+    olustur: () => varsayilanUcgen({ kenarlar: ["", "", ""], kenarortay: "A", kenarortayAdi: "V" }) },
+  { id: "g-agirlik", ad: "Ağırlık merkezi", ipucu: "Üç kenarortay ve ağırlık merkezi G", nesne: "ucgenABC", aramaKelimeleri: ["ağırlık merkezi", "kenarortay", "g noktası", "2:1"],
+    olustur: () => varsayilanUcgen({ kenarlar: ["", "", ""], kenarortay: "hepsi", agirlikAdi: "G" }) },
+  { id: "g-dis-aci", ad: "Dış açı", ipucu: "C köşesinde BC uzantısı ve dış açı (A + B)", nesne: "ucgenABC", aramaKelimeleri: ["dış açı", "uzantı", "iç açılar toplamı"],
+    olustur: () => varsayilanUcgen({ kenarlar: ["", "", ""], aciIsareti: ["yay", "yay", "yok"], acilar: ["α", "β", ""], disAci: ["C"], disAciEtiket: ["", "", "α+β"] }) },
+  { id: "g-ic-teget", ad: "İç teğet çember", ipucu: "İç teğet çember ve merkezi I (açıortayların kesişimi)", nesne: "ucgenABC", aramaKelimeleri: ["iç teğet çember", "iç merkez", "açıortay kesişimi", "r = A/u"],
+    olustur: () => varsayilanUcgen({ kenarlar: ["", "", ""], icTegetCember: true, icMerkezAdi: "I" }) },
+  { id: "g-cevrel", ad: "Çevrel çember", ipucu: "Çevrel çember ve merkezi O (orta dikmelerin kesişimi)", nesne: "ucgenABC", aramaKelimeleri: ["çevrel çember", "dış merkez", "orta dikme", "sinüs teoremi"],
+    olustur: () => varsayilanUcgen({ kenarlar: ["", "", ""], cevrelCember: true, cevrelMerkezAdi: "O" }) },
 ];
 
 export function varsayilanCember(ek: Partial<CemberVerisi> = {}): CemberVerisi {
@@ -443,10 +659,21 @@ export function varsayilanCember(ek: Partial<CemberVerisi> = {}): CemberVerisi {
 }
 
 export const CEMBER_SABLONLARI: GeometriSablonu[] = [
-  { id: "c-kiris", ad: "Çember + kiriş", ipucu: "Merkez O, kiriş AB", olustur: () => varsayilanCember() },
-  { id: "c-merkez-aci", ad: "Merkez açı", ipucu: "AOB merkez açısı ve ACB çevre açısı (2α, α)", olustur: () => varsayilanCember({ kiris: true, merkezAci: true, cevreAci: true }) },
-  { id: "c-teget", ad: "Teğet", ipucu: "T noktasında teğet; OT ⟂ teğet", olustur: () => varsayilanCember({ kiris: false, teget: true, konum: [200, 340, 90, 300] }) },
-  { id: "c-cap", ad: "Çap + çevre açı", ipucu: "AB çap, C çember üstünde: ACB = 90°", olustur: () => varsayilanCember({ kiris: false, cap: true, cevreAci: true, cevreAciEtiket: "90°", konum: [180, 0, 70, 300], adlar: ["O", "A", "B", "C", "T", "B"] }) },
+  { id: "c-kiris", ad: "Çember + kiriş", ipucu: "Merkez O, kiriş AB", olustur: () => varsayilanCember(), nesne: "cemberGeo", aramaKelimeleri: ["çember", "kiriş", "daire"] },
+  { id: "c-merkez-aci", ad: "Merkez açı", ipucu: "AOB merkez açısı ve ACB çevre açısı (2α, α)", olustur: () => varsayilanCember({ kiris: true, merkezAci: true, cevreAci: true }), nesne: "cemberGeo", aramaKelimeleri: ["merkez açı", "çevre açı", "yay"] },
+  { id: "c-teget", ad: "Teğet", ipucu: "T noktasında teğet; OT ⟂ teğet", olustur: () => varsayilanCember({ kiris: false, teget: true, konum: [200, 340, 90, 300] }), nesne: "cemberGeo", aramaKelimeleri: ["teğet", "yarıçap dik"] },
+  { id: "c-cap", ad: "Çap + çevre açı", ipucu: "AB çap, C çember üstünde: ACB = 90°", olustur: () => varsayilanCember({ kiris: false, cap: true, cevreAci: true, cevreAciEtiket: "90°", konum: [180, 0, 70, 300], adlar: ["O", "A", "B", "C", "T", "B"] }), nesne: "cemberGeo", aramaKelimeleri: ["çap", "thales", "90 derece"] },
+  // v1.2
+  { id: "c-ic-aci", ad: "İç açı (kesişen kirişler)", ipucu: "AB ve CD kirişleri E'de kesişir: AEC = (AC + BD) / 2", nesne: "cemberGeo", aramaKelimeleri: ["iç açı", "kesişen kiriş", "kiriş kesişimi"],
+    olustur: () => varsayilanCember({ kiris: false, icAci: true, icAciEtiket: "x", konum: [160, 10, 80, 300, 230], adlar: ["O", "A", "B", "C", "T", "D", "E"] }) },
+  { id: "c-dis-kesen", ad: "Dış açı (iki kesen)", ipucu: "P'den iki kesen: APB = (AB − CD) / 2", nesne: "cemberGeo", aramaKelimeleri: ["dış açı", "kesen", "dış nokta"],
+    olustur: () => varsayilanCember({ kiris: false, disAci: "kesen", disAciEtiket: "x", disNokta: { aci: 0, uzaklik: 2.1 }, disAdlar: ["P", "C", "D"], konum: [130, 230, 90, 300] }) },
+  { id: "c-iki-teget", ad: "İki teğet", ipucu: "P'den iki teğet: |PA| = |PB|, OA ⟂ PA", nesne: "cemberGeo", aramaKelimeleri: ["iki teğet", "teğet uzunlukları eşit", "dış açı"],
+    olustur: () => varsayilanCember({ kiris: false, disAci: "teget", disAciEtiket: "x", disNokta: { aci: 0, uzaklik: 2.1 }, disAdlar: ["P", "A", "B"] }) },
+  { id: "c-teget-kiris", ad: "Teğet-kiriş açısı", ipucu: "T'de teğet ve TA kirişi: açı = TA yayının yarısı", nesne: "cemberGeo", aramaKelimeleri: ["teğet kiriş açısı", "teğet", "kiriş"],
+    olustur: () => varsayilanCember({ kiris: false, tegetKiris: true, tegetKirisEtiket: "α", konum: [150, 340, 90, 270] }) },
+  { id: "c-dilim", ad: "Daire dilimi", ipucu: "AOB merkez açısının dilimi taralı", nesne: "cemberGeo", aramaKelimeleri: ["daire dilimi", "dilim alanı", "taralı", "sektör"],
+    olustur: () => varsayilanCember({ kiris: false, merkezAci: true, dilimTarama: true, merkezAciEtiket: "60°", konum: [20, 80, 90, 300] }) },
 ];
 
 export function varsayilanBenzer(ek: Partial<BenzerVerisi> = {}): BenzerVerisi {
@@ -454,8 +681,8 @@ export function varsayilanBenzer(ek: Partial<BenzerVerisi> = {}): BenzerVerisi {
 }
 
 export const BENZER_SABLONLARI: GeometriSablonu[] = [
-  { id: "b-ic", ad: "DE ∥ BC (Thales)", ipucu: "ABC içinde BC'ye paralel DE", olustur: () => varsayilanBenzer() },
-  { id: "b-yan", ad: "Yan yana benzer üçgenler", ipucu: "ABC ~ DEF, eş açılar yaylarla", olustur: () => varsayilanBenzer({ duzen: "yan", oran: 0.6, adlar: ["A", "B", "C", "D", "E", "F"], etiketler: ["a", "b", "c", "a'", "b'", "c'"] }) },
+  { id: "b-ic", ad: "DE ∥ BC (Thales)", ipucu: "ABC içinde BC'ye paralel DE", olustur: () => varsayilanBenzer(), nesne: "benzerUcgen", aramaKelimeleri: ["benzerlik", "thales", "temel orantı"] },
+  { id: "b-yan", ad: "Yan yana benzer üçgenler", ipucu: "ABC ~ DEF, eş açılar yaylarla", olustur: () => varsayilanBenzer({ duzen: "yan", oran: 0.6, adlar: ["A", "B", "C", "D", "E", "F"], etiketler: ["a", "b", "c", "a'", "b'", "c'"] }), nesne: "benzerUcgen", aramaKelimeleri: ["benzer üçgen", "benzerlik oranı"] },
 ];
 
 export function varsayilanCokgen(ek: Partial<CokgenVerisi> = {}): CokgenVerisi {
@@ -464,9 +691,79 @@ export function varsayilanCokgen(ek: Partial<CokgenVerisi> = {}): CokgenVerisi {
 }
 
 export const COKGEN_SABLONLARI: GeometriSablonu[] = [
-  { id: "p-5", ad: "Beşgen ABCDE", ipucu: "Düzgün beşgen, köşe adlı", olustur: () => varsayilanCokgen({ n: 5 }) },
-  { id: "p-6", ad: "Altıgen + köşegen", ipucu: "Düzgün altıgen, merkez O ve köşegenler", olustur: () => varsayilanCokgen({ n: 6, merkez: true, kosegen: true }) },
-  { id: "p-4", ad: "Kare ABCD", ipucu: "Eş kenar işaretli kare", olustur: () => varsayilanCokgen({ n: 4, esKenar: true }) },
+  { id: "p-5", ad: "Beşgen ABCDE", ipucu: "Düzgün beşgen, köşe adlı", olustur: () => varsayilanCokgen({ n: 5 }), nesne: "cokgenAd", aramaKelimeleri: ["beşgen", "düzgün çokgen"] },
+  { id: "p-6", ad: "Altıgen + köşegen", ipucu: "Düzgün altıgen, merkez O ve köşegenler", olustur: () => varsayilanCokgen({ n: 6, merkez: true, kosegen: true }), nesne: "cokgenAd", aramaKelimeleri: ["altıgen", "köşegen"] },
+  { id: "p-4", ad: "Kare ABCD", ipucu: "Eş kenar işaretli kare", olustur: () => varsayilanCokgen({ n: 4, esKenar: true }), nesne: "cokgenAd", aramaKelimeleri: ["kare", "dörtgen"] },
+];
+
+// ── v1.2 şablon listeleri ──────────────────────────────────────────────────
+
+export const DOGRU_ACI_SABLONLARI: GeometriSablonu[] = [
+  { id: "d-kesen", ad: "Paralel iki doğru ve kesen", ipucu: "d₁ ∥ d₂, kesen 8 açı oluşturur (1–8 numaralı)", nesne: "dogrudaAcilar", aramaKelimeleri: ["paralel", "kesen", "yöndeş", "ters açı", "d1 d2"],
+    olustur: () => varsayilanDogruAci() },
+  { id: "d-yondes", ad: "Yöndeş açılar", ipucu: "Kesenin aynı yanında, eş açılar", nesne: "dogrudaAcilar", aramaKelimeleri: ["yöndeş açılar", "paralel"],
+    olustur: () => varsayilanDogruAci({ etiketler: ["α", "", "", "", "α", "", "", ""] }) },
+  { id: "d-z", ad: "Z kuralı (iç ters)", ipucu: "İç ters açılar eşittir", nesne: "dogrudaAcilar", aramaKelimeleri: ["z kuralı", "iç ters açılar", "paralel"],
+    olustur: () => varsayilanDogruAci({ duzen: "z", aci: 55, etiketler: ["α", "α"] }) },
+  { id: "d-u", ad: "U kuralı (karşı durumlu)", ipucu: "Karşı durumlu açıların toplamı 180°", nesne: "dogrudaAcilar", aramaKelimeleri: ["u kuralı", "karşı durumlu", "180 derece"],
+    olustur: () => varsayilanDogruAci({ duzen: "u", aci: 60, etiketler: ["α", "180° − α"] }) },
+  { id: "d-m", ad: "M kuralı", ipucu: "Kırık doğru: ortadaki açı = uç açıların toplamı (x + y)", nesne: "dogrudaAcilar", aramaKelimeleri: ["m kuralı", "kırık doğru", "zikzak"],
+    olustur: () => varsayilanDogruAci({ duzen: "m", aci: 40, aci2: 30, etiketler: ["x", "y", "x + y"] }) },
+  { id: "d-kalem", ad: "Kalem ucu", ipucu: "Üç açının toplamı 360°", nesne: "dogrudaAcilar", aramaKelimeleri: ["kalem ucu", "360 derece", "paralel"],
+    olustur: () => varsayilanDogruAci({ duzen: "kalemUcu", aci: 40, aci2: 35, etiketler: ["a", "b", "c"] }) },
+  { id: "d-zikzak", ad: "Zikzak kuralı", ipucu: "Sağa bakan açılar toplamı = sola bakanlar toplamı", nesne: "dogrudaAcilar", aramaKelimeleri: ["zikzak", "kırık doğru", "testere"],
+    olustur: () => varsayilanDogruAci({ duzen: "zikzak", aci: 45, aci2: 40, etiketler: ["a", "b", "c", "d"] }) },
+];
+
+export const DORTGEN_SABLONLARI: GeometriSablonu[] = [
+  { id: "q-paralelkenar", ad: "Paralelkenar", ipucu: "Karşılıklı kenarlar paralel ve eş", nesne: "dortgenGeo", aramaKelimeleri: ["paralelkenar", "dörtgen"],
+    olustur: () => varsayilanDortgen({ tip: "paralelkenar", esKenar: [1, 2, 1, 2] }) },
+  { id: "q-paralelkenar-yukseklik", ad: "Paralelkenar + yükseklik", ipucu: "D'den AB'ye DH yüksekliği", nesne: "dortgenGeo", aramaKelimeleri: ["paralelkenar alanı", "yükseklik", "dh"],
+    olustur: () => varsayilanDortgen({ tip: "paralelkenar", yukseklik: true, kenarlar: ["a", "", "", "b"] }) },
+  { id: "q-eskenar", ad: "Eşkenar dörtgen", ipucu: "Köşegenler dik kesişir (E)", nesne: "dortgenGeo", aramaKelimeleri: ["eşkenar dörtgen", "baklava", "köşegen dik"],
+    olustur: () => varsayilanDortgen({ tip: "eskenar", kosegen: true, esKenar: [1, 1, 1, 1] }) },
+  { id: "q-yamuk", ad: "Yamuk", ipucu: "AB ∥ DC; D'den yükseklik", nesne: "dortgenGeo", aramaKelimeleri: ["yamuk", "taban", "orta taban"],
+    olustur: () => varsayilanDortgen({ tip: "yamuk", yukseklik: true }) },
+  { id: "q-ikizkenar-yamuk", ad: "İkizkenar yamuk", ipucu: "|AD| = |BC|, taban açıları eş", nesne: "dortgenGeo", aramaKelimeleri: ["ikizkenar yamuk", "yamuk"],
+    olustur: () => varsayilanDortgen({ tip: "ikizkenarYamuk", esKenar: [0, 1, 0, 1], esAci: [1, 1, 0, 0] }) },
+  { id: "q-dik-yamuk", ad: "Dik yamuk", ipucu: "A ve D köşeleri dik", nesne: "dortgenGeo", aramaKelimeleri: ["dik yamuk", "yamuk"],
+    olustur: () => varsayilanDortgen({ tip: "dikYamuk", aciIsareti: ["dik", "yok", "yok", "dik"] }) },
+  { id: "q-deltoid", ad: "Deltoid", ipucu: "|AB| = |AD|, |CB| = |CD|; köşegenler dik", nesne: "dortgenGeo", aramaKelimeleri: ["deltoid", "uçurtma", "köşegen dik"],
+    olustur: () => varsayilanDortgen({ tip: "deltoid", kosegen: true, esKenar: [1, 2, 2, 1] }) },
+  { id: "q-dikdortgen", ad: "Dikdörtgen + köşegen", ipucu: "Köşegenler eş ve birbirini ortalar", nesne: "dortgenGeo", aramaKelimeleri: ["dikdörtgen", "köşegen"],
+    olustur: () => varsayilanDortgen({ tip: "dikdortgen", kosegen: true, aciIsareti: ["dik", "dik", "dik", "dik"] }) },
+  { id: "q-kare", ad: "Kare + köşegen", ipucu: "Köşegenler dik, eş ve birbirini ortalar", nesne: "dortgenGeo", aramaKelimeleri: ["kare", "köşegen", "dörtgen"],
+    olustur: () => varsayilanDortgen({ tip: "kare", kosegen: true, esKenar: [1, 1, 1, 1], aciIsareti: ["dik", "yok", "yok", "yok"] }) },
+];
+
+export const KATI_SABLONLARI: GeometriSablonu[] = [
+  ...KATI_TURLERI.map((t) => ({
+    id: `k-${t.id}`, ad: t.ad, ipucu: `${t.ad}: ${t.olcuAdlari.join(", ")}`, nesne: "katiCisim",
+    aramaKelimeleri: [t.ad.toLocaleLowerCase("tr"), "katı cisim", "3b", "üç boyutlu", ...(t.id === "kup" || t.id === "prizma" ? ["hacim", "ayrıt"] : t.id === "kure" ? ["yarıçap", "hacim"] : ["hacim"])],
+    olustur: (): GeometriVerisi => varsayilanKati({ cisim: t.id }),
+  })),
+  { id: "k-kup-kosegen", ad: "Küp köşegeni", ipucu: "Küpte cisim köşegeni AG = a√3", nesne: "katiCisim", aramaKelimeleri: ["küp köşegeni", "cisim köşegeni", "a√3"],
+    olustur: () => varsayilanKati({ cisim: "kup", kosegen: "cisim", koseAdlari: true }) },
+  { id: "k-prizma-yuzey", ad: "Prizma yüzey köşegeni", ipucu: "Ön yüzde AF yüzey köşegeni", nesne: "katiCisim", aramaKelimeleri: ["yüzey köşegeni", "prizma"],
+    olustur: () => varsayilanKati({ cisim: "prizma", kosegen: "yuzey" }) },
+];
+
+export const KATLAMA_SABLONLARI: GeometriSablonu[] = [
+  { id: "f-kosegen", ad: "Dikdörtgen köşegenden katlama", ipucu: "16×8 kağıt AC boyunca katlanır: D′ ve E oluşur", nesne: "kagitKatlama", aramaKelimeleri: ["kağıt katlama", "köşegen", "dikdörtgen", "katlama"],
+    olustur: () => varsayilanKatlama() },
+  { id: "f-dik-ucgen", ad: "Dik üçgen köşeden noktaya", ipucu: "6-8-10 dik üçgen A ile BC'deki D noktası boyunca katlanır", nesne: "kagitKatlama", aramaKelimeleri: ["dik üçgen katlama", "kağıt katlama"],
+    olustur: () => varsayilanKatlama({ kagit: { tur: "dikucgen", w: 16, h: 8, a: 10, p: 8, q: 6 }, katlar: [{ mod: "nokta", k1: "A", k2: "C", hareketli: "B", kose: "A", kenar: "BC", uz: 3, hedef: "O" }] }) },
+  { id: "f-kare-merkez", ad: "Karede iki köşe merkeze", ipucu: "10×10 karede B ve D köşeleri merkez O'ya katlanır", nesne: "kagitKatlama", aramaKelimeleri: ["kare katlama", "merkeze katlama", "kağıt katlama"],
+    olustur: () => varsayilanKatlama({ kagit: { tur: "kare", w: 16, h: 8, a: 10, p: 8, q: 6 }, katlar: [
+      { mod: "getir", k1: "A", k2: "C", hareketli: "B", kose: "A", kenar: "BC", uz: 4, hedef: "O" },
+      { mod: "getir", k1: "A", k2: "C", hareketli: "D", kose: "A", kenar: "BC", uz: 4, hedef: "O" },
+    ] }) },
+];
+
+/** Sol kütüphane için tüm geometri şablonları (her biri `nesne` + `aramaKelimeleri` taşır). */
+export const GEOMETRI_KUTUPHANESI: GeometriSablonu[] = [
+  ...UCGEN_SABLONLARI, ...CEMBER_SABLONLARI, ...BENZER_SABLONLARI, ...COKGEN_SABLONLARI,
+  ...DOGRU_ACI_SABLONLARI, ...DORTGEN_SABLONLARI, ...KATI_SABLONLARI, ...KATLAMA_SABLONLARI,
 ];
 
 export function varsayilanGeometri(nesne: string): GeometriVerisi {
@@ -474,7 +771,20 @@ export function varsayilanGeometri(nesne: string): GeometriVerisi {
   if (nesne === "benzerUcgen") return varsayilanBenzer();
   if (nesne === "cemberGeo") return varsayilanCember();
   if (nesne === "cokgenAd") return varsayilanCokgen();
+  if (nesne === "dogrudaAcilar") return varsayilanDogruAci();
+  if (nesne === "dortgenGeo") return varsayilanDortgen();
+  if (nesne === "katiCisim") return varsayilanKati();
+  if (nesne === "kagitKatlama") return varsayilanKatlama();
   return varsayilanUcgen();
+}
+
+/** Bu veri bu nesnede çizilebilir mi (ör. `dortgenGeo` nesnesine üçgen verisi gelmesin)? */
+export function geometriNesneyeUygun(nesne: string, v: GeometriVerisi): boolean {
+  const bek: Record<string, GeometriVerisi["tur"][]> = {
+    ucgenABC: ["ucgen"], dikUcgen: ["ucgen"], benzerUcgen: ["benzer"], cemberGeo: ["cember"], cokgenAd: ["cokgen"],
+    dogrudaAcilar: ["dogruAci"], dortgenGeo: ["dortgen"], katiCisim: ["kati"], kagitKatlama: ["katlama"],
+  };
+  return !bek[nesne] || bek[nesne].includes(v.tur);
 }
 
 // ── Doğrulama ──────────────────────────────────────────────────────────────
@@ -482,6 +792,8 @@ export function varsayilanGeometri(nesne: string): GeometriVerisi {
 const sayi = (v: unknown) => typeof v === "number" && Number.isFinite(v);
 const metinDizisi = (v: unknown, en: number) => Array.isArray(v) && v.length <= en && v.every((t) => typeof t === "string" && t.length <= 24);
 const sayiDizisi = (v: unknown, en: number) => Array.isArray(v) && v.length <= en && v.every((t) => sayi(t) && Math.abs(t as number) <= 1e6);
+const istegeBagliMetin = (v: unknown) => v === undefined || (typeof v === "string" && v.length <= 24);
+const istegeBagliBool = (v: unknown) => v === undefined || typeof v === "boolean";
 
 export function geometriVerisiGecerliMi(v: unknown): v is GeometriVerisi {
   if (!v || typeof v !== "object") return false;
@@ -493,11 +805,24 @@ export function geometriVerisiGecerliMi(v: unknown): v is GeometriVerisi {
       Array.isArray(g.aciIsareti) && g.aciIsareti.length === 3 && g.aciIsareti.every((t) => ["yok", "yay", "dik"].includes(String(t))) &&
       [g.esKenar, g.esAci].every((d) => Array.isArray(d) && d.length === 3 && d.every((n) => Number.isInteger(n) && n >= 0 && n <= 3)) &&
       ["yok", "A", "B", "C"].includes(String(g.yukseklik)) && typeof g.yukseklikEtiket === "string" && g.yukseklikEtiket.length <= 24 &&
-      typeof g.ayakAdi === "string" && g.ayakAdi.length <= 24;
+      typeof g.ayakAdi === "string" && g.ayakAdi.length <= 24 &&
+      // v1.2 isteğe bağlı alanlar
+      (g.aciortay === undefined || ["yok", "A", "B", "C"].includes(String(g.aciortay))) &&
+      (g.kenarortay === undefined || ["yok", "A", "B", "C", "hepsi"].includes(String(g.kenarortay))) &&
+      (g.disAci === undefined || (Array.isArray(g.disAci) && g.disAci.length <= 3 && g.disAci.every((t) => ["A", "B", "C"].includes(String(t))))) &&
+      (g.disAciEtiket === undefined || metinDizisi(g.disAciEtiket, 3)) &&
+      [g.aciortayAdi, g.kenarortayAdi, g.agirlikAdi, g.icMerkezAdi, g.cevrelMerkezAdi].every(istegeBagliMetin) &&
+      [g.icTegetCember, g.cevrelCember, g.sabitKutu].every(istegeBagliBool);
   }
   if (g.tur === "cember") {
-    return metinDizisi(g.adlar, 6) && sayiDizisi(g.konum, 4) && ["merkez", "yaricap", "kiris", "cap", "merkezAci", "cevreAci", "teget"].every((a) => typeof g[a] === "boolean") &&
-      typeof g.merkezAciEtiket === "string" && (g.merkezAciEtiket as string).length <= 24 && typeof g.cevreAciEtiket === "string" && (g.cevreAciEtiket as string).length <= 24;
+    const dn = g.disNokta as Record<string, unknown> | undefined;
+    return metinDizisi(g.adlar, 8) && sayiDizisi(g.konum, 5) && ["merkez", "yaricap", "kiris", "cap", "merkezAci", "cevreAci", "teget"].every((a) => typeof g[a] === "boolean") &&
+      typeof g.merkezAciEtiket === "string" && (g.merkezAciEtiket as string).length <= 24 && typeof g.cevreAciEtiket === "string" && (g.cevreAciEtiket as string).length <= 24 &&
+      [g.icAci, g.tegetKiris, g.dilimTarama].every(istegeBagliBool) &&
+      [g.icAciEtiket, g.disAciEtiket, g.tegetKirisEtiket].every(istegeBagliMetin) &&
+      (g.disAci === undefined || ["yok", "kesen", "teget"].includes(String(g.disAci))) &&
+      (dn === undefined || (!!dn && typeof dn === "object" && sayi(dn.aci) && Math.abs(dn.aci as number) <= 720 && sayi(dn.uzaklik) && (dn.uzaklik as number) >= 1 && (dn.uzaklik as number) <= 5)) &&
+      (g.disAdlar === undefined || metinDizisi(g.disAdlar, 3));
   }
   if (g.tur === "benzer") {
     return (g.duzen === "ic" || g.duzen === "yan") && sayi(g.oran) && metinDizisi(g.adlar, 6) && metinDizisi(g.etiketler, 6) && typeof g.esAci === "boolean";
@@ -506,7 +831,7 @@ export function geometriVerisiGecerliMi(v: unknown): v is GeometriVerisi {
     return Number.isInteger(g.n) && (g.n as number) >= 3 && (g.n as number) <= 12 && metinDizisi(g.adlar, 12) &&
       ["merkez", "kosegen", "esKenar"].every((a) => typeof g[a] === "boolean");
   }
-  return false;
+  return ekGeoGecerliMi(g);
 }
 
 /** `ek` (açı yayı, ışın ok, halka akım…) değerleri sınırlı ve temiz mi? */
@@ -529,14 +854,20 @@ export function fizikEkGecerliMi(v: unknown): v is FizikEk {
  * adlarda ("A(−12,15)") PNG'de 11 px kırpıldığı ölçüldü. Kesin konumu her
  * şablonda ayrı hesaplamak yerine en uzun yazıdan güvenli bir üst sınır
  * veriliyor — fazla beyaz alan dışa aktarımda `icerigeKirp` ile zaten atılıyor.
+ *
+ * v1.2: `sabitKutu` üçgende köşeler kutunun tam kenarında olabilir (sığdırma payı
+ * yok), doğruda açılarda d₁/d₂ adı doğrunun SAĞ ucundan sola hizalı yazılır —
+ * ikisinde de yazının tam genişliği payı eklenir. Ölçüm: tests/v12-g-senaryolari.ts
+ * (gerçek tuval pikseli, tüm şablonlar × 0°/90°).
  */
 export function geometriDisPayi(ctx: CanvasRenderingContext2D, s: FizikSekli) {
-  const v = s.geo && geometriVerisiGecerliMi(s.geo) ? s.geo : varsayilanGeometri(s.nesne);
+  const v = s.geo && geometriVerisiGecerliMi(s.geo) && geometriNesneyeUygun(s.nesne, s.geo) ? s.geo : varsayilanGeometri(s.nesne);
   const yazilar: string[] =
-    v.tur === "ucgen" ? [...v.adlar, ...v.kenarlar, ...v.acilar, v.yukseklikEtiket, v.ayakAdi]
-    : v.tur === "cember" ? [...v.adlar, v.merkezAciEtiket, v.cevreAciEtiket]
+    v.tur === "ucgen" ? [...v.adlar, ...v.kenarlar, ...v.acilar, v.yukseklikEtiket, v.ayakAdi, ...(v.disAciEtiket ?? []), v.aciortayAdi ?? "", v.kenarortayAdi ?? "", v.agirlikAdi ?? "", v.icMerkezAdi ?? "", v.cevrelMerkezAdi ?? ""]
+    : v.tur === "cember" ? [...v.adlar, v.merkezAciEtiket, v.cevreAciEtiket, v.icAciEtiket ?? "", v.disAciEtiket ?? "", v.tegetKirisEtiket ?? "", ...(v.disAdlar ?? [])]
     : v.tur === "benzer" ? [...v.adlar, ...v.etiketler]
-    : [...v.adlar];
+    : v.tur === "cokgen" ? [...v.adlar]
+    : ekGeoYazilari(v);
   let w = 0, h = 0;
   for (const y of yazilar) {
     const t = (y ?? "").trim();
@@ -544,7 +875,18 @@ export function geometriDisPayi(ctx: CanvasRenderingContext2D, s: FizikSekli) {
     const o = fizikMetniOlcu(ctx, t, 18);
     w = Math.max(w, o.w); h = Math.max(h, o.h);
   }
-  const yatay = Math.max(28, Math.ceil(34 + w / 2 + 4));
+  const tamGenislik = (v.tur === "ucgen" && v.sabitKutu) || v.tur === "dogruAci";
+  const yatay = Math.max(28, Math.ceil(34 + (tamGenislik ? w : w / 2) + 4));
   const dikey = Math.max(24, Math.ceil(34 + h / 2 + 4));
-  return { sol: yatay, sag: yatay, ust: dikey, alt: dikey };
+  // Sürüklenen köşeler (sabitKutu üçgen / serbest dörtgen) kutunun dışına çıkabilir: taşma kadar ek pay.
+  const serbestKose = v.tur === "ucgen" && v.sabitKutu ? v.kose : v.tur === "dortgen" && v.tip === "serbest" ? v.kose ?? [] : [];
+  const tas = { sol: 0, sag: 0, ust: 0, alt: 0 };
+  for (const p of serbestKose) {
+    tas.sol = Math.max(tas.sol, -p.x * s.w); tas.sag = Math.max(tas.sag, (p.x - 1) * s.w);
+    tas.ust = Math.max(tas.ust, -p.y * s.h); tas.alt = Math.max(tas.alt, (p.y - 1) * s.h);
+  }
+  return { sol: yatay + Math.ceil(tas.sol), sag: yatay + Math.ceil(tas.sag), ust: dikey + Math.ceil(tas.ust), alt: dikey + Math.ceil(tas.alt) };
 }
+
+/** Panel/simge için tür adları (kütüphane, önizleme). */
+export { DORTGEN_TIPLERI, KATI_TURLERI };

@@ -1,8 +1,9 @@
 import type { PointerEvent } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDisariTiklama } from "@/lib/disariTiklama";
 import {
   ArrowRight,
+  BookOpen,
   Copy,
   Circle,
   Eraser,
@@ -15,6 +16,7 @@ import {
   MousePointer2,
   MoreHorizontal,
   PenTool,
+  X,
   Redo2,
   Sigma,
   Square,
@@ -33,17 +35,36 @@ import { DenklemEditoruModal } from "./DenklemEditoruModal";
 import { akisMetniniCoz } from "../cizim/akisMetni";
 import { akisiYerlestir } from "../cizim/akisYerlesim";
 import { useKapatmaOnayi } from "../hooks/useKapatmaOnayi";
-import { FIZIK_TANIMLARI, fizikDisPayi, type FizikGrubu } from "../cizim/fizik";
+import { FIZIK_TANIMLARI, fizikDisPayi } from "../cizim/fizik";
 import { varsayilanIstatistik } from "../cizim/istatistik";
-import { varsayilanSema } from "../cizim/sema";
+import { semaBoyutu, varsayilanSema } from "../cizim/sema";
 import { kimyaBoyutu, varsayilanKimya } from "../cizim/kimya";
 import { GRAFIK_SABLONLARI, hareketUcluGrafik, noktalardanGrafik, ORNEK_EVRELER } from "../cizim/grafik";
-import type { GrafikVerisi, IstatistikVerisi, KimyaVerisi, SemaVerisi } from "../cizim/tipler";
-import { BaglayiciBicimPaneli, FizikSecimPaneli, FizikSeridi } from "./FizikPaneli";
+import type { GeometriVerisi, GrafikVerisi, IstatistikVerisi, KimyaVerisi, SemaVerisi } from "../cizim/tipler";
+import { BaglayiciBicimPaneli, FizikSecimPaneli } from "./FizikPaneli";
+import { fizikSahnePaneliVarMi } from "./FizikSahnePaneli";
 import { GrafikSecimPaneli, GrafikSeridi } from "./GrafikPaneli";
 import { IstatistikPaneli, MatematikSeridi, SemaPaneli } from "./MatematikPaneli";
 import { KimyaPaneli, KimyaSeridi } from "./KimyaPaneli";
 import type { BaglayiciAyari } from "./FizikPaneli";
+import { AKIS_ARACLARI, kutuphaneGirdileri, type KutuphaneGirdisi } from "../cizim/kutuphane";
+import {
+  baglantiPortlari,
+  cevrilebilirMi,
+  grafikNoktaTasi,
+  grafikNoktaTutamaclari,
+  grafikPenceresi,
+  portluMu,
+  sekilDondur90,
+  sekilYatayCevir,
+  type BaglantiPortu,
+} from "../cizim/etkilesim";
+import { geometriEnYakinKenarVeyaKose, geometriKoseTasi, geometriKoseleri } from "../cizim/geometriEtkilesim";
+import { geometriMi } from "../cizim/geometriSekilleri";
+import type { GrafikDuzeni } from "../cizim/grafik";
+import { SolKutuphane } from "./cizim/SolKutuphane";
+import { YuzenAracCubugu, type YuzenAracAyarlari } from "./cizim/YuzenAracCubugu";
+import { YerindeDuzenleBalonu, type BalonHedefi } from "./cizim/YerindeDuzenleBalonu";
 
 import type {
   CizgiTipi,
@@ -139,14 +160,6 @@ import { kisayol } from "../lib/kisayol";
 /** Geri/ileri al yığınlarının bir adımı: şekiller + o anki tuval ölçüsü. */
 type GecmisKaydi = { sekiller: Sekil[]; tuvalOlcu: TuvalOlcusu };
 
-const AKIS_ARACLARI: { sekil: AkisSekli; etiket: string; ipucu: string }[] = [
-  { sekil: "baslangic", etiket: "Başla/Bitir", ipucu: "Yuvarlatılmış uç kutusu" },
-  { sekil: "surec", etiket: "İşlem", ipucu: "Dikdörtgen işlem adımı" },
-  { sekil: "karar", etiket: "Karar", ipucu: "Eşkenar dörtgen — evet/hayır dallanması" },
-  { sekil: "veri", etiket: "Girdi/Çıktı", ipucu: "Paralelkenar" },
-  { sekil: "hazirlik", etiket: "Hazırlık", ipucu: "Altıgen — döngü hazırlığı" },
-  { sekil: "belge", etiket: "Belge", ipucu: "Alt kenarı dalgalı çıktı belgesi" },
-];
 
 /** Düğmedeki küçük şekil önizlemesi — adı okumadan da ayırt edilebilsin. */
 function AkisSimge({ sekil }: { sekil: AkisSekli }) {
@@ -172,12 +185,16 @@ function AkisSimge({ sekil }: { sekil: AkisSekli }) {
 const TEMEL_RENKLI_TURLER: string[] = ["dogru", "dikdortgen", "elips", "ucgen", "cokgen", "dalga", "serbest", "metin"];
 const TEMEL_DOLGULU_TURLER: string[] = ["dikdortgen", "elips", "ucgen", "cokgen"];
 
-const AKIS_KIPI_ARACLARI: CizimAraci[] = ["sec", "silgi", "metin"];
 
 const ARAC_TANIMLARI: { arac: CizimAraci; etiket: string; ipucu?: string; icon: typeof Minus }[] = [
   { arac: "sec", etiket: "Seç / Taşı", icon: MousePointer2 },
   { arac: "dogru", etiket: "Çizgi", ipucu: "Shift ile yatay, dikey veya 45° çizgi", icon: Minus },
-  { arac: "ok", etiket: "Ok / Vektör", ipucu: "Kuvvet, hız, ivme veya ışın oku çizin", icon: ArrowRight },
+  {
+    arac: "baglayici",
+    etiket: "Ok / Bağlayıcı",
+    ipucu: "Şekilleri birbirine bağlayın (ok, devre teli, ip, yay, kuvvet) ya da boşlukta ok çekin. Esc ile bırakılır",
+    icon: ArrowRight,
+  },
   {
     arac: "dikdortgen",
     etiket: "Dikdörtgen",
@@ -209,20 +226,45 @@ const ARAC_TANIMLARI: { arac: CizimAraci; etiket: string; ipucu?: string; icon: 
     icon: AudioWaveform,
   },
   { arac: "serbest", etiket: "Serbest çizgi", icon: PenTool },
-  { arac: "silgi", etiket: "Silgi", ipucu: "Üzerinden geçtiğiniz şekilleri siler", icon: Eraser },
-  { arac: "metin", etiket: "Metin etiketi", icon: Type },
+  { arac: "metin", etiket: "Metin", ipucu: "Tıkladığınız yere yazı ekler", icon: Type },
+  { arac: "silgi", etiket: "Silgi", ipucu: "Üzerinden geçtiğiniz şekilleri siler (Esc ile bırakılır)", icon: Eraser },
+];
+
+/** Ok / Bağlayıcı aracının türleri (araç seçiliyken tuvalin üstündeki şeritte). */
+const BAGLAYICI_TURLERI: { id: string; ad: string; ayar: BaglayiciAyari; ipucu: string }[] = [
+  { id: "ok", ad: "Ok", ayar: { stil: "duz", okUcu: "son" }, ipucu: "Düz ok" },
+  { id: "dik", ad: "Dik açılı ok", ayar: { stil: "dik", okUcu: "son" }, ipucu: "Akış şemasındaki gibi dik açılı ok" },
+  { id: "tel", ad: "Devre teli", ayar: { stil: "dik", okUcu: "yok" }, ipucu: "Dik açılı tel; devre elemanlarını bağlar" },
+  { id: "ip", ad: "İp / Çubuk", ayar: { stil: "duz", okUcu: "yok" }, ipucu: "Düz çizgi (ip, çubuk, kablo)" },
+  { id: "yay", ad: "Yay", ayar: { stil: "yay", okUcu: "yok" }, ipucu: "Zikzaklı yay" },
+  { id: "vektor", ad: "Kuvvet / Vektör", ayar: { stil: "vektor", okUcu: "son" }, ipucu: "Kalın uçlu ok — kuvvet, hız, ivme" },
 ];
 
 /**
- * "Diğer" menüsüne inen araçlar.
- *
- * Ayrım kullanım sıklığı: fizik/matematik sorusu çizen öğretmen çizgi, ok,
- * dikdörtgen, daire, üçgen ve metni sürekli kullanıyor; çokgen, dalga ve
- * serbest çizgi ise nadir. Onbir araç etiketleriyle tek satıra sığmıyordu
- * (ölçüldü: satır 93 px, yani iki sıraya sarıyordu) — sekize inince tek
- * sıraya oturuyor. Nadir araçlar kaybolmuyor, bir tık ötede.
+ * Sağ panelin KENDİLİĞİNDEN açılmadığı basit fizik nesneleri: bunlarda etiket,
+ * çevir, döndür, dolgu yüzen çubukta. Listede OLMAYAN her nesne (grafik,
+ * istatistik, şema, kimya, geometri ve sonradan eklenen düzenekler) seçilince
+ * ayrıntılı panel açılır — yeni bir nesnenin ayarları gözden kaçmasın.
  */
-const NADIR_ARACLAR: CizimAraci[] = ["cokgen", "dalga", "serbest"];
+const BASIT_FIZIK: string[] = [
+  "kutle", "kure", "egikDuzlem", "makara", "araba", "nokta", "yay", "kap", "duvar", "zemin", "tavan",
+  "direnc", "pil", "ampul", "anahtarAcik", "anahtarKapali", "kondansator", "bobin", "ampermetre", "voltmetre",
+  "mercekTumsek", "mercekCukur", "aynaCukur", "aynaTumsek", "aynaDuzlem", "prizma", "miknatis", "yukArti", "yukEksi",
+  "vektorKuvvet", "vektorHiz", "vektorIvme", "vektorBilesen", "dugum", "koordinat",
+];
+
+/** Veri `geo` taşıyan geometri nesnesi mi (üçgen, dörtgen, çember, çokgen…)? */
+function geometriNesnesiMi(s: Extract<Sekil, { tur: "fizik" }>): boolean {
+  return geometriMi(s.nesne) || FIZIK_TANIMLARI[s.nesne]?.grup === "geometri" && !!s.geo;
+}
+
+function karmasikMi(s: Sekil | undefined): boolean {
+  if (!s || s.tur !== "fizik") return false;
+  if (BASIT_FIZIK.includes(s.nesne)) return false;
+  return true;
+}
+
+
 
 export function CizimEditoruModal({
   onClose,
@@ -265,7 +307,7 @@ export function CizimEditoruModal({
   const ileriRef = useRef<GecmisKaydi[]>([]);
   const [gecmisSayisi, setGecmisSayisi] = useState(0);
   const [ileriSayisi, setIleriSayisi] = useState(0);
-  const [arac, setArac] = useState<CizimAraci>("dogru");
+  const [arac, setArac] = useState<CizimAraci>("sec");
   const [kalinlik, setKalinlik] = useState(2);
   const [cizgiTipi, setCizgiTipi] = useState<CizgiTipi>("duz");
   const [tarama, setTarama] = useState<TaramaTipi>("yok");
@@ -304,11 +346,17 @@ export function CizimEditoruModal({
   //
   // Kaynak ucu artık ŞEKİL ya da SERBEST NOKTA olabilir (fizik kipinde kuvvet
   // oku boş bir noktadan başlayıp bir kütlede bitebilir).
-  const [baglayiciKaynakUcu, setBaglayiciKaynakUcu] = useState<BaglayiciUcu | null>(null);
-  const baglayiciKaynakId = baglayiciKaynakUcu && "sekilId" in baglayiciKaynakUcu ? baglayiciKaynakUcu.sekilId : null;
-  const setBaglayiciKaynakId = (id: string | null) => setBaglayiciKaynakUcu(id ? { sekilId: id } : null);
+  const [baglayiciKaynakUcuDurum, setBaglayiciKaynakUcuDurum] = useState<BaglayiciUcu | null>(null);
+  // Ref aynası: basış ve bırakış React render'ı araya girmeden art arda gelebilir.
+  const baglayiciKaynakUcuRef = useRef<BaglayiciUcu | null>(null);
+  const baglayiciKaynakUcu = baglayiciKaynakUcuDurum;
+  const setBaglayiciKaynakUcu = (uc: BaglayiciUcu | null) => { baglayiciKaynakUcuRef.current = uc; setBaglayiciKaynakUcuDurum(uc); };
   /** Yeni bağlayıcının biçimi. Akış kipinde dik açılı ok; fizik kipinde paletten. */
-  const [baglayiciAyari, setBaglayiciAyari] = useState<BaglayiciAyari>({ stil: "dik", okUcu: "son" });
+  const [baglayiciAyari, setBaglayiciAyariDurum] = useState<BaglayiciAyari>({ stil: "dik", okUcu: "son" });
+  /** Öğretmen bağlayıcı türünü kendisi seçti mi? Seçmediyse tür uçlara göre belirlenir. */
+  const baglayiciTuruSecildiRef = useRef(false);
+  const [baglayiciTuruSecildi, setBaglayiciTuruSecildi] = useState(false);
+  const setBaglayiciAyari = (a: BaglayiciAyari) => { baglayiciTuruSecildiRef.current = true; setBaglayiciTuruSecildi(true); setBaglayiciAyariDurum(a); };
   const [hata, setHata] = useState("");
   const [temizleOnayi, setTemizleOnayi] = useState(false);
   const [secimKutusu, setSecimKutusu] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
@@ -330,55 +378,50 @@ export function CizimEditoruModal({
   /** Denklemi düzenlenen akış kutusunun kimliği (null = denklem modalı kapalı). */
   const [denklemKutusuId, setDenklemKutusuId] = useState<string | null>(null);
   /** Yazarak tarif paneli açık mı + metni + son ayrıştırma uyarıları. */
-  const [tarifAcik, setTarifAcik] = useState(false);
   const [tarifMetni, setTarifMetni] = useState("");
   const [tarifUyarilari, setTarifUyarilari] = useState<string[]>([]);
   /** Tuvalde şekil varken "Diz" denince açılan onay. */
   const [dizmeOnayi, setDizmeOnayi] = useState(false);
   /**
-   * Araç çubuğu kipi.
-   *
-   * NEDEN VAR: akış şeması çizen öğretmen üçgen/dalga/tarama araçlarını hiç
-   * kullanmıyor ama hepsi ekranın üstünü kaplıyordu (araç ızgarası + çizgi
-   * özellikleri şeridi, tuvalden ÖNCE beş satır). Kip, o iki bloğu ilgisiz
-   * olduğu tarafta gizliyor.
-   *
-   * Açılışta belgeye BAKARAK seçiliyor: içinde akış kutusu olan bir çizim
-   * yeniden açıldığında öğretmen kaldığı yerden devam etmek ister.
+   * Sol kütüphane çekmecesi. Geniş ekranda açık başlar; dar ekranda (iPad
+   * dikey) tuvalin üstüne açılan çekmece olduğu için kapalı başlar. Karta
+   * tıklamak onu KAPATMAZ (ardı ardına ekleme).
    */
-  /** Fizik şekil paletinde seçili grup. Üstteki "Matematik" ve "Kimya" sekmeleri
-   *  aynı paleti doğrudan ilgili grupta açar (ayrı bir panel DEĞİL). */
-  const [fizikGrubu, setFizikGrubu] = useState<FizikGrubu>("mekanik");
-  const [kip, setKip] = useState<"cizim" | "akis" | "fizik">(() => {
-    const ilk = baslangicBelgesi?.sekiller ?? [];
-    if (ilk.some((s) => s.tur === "fizik")) return "fizik";
-    return ilk.some((s) => s.tur === "akis" || s.tur === "baglayici") ? "akis" : "cizim";
-  });
+  const [solAcik, setSolAcik] = useState(() => typeof window === "undefined" || (window.innerWidth || 1440) >= 1024);
+  /** Ayrıntılı (sağ) panel. Karmaşık nesne seçilince kendiliğinden açılır. */
+  const [sagPanelAcik, setSagPanelAcik] = useState(false);
+  /** Bağlantı portları gösterilen (fareyle üstüne gelinen) şekil. */
+  const [uzerindekiId, setUzerindekiId] = useState<string | null>(null);
+  /** Porttan sürüklenen bağlayıcının önizleme çizgisi. */
+  const [portCizgisi, setPortCizgisi] = useState<{ bas: Nokta; son: Nokta } | null>(null);
+  /** Çift tıklamada açılan yerinde düzenleme baloncuğu. */
+  const [balon, setBalon] = useState<{ hedef: BalonHedefi; nokta: Nokta } | null>(null);
+  const balonOncesiRef = useRef<Sekil[] | null>(null);
+  /** İşaretçi tuvalde basılıyken yüzen çubuk gizlenir (sürüklenen şeklin üstünde durmasın). */
+  const [isaretciBasili, setIsaretciBasili] = useState(false);
+  const [sonEklenen, setSonEklenen] = useState<string | null>(null);
+  // Yüzen çubuk/balon, kaydırılan/boyu değişen tuvalle birlikte konumlansın diye yeniden çizilir.
+  const [, setKaydirmaSayaci] = useState(0);
+  /** Ayrıntılı panel açılınca yer açmak için kendiliğinden kapanan kütüphane. */
+  const solOtomatikKapandiRef = useRef(false);
+  const aracRef = useRef<CizimAraci>("dogru");
+  const balonAcikRef = useRef(false);
   /**
-   * ODAK KİPİ — "sadece tuval".
-   *
-   * NEDEN: 1200×800 gerçek pencerede ÖLÇÜLDÜ — bir şekil seçiliyken araç
-   * çubuğu 404 px içerik istiyor, 240 px'e sıkışıyor (164 px kontrol kendi
-   * içinde kayıyor) ve 600 px'lik tuvalin yalnız 302 px'i görünüyor. Öğretmen
-   * "üstte çok şey oluyor" derken bunu görüyor.
-   *
-   * Kip hiçbir şeyi kalıcı olarak saklamıyor: tek tuşla girilip Escape ile
-   * çıkılıyor. Ayar gizlemek yerine, ayar YAPMADIĞI anı tanıyor.
+   * ODAK KİPİ — "sadece tuval": araç çubukları ve paneller gizlenir; Escape
+   * ile çıkılır. "Daha fazla" menüsünden açılır.
    */
   const [odakKipi, setOdakKipi] = useState(false);
-  // Sağ panel sekmesi: seçim yapılınca "Ayarlar", seçim kalkınca "Şekiller" açılır.
-  const [sagSekme, setSagSekme] = useState<"sekiller" | "ayarlar">("sekiller");
   /** Klavye dinleyicisi bir kez kuruluyor ([] bağımlılık); güncel değeri
    *  ref'ten okur, yoksa mount anındaki `false`a donar. */
   const odakKipiRef = useRef(false);
   useEffect(() => {
     odakKipiRef.current = odakKipi;
   }, [odakKipi]);
-  /** Nadir araçlar taşma menüsünde; açık/kapalı durumu. */
+  /** "Daha fazla" menüsü (ızgara, tuval ölçüsü, temizle…). */
   const [digerAraclarAcik, setDigerAraclarAcik] = useState(false);
-  // OA89: menü tuvalin üstünde açık kalıyordu; dışarı tıklayınca kapansın.
   const digerAraclarRef = useRef<HTMLDivElement>(null);
-  useDisariTiklama(digerAraclarAcik, () => setDigerAraclarAcik(false), digerAraclarRef);
+  const dahaFazlaMenuRef = useRef<HTMLDivElement>(null);
+  useDisariTiklama(digerAraclarAcik, () => setDigerAraclarAcik(false), digerAraclarRef, dahaFazlaMenuRef);
   const [kullaniciSablonlari, setKullaniciSablonlari] = useState<KullaniciSablonu[]>(() => {
     try {
       const kayit = window.localStorage.getItem(KULLANICI_SABLONLARI_ANAHTARI);
@@ -395,6 +438,18 @@ export function CizimEditoruModal({
   const boyutlandirmaBaslangici = useRef<{ sekilId: string; handleId: TutamacId; orijinal: Sekil; baslangicAci?: number } | null>(
     null,
   );
+  /** Çift tıklamayı tanımak için son basış. */
+  const sonBasisRef = useRef<{ t: number; nokta: Nokta } | null>(null);
+  /** Porttan bağlayıcı sürükleme. */
+  const portSurukleRef = useRef<{ kaynak: BaglayiciUcu; bas: Nokta } | null>(null);
+  /** Bağlayıcı aracında basış noktası (sürükle-bırak ile bağlamak için). */
+  const baglayiciSurukleRef = useRef<{ nokta: Nokta; yeniKaynak: boolean } | null>(null);
+  /** Köşe/nokta tutamacı sürükleme; grafikte pencere sürükleme boyunca dondurulur. */
+  const noktaSurukleRef = useRef<{
+    sekilId: string; tur: "geo" | "grafik"; i: number; egri?: number;
+    pencere?: GrafikDuzeni;
+    eskiPencere?: Pick<GrafikVerisi, "xMin" | "xMax" | "yMin" | "yMax" | "xAdim" | "yAdim">;
+  } | null>(null);
   const grupDondurmeBaslangici = useRef<{ orijinaller: Sekil[]; merkez: Nokta; baslangicAci: number } | null>(null);
   const silgiAktifRef = useRef(false);
   const secimKutusuBaslangiciRef = useRef<Nokta | null>(null);
@@ -415,6 +470,8 @@ export function CizimEditoruModal({
   // güncellenen bu ref'ler üzerinden erişilir.
   const seciliIdRef = useRef(seciliId);
   seciliIdRef.current = seciliId;
+  aracRef.current = arac;
+  balonAcikRef.current = !!balon;
   const seciliIdsRef = useRef(seciliIds);
   seciliIdsRef.current = seciliIds;
   // Metin punto kutusuna odaklanma anındaki punto + tüm şekil listesi: onBlur'da
@@ -426,9 +483,79 @@ export function CizimEditoruModal({
     if (!ctx) return;
     sekillerRef.current = sekiller;
     tuvaleCiz(ctx, sekiller, taslak, seciliIds, true, izgaraGoster, secimKutusu, hizalamaCizgileri, tuvalOlcu);
+    etkilesimKatmaniCiz(ctx);
     // tuvalOlcu bağımlılıkta OLMALI: <canvas width/height> değişince tarayıcı
     // tuvali siler; yeniden çizilmezse ölçü değişiminden sonra tuval boş kalır.
-  }, [sekiller, taslak, seciliIds, izgaraGoster, secimKutusu, hizalamaCizgileri, tuvalOlcu]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sekiller, taslak, seciliIds, izgaraGoster, secimKutusu, hizalamaCizgileri, tuvalOlcu, uzerindekiId, portCizgisi, zoom, arac, baglayiciKaynakUcu]);
+
+  /**
+   * Doğrudan etkileşim katmanı (seçim çerçevesinin üstünde): bağlantı portları
+   * (mavi halkalar), köşe/nokta tutamaçları, porttan çekilen bağlayıcının
+   * önizlemesi. Ekranda sabit boyda görünsün diye yakınlaştırmaya bölünür.
+   */
+  function etkilesimKatmaniCiz(ctx: CanvasRenderingContext2D) {
+    const b = 100 / Math.max(zoom, 1);
+    ctx.save();
+    ctx.setLineDash([]);
+    if (arac === "sec" || arac === "baglayici") {
+      for (const sk of portluSekiller()) {
+        for (const p of baglantiPortlari(sk)) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 6 * b, 0, Math.PI * 2);
+          ctx.fillStyle = "#dbeafe";
+          ctx.fill();
+          ctx.lineWidth = 2 * b;
+          ctx.strokeStyle = "#2563eb";
+          ctx.stroke();
+        }
+      }
+    }
+    if (arac === "sec") {
+      for (const t of noktaTutamaclari()) {
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, 7 * b, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+        ctx.lineWidth = 2.5 * b;
+        ctx.strokeStyle = "#2563eb";
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, 2.5 * b, 0, Math.PI * 2);
+        ctx.fillStyle = "#2563eb";
+        ctx.fill();
+      }
+    }
+    if (portCizgisi) {
+      ctx.setLineDash([6 * b, 4 * b]);
+      ctx.lineWidth = 2 * b;
+      ctx.strokeStyle = "#2563eb";
+      ctx.beginPath();
+      ctx.moveTo(portCizgisi.bas.x, portCizgisi.bas.y);
+      ctx.lineTo(portCizgisi.son.x, portCizgisi.son.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(portCizgisi.son.x, portCizgisi.son.y, 4 * b, 0, Math.PI * 2);
+      ctx.fillStyle = "#2563eb";
+      ctx.fill();
+    }
+    // Bağlayıcı aracında seçilen kaynak: küçük işaret (sıradaki tık hedeftir).
+    const kaynak = baglayiciKaynakUcu;
+    if (arac === "baglayici" && kaynak) {
+      const sk = "sekilId" in kaynak ? sekiller.find((x) => x.id === kaynak.sekilId) : undefined;
+      const p = "sekilId" in kaynak
+        ? (sk && (sk.tur === "akis" || sk.tur === "fizik") ? { x: sk.x + sk.w / 2, y: sk.y + sk.h / 2 } : null)
+        : { x: kaynak.x, y: kaynak.y };
+      if (p) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6 * b, 0, Math.PI * 2);
+        ctx.fillStyle = "#2563eb";
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
 
   // Seçim değişince özellik panelini araç çubuğunun görünür alanına getir.
   // `scrollIntoView` jsdom'da tanımsız olabiliyor — testler bileşeni gerçek
@@ -474,6 +601,12 @@ export function CizimEditoruModal({
         setOdakKipi(false);
         return;
       }
+      // Escape önce etkin aracı bırakır (sürekli bağlayıcı kipi, silgi, çizim
+      // araçları) ve Seç'e döner; Seç'teyken seçimi temizler.
+      if (e.key === "Escape" && aracRef.current !== "sec") {
+        setArac("sec"); setBaglayiciKaynakUcu(null); setPortCizgisi(null); setMetinNoktasi(null);
+        return;
+      }
       if (e.key === "Escape") { secimAyarla([]); setMetinNoktasi(null); return; }
       if (seciliIdsRef.current.length && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
         const ctx = canvasRef.current?.getContext("2d");
@@ -502,7 +635,8 @@ export function CizimEditoruModal({
   useEffect(() => {
     function etkilesimVar() {
       return !!(taslakRef.current || surukleBaslangici.current || boyutlandirmaBaslangici.current
-        || grupDondurmeBaslangici.current || secimKutusuBaslangiciRef.current || silgiAktifRef.current);
+        || grupDondurmeBaslangici.current || secimKutusuBaslangiciRef.current || silgiAktifRef.current
+        || portSurukleRef.current || noktaSurukleRef.current || baglayiciSurukleRef.current);
     }
     function pencereYukari(e: globalThis.PointerEvent) {
       if (e.target === canvasRef.current || !etkilesimVar()) return;
@@ -645,7 +779,10 @@ export function CizimEditoruModal({
 
   function secilenleriHizala(tur: "sol" | "orta-x" | "ust" | "orta-y") {
     const ctx = canvasRef.current?.getContext("2d");
-    const secilenler = sekiller.filter((s) => seciliIds.includes(s.id));
+    // Bağlayıcılar hizalamaya KATILMAZ: kutuları tuval dışında (-1e6) duruyor;
+    // Ctrl+A ile seçildiklerinde "sola hizala" her şeyi -1e6'ya itiyordu. Uçları
+    // şekillere bağlı olduğu için şekillerle birlikte zaten yer değiştirirler.
+    const secilenler = sekiller.filter((s) => seciliIds.includes(s.id) && s.tur !== "baglayici");
     if (!ctx || secilenler.length < 2) return;
     const sinirlar = secilenler.map((s) => ({ sekil: s, sinir: sekilSinirlari(ctx, s) }));
     const hedef = tur === "sol" ? Math.min(...sinirlar.map((x) => x.sinir.x))
@@ -664,7 +801,7 @@ export function CizimEditoruModal({
 
   function secilenleriDagit(eksen: "x" | "y") {
     const ctx = canvasRef.current?.getContext("2d");
-    const secilenler = sekiller.filter((s) => seciliIds.includes(s.id));
+    const secilenler = sekiller.filter((s) => seciliIds.includes(s.id) && s.tur !== "baglayici");
     if (!ctx || secilenler.length < 3) return;
     const sirali = secilenler.map((s) => {
       const sinir = sekilSinirlari(ctx, s);
@@ -813,6 +950,121 @@ export function CizimEditoruModal({
     return { x, y };
   }
 
+  /**
+   * Bağlayıcı ucunun tıklanan yere göre karşılığı: akış kutusu ya da fizik
+   * nesnesi (şekle tutunur), kareli alan (en yakın köşe), yoksa serbest nokta.
+   * "Şekle yapışma" kapalıysa her zaman serbest nokta.
+   */
+  function baglayiciUcuBul(ctx: CanvasRenderingContext2D, nokta: Nokta, haric?: string): BaglayiciUcu {
+    const zeminMi = (sk: Sekil) => sk.tur === "fizik" && sk.nesne === "kareliAlan";
+    const liste = sekillerRef.current;
+    const vurulan = [...liste]
+      .reverse()
+      .find((sk) => sk.id !== haric && !baglayiciAyari.serbest && (sk.tur === "akis" || sk.tur === "fizik") && !zeminMi(sk) && sekilVuruldu(ctx, sk, nokta, zoom, liste));
+    if (vurulan) {
+      // Hedefin bir portunun üstünde bırakıldıysa o kenara bağlan.
+      const port = baglantiPortlari(vurulan).find((p) => Math.hypot(p.x - nokta.x, p.y - nokta.y) <= portYaricapi());
+      return port ? { sekilId: vurulan.id, yon: port.yon } : { sekilId: vurulan.id };
+    }
+    const alan = [...liste].reverse().find((sk) => {
+      if (!zeminMi(sk) || sk.tur !== "fizik") return false;
+      const p = noktaYerel(ctx, sk, nokta);
+      const pay = 10;
+      return p.x >= sk.x - pay && p.x <= sk.x + sk.w + pay && p.y >= sk.y - pay && p.y <= sk.y + sk.h + pay;
+    });
+    if (alan) return { sekilId: alan.id, dugum: enYakinDugum(alan, noktaYerel(ctx, alan, nokta)) };
+    // Boş noktaya da bağlanılır (serbest uç): kuvvet vektörünün başlangıcı/
+    // bitişi çoğu zaman bir cismin üstünde değil, boşlukta.
+    return { x: nokta.x, y: nokta.y };
+  }
+
+  /** Port/köşe tutamacı vuruş yarıçapı: parmakla da tutulabilsin (≥ 18 ekran px). */
+  function portYaricapi() {
+    return Math.max(tutamacPayi(zoom), 18 * (100 / Math.max(zoom, 1)));
+  }
+
+  /** Portları görünen şekiller: üstüne gelinen + tek seçili (dokunmatikte üstüne gelme yok). */
+  function portluSekiller(): Sekil[] {
+    const idler = [uzerindekiId, seciliIds.length === 1 ? seciliIds[0] : null].filter(Boolean) as string[];
+    return [...new Set(idler)].map((id) => sekillerRef.current.find((s) => s.id === id)).filter((s): s is Sekil => !!s && portluMu(s));
+  }
+
+  function portBul(nokta: Nokta): (BaglantiPortu & { sekilId: string }) | null {
+    for (const s of portluSekiller()) {
+      const p = baglantiPortlari(s).find((q) => Math.hypot(q.x - nokta.x, q.y - nokta.y) <= portYaricapi());
+      if (p) return { ...p, sekilId: s.id };
+    }
+    return null;
+  }
+
+  /** Tek seçili şeklin doğrudan sürüklenebilir noktaları (üçgen köşesi, çember noktası, grafik köşesi). */
+  function noktaTutamaclari(): { tur: "geo" | "grafik"; i: number; egri?: number; x: number; y: number }[] {
+    if (seciliIds.length !== 1) return [];
+    const s = sekillerRef.current.find((x) => x.id === seciliIds[0]);
+    if (!s || s.tur !== "fizik") return [];
+    if (s.nesne === "grafik") return grafikNoktaTutamaclari(s).map((p) => ({ tur: "grafik" as const, i: p.nokta, egri: p.egri, x: p.x, y: p.y }));
+    if (geometriNesnesiMi(s)) {
+      // Düzgün çokgende köşe taşınmaz (düzgünlük bozulur): tutamaç gösterilmez.
+      return geometriKoseleri(s)
+        .filter((t) => geometriKoseTasi(s, t.index, t) !== null)
+        .map((t) => ({ tur: "geo" as const, i: t.index, x: t.x, y: t.y }));
+    }
+    return [];
+  }
+
+  /** Çift tıklama: yerinde düzenleme baloncuğu ya da (karmaşık nesnede) ayrıntılı panel. */
+  function ciftTiklamaIsle(ctx: CanvasRenderingContext2D, nokta: Nokta): boolean {
+    const tol = Math.max(tutamacPayi(zoom) * 1.5, 12 * (100 / Math.max(zoom, 1)));
+    const liste = sekillerRef.current;
+    const secili = seciliIds.length === 1 ? liste.find((x) => x.id === seciliIds[0]) : undefined;
+    const vurulan = [...liste].reverse().find((s) => sekilVuruldu(ctx, s, nokta, zoom, liste));
+    // Seçili geometri şeklinin köşe/kenarı, kutusunun içinde olmasa da önce denenir.
+    const adaylar = [secili, vurulan].filter((x): x is Sekil => !!x);
+    for (const s of adaylar) {
+      if (s.tur !== "fizik" || !geometriNesnesiMi(s)) continue;
+      const parca = geometriEnYakinKenarVeyaKose(s, nokta, tol);
+      if (parca) {
+        secimAyarla([s.id]);
+        balonAc({ tur: "geo", sekilId: s.id, hedef: { tur: parca.tur, index: parca.index }, ad: parca.ad }, nokta);
+        return true;
+      }
+    }
+    if (!vurulan) return false;
+    if (vurulan.tur === "metin") {
+      secimAyarla([vurulan.id]);
+      setMetinDuzenlenenId(vurulan.id);
+      setMetinNoktasi(nokta);
+      setMetinDeger(vurulan.metin);
+      setMetinPunto(vurulan.punto ?? METIN_PUNTO);
+      setMetinSatirAraligi(vurulan.satirAraligi ?? METIN_SATIR_ARALIGI);
+      return true;
+    }
+    if (vurulan.tur === "akis" || vurulan.tur === "baglayici" || (vurulan.tur === "fizik" && !karmasikMi(vurulan))) {
+      secimAyarla([vurulan.id]);
+      balonAc({ tur: "metin", sekilId: vurulan.id }, nokta);
+      return true;
+    }
+    if (karmasikMi(vurulan)) {
+      secimAyarla([vurulan.id]);
+      setSagPanelAcik(true);
+      return true;
+    }
+    return false;
+  }
+
+  function balonAc(hedef: BalonHedefi, nokta: Nokta) {
+    balonOncesiRef.current = sekillerRef.current;
+    setBalon({ hedef, nokta });
+  }
+
+  function balonKapat() {
+    const once = balonOncesiRef.current;
+    balonOncesiRef.current = null;
+    // Baloncukta gerçekten bir şey değiştiyse TEK geçmiş adımı yazılır.
+    if (once && once !== sekillerRef.current) tarihceyeKaydet(once);
+    setBalon(null);
+  }
+
   function isaretciAsagi(e: PointerEvent<HTMLCanvasElement>) {
     // Canvas'ın tabindex'i yok; preventDefault olmadan tarayıcı mousedown'ın
     // varsayılan davranışı olarak "odaklanabilir olmayan öğeye tıklandı" diyip
@@ -827,35 +1079,12 @@ export function CizimEditoruModal({
 
     if (arac === "baglayici") {
       if (!ctx) return;
-      // Yalnız AKIŞ KUTULARINA bağlanılıyor. Serbest çizgi/metin gibi
-      // şekillere tutunmak teknik olarak mümkün ama akış şemasında anlamsız;
-      // yanlış hedefe bağlanmayı da engelliyor.
-      const zeminMi = (sk: Sekil) => sk.tur === "fizik" && sk.nesne === "kareliAlan";
-      const vurulan = [...sekiller]
-        .reverse()
-        .find((sk) => !baglayiciAyari.serbest && (sk.tur === "akis" || sk.tur === "fizik") && !zeminMi(sk) && sekilVuruldu(ctx, sk, nokta, zoom, sekiller));
-      if (vurulan) {
-        baglayiciTikla({ sekilId: vurulan.id });
-        return;
-      }
-      // Kareli alanın içine (ya da hemen yanına) tıklandı: en yakın köşeye yapış.
-      const alan = [...sekiller].reverse().find((sk) => {
-        if (!zeminMi(sk) || sk.tur !== "fizik") return false;
-        const p = noktaYerel(ctx, sk, nokta);
-        const pay = 10;
-        return p.x >= sk.x - pay && p.x <= sk.x + sk.w + pay && p.y >= sk.y - pay && p.y <= sk.y + sk.h + pay;
-      });
-      if (alan) {
-        baglayiciTikla({ sekilId: alan.id, dugum: enYakinDugum(alan, noktaYerel(ctx, alan, nokta)) });
-        return;
-      }
-      // Fizik kipinde boş noktaya da bağlanılır (serbest uç): kuvvet vektörünün
-      // başlangıcı/bitişi çoğu zaman bir cismin üstünde değil, boşlukta.
-      if (kip === "fizik") {
-        baglayiciTikla({ x: nokta.x, y: nokta.y });
-        return;
-      }
-      setBaglayiciKaynakId(null);
+      // Kaynak bu basışta seçildiyse sürükleyip bırakılan yer HEDEF olur
+      // (iki tıkla kurmak da çalışmaya devam eder).
+      baglayiciSurukleRef.current = { nokta, yeniKaynak: !baglayiciKaynakUcuRef.current };
+      // Porttan başlandıysa çıkış yönü o kenar.
+      const port = portBul(nokta);
+      baglayiciTikla(port ? { sekilId: port.sekilId, yon: port.yon } : baglayiciUcuBul(ctx, nokta));
       return;
     }
 
@@ -878,6 +1107,38 @@ export function CizimEditoruModal({
 
     if (arac === "sec") {
       if (!ctx) return;
+      setIsaretciBasili(true);
+      // Çift tıklama/dokunma: `detail` pointerdown'da her tarayıcıda dolu
+      // gelmiyor (Chrome 0 veriyor, dokunmatikte hiç yok); süre + mesafeyle de tanınır.
+      const simdi = Date.now();
+      const onceki = sonBasisRef.current;
+      sonBasisRef.current = { t: simdi, nokta };
+      const cift = e.detail >= 2 || (!!onceki && simdi - onceki.t < 450 && Math.hypot(nokta.x - onceki.nokta.x, nokta.y - onceki.nokta.y) < 12 * (100 / Math.max(zoom, 1)));
+      if (cift) sonBasisRef.current = null;
+      if (cift && ciftTiklamaIsle(ctx, nokta)) return;
+      // BAĞLANTI PORTU: şeklin kenarındaki mavi halkadan sürükleyince bağlayıcı çekilir.
+      const port = portBul(nokta);
+      if (port) {
+        portSurukleRef.current = { kaynak: { sekilId: port.sekilId, yon: port.yon }, bas: { x: port.x, y: port.y } };
+        setPortCizgisi({ bas: { x: port.x, y: port.y }, son: nokta });
+        return;
+      }
+      // DOĞRUDAN NOKTA TUTAMAÇLARI (üçgen köşesi, çember noktası, grafik köşesi).
+      const nt = noktaTutamaclari().find((t) => Math.hypot(t.x - nokta.x, t.y - nokta.y) <= portYaricapi());
+      if (nt && seciliId) {
+        const s0 = sekiller.find((x) => x.id === seciliId);
+        if (s0 && s0.tur === "fizik") {
+          islemOncesiRef.current = sekiller;
+          islemDegistiRef.current = false;
+          const pencere = nt.tur === "grafik" && s0.grafik ? grafikPenceresi(s0, s0.grafik) : undefined;
+          const g = s0.grafik;
+          noktaSurukleRef.current = {
+            sekilId: s0.id, tur: nt.tur, i: nt.i, egri: nt.egri, pencere,
+            eskiPencere: g ? { xMin: g.xMin, xMax: g.xMax, yMin: g.yMin, yMax: g.yMax, xAdim: g.xAdim, yAdim: g.yAdim } : undefined,
+          };
+          return;
+        }
+      }
       if (seciliIds.length > 1) {
         const secilenler = sekiller.filter((s) => seciliIds.includes(s.id));
         const sinir = birlesikSinir(ctx, secilenler);
@@ -929,15 +1190,6 @@ export function CizimEditoruModal({
       }
       const vurulan = [...sekiller].reverse().find((s) => sekilVuruldu(ctx, s, nokta, zoom, sekiller));
       if (vurulan) {
-        if (e.detail >= 2 && vurulan.tur === "metin") {
-          secimAyarla([vurulan.id]);
-          setMetinDuzenlenenId(vurulan.id);
-          setMetinNoktasi(nokta);
-          setMetinDeger(vurulan.metin);
-          setMetinPunto(vurulan.punto ?? METIN_PUNTO);
-          setMetinSatirAraligi(vurulan.satirAraligi ?? METIN_SATIR_ARALIGI);
-          return;
-        }
         const vurulanIds = vurulan.grupId
           ? sekiller.filter((s) => s.grupId === vurulan.grupId).map((s) => s.id)
           : [vurulan.id];
@@ -1033,8 +1285,58 @@ export function CizimEditoruModal({
     setTaslak(yeniTaslak);
   }
 
+  /** Fareyle üstüne gelinen portlu şekil (kutusunun port payı kadar dışı dahil). */
+  function uzerindekiniGuncelle(nokta: Nokta, haric?: string) {
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return;
+    const pay = portYaricapi();
+    const bulunan = [...sekillerRef.current].reverse().find((s) => {
+      if (s.id === haric || !portluMu(s)) return false;
+      const k = sekilSinirlari(ctx, s);
+      return nokta.x >= k.x - pay && nokta.x <= k.x + k.w + pay && nokta.y >= k.y - pay && nokta.y <= k.y + k.h + pay;
+    });
+    const id = bulunan?.id ?? null;
+    if (id !== uzerindekiId) setUzerindekiId(id);
+  }
+
   function isaretciHareket(e: PointerEvent<HTMLCanvasElement>) {
     const nokta = noktaAl(e);
+
+    // Porttan bağlayıcı çekiliyor: önizleme çizgisi + bırakılacak hedefin portları.
+    if (portSurukleRef.current) {
+      setPortCizgisi({ bas: portSurukleRef.current.bas, son: nokta });
+      uzerindekiniGuncelle(nokta, "sekilId" in portSurukleRef.current.kaynak ? portSurukleRef.current.kaynak.sekilId : undefined);
+      return;
+    }
+    // Köşe / nokta tutamacı sürükleniyor.
+    if (noktaSurukleRef.current) {
+      const ns = noktaSurukleRef.current;
+      const s0 = sekillerRef.current.find((x) => x.id === ns.sekilId);
+      if (!s0 || s0.tur !== "fizik") return;
+      let yeni: Sekil = s0;
+      if (ns.tur === "geo") {
+        const geo = geometriKoseTasi(s0, ns.i, nokta);
+        if (geo) yeni = { ...s0, geo };
+      } else if (ns.tur === "grafik" && ns.pencere && ns.egri !== undefined) {
+        const p = ns.pencere;
+        // Pencere sürükleme boyunca dondurulur: yoksa nokta değiştikçe eksenler
+        // yeniden ölçeklenir ve köşe imlecin altından kaçar.
+        const sabit = { ...s0, grafik: s0.grafik ? { ...s0.grafik, xMin: p.xMin, xMax: p.xMax, yMin: p.yMin, yMax: p.yMax, xAdim: p.xAdim, yAdim: p.yAdim } : s0.grafik };
+        const g = grafikNoktaTasi(sabit, ns.egri, ns.i, nokta, p);
+        if (g) yeni = { ...sabit, grafik: g };
+      }
+      if (yeni === s0) return;
+      if (!islemDegistiRef.current) {
+        tarihceyeKaydet(islemOncesiRef.current ?? sekillerRef.current);
+        islemDegistiRef.current = true;
+      }
+      setSekiller((liste) => liste.map((x) => (x.id === ns.sekilId ? yeni : x)));
+      return;
+    }
+    if ((arac === "sec" || arac === "baglayici") && !surukleBaslangici.current && !boyutlandirmaBaslangici.current
+      && !grupDondurmeBaslangici.current && !secimKutusuBaslangiciRef.current) {
+      uzerindekiniGuncelle(nokta);
+    }
 
     if (arac === "sec" && !surukleBaslangici.current && !boyutlandirmaBaslangici.current
       && !grupDondurmeBaslangici.current && !secimKutusuBaslangiciRef.current) {
@@ -1050,6 +1352,8 @@ export function CizimEditoruModal({
           if (tutamac) imlec = tutamac.id === "dondur" ? "grab" : "nwse-resize";
         }
         if (imlec === "crosshair" && [...sekiller].reverse().some((s) => sekilVuruldu(ctx, s, nokta, zoom, sekiller))) imlec = "move";
+        if (portBul(nokta)) imlec = "crosshair";
+        else if (noktaTutamaclari().some((t) => Math.hypot(t.x - nokta.x, t.y - nokta.y) <= portYaricapi())) imlec = "grab";
         e.currentTarget.style.cursor = imlec;
       }
     }
@@ -1264,7 +1568,57 @@ export function CizimEditoruModal({
     setTaslak(yeniTaslak);
   }
 
-  function isaretciYukari() {
+  function isaretciYukari(e?: PointerEvent<HTMLCanvasElement>) {
+    setIsaretciBasili(false);
+    // Porttan çekilen bağlayıcı bırakıldı.
+    if (portSurukleRef.current) {
+      const ps = portSurukleRef.current;
+      portSurukleRef.current = null;
+      const cizgi = portCizgisi;
+      setPortCizgisi(null);
+      const ctx = canvasRef.current?.getContext("2d");
+      const son = e ? noktaAl(e) : cizgi?.son;
+      if (!ctx || !son) return;
+      if (Math.hypot(son.x - ps.bas.x, son.y - ps.bas.y) < 12 * (100 / Math.max(zoom, 1))) return;
+      const kaynakId = "sekilId" in ps.kaynak ? ps.kaynak.sekilId : undefined;
+      const hedef = baglayiciUcuBul(ctx, son, kaynakId);
+      baglayiciOlustur(ps.kaynak, hedef);
+      return;
+    }
+    if (noktaSurukleRef.current) {
+      const ns = noktaSurukleRef.current;
+      noktaSurukleRef.current = null;
+      // Grafik: dondurulan pencere eski hâline (çoğu zaman otomatik) döner.
+      if (ns.tur === "grafik" && ns.eskiPencere && islemDegistiRef.current) {
+        const eski = ns.eskiPencere;
+        setSekiller((liste) => liste.map((x) => {
+          if (x.id !== ns.sekilId || x.tur !== "fizik" || !x.grafik) return x;
+          const g = { ...x.grafik } as Record<string, unknown>;
+          for (const k of ["xMin", "xMax", "yMin", "yMax", "xAdim", "yAdim"] as const) {
+            if (eski[k] === undefined) delete g[k]; else g[k] = eski[k];
+          }
+          return { ...x, grafik: g as unknown as GrafikVerisi };
+        }));
+      }
+      islemOncesiRef.current = null;
+      islemDegistiRef.current = false;
+      return;
+    }
+    if (arac === "baglayici") {
+      // Sürükle-bırak: kaynak bu basışta seçildiyse bırakılan yer hedeftir.
+      const bs = baglayiciSurukleRef.current;
+      baglayiciSurukleRef.current = null;
+      const ctx = canvasRef.current?.getContext("2d");
+      if (bs?.yeniKaynak && e && ctx && baglayiciKaynakUcuRef.current) {
+        const son = noktaAl(e);
+        if (Math.hypot(son.x - bs.nokta.x, son.y - bs.nokta.y) >= 12 * (100 / Math.max(zoom, 1))) {
+          const kaynak = baglayiciKaynakUcuRef.current;
+          const haric = "sekilId" in kaynak ? kaynak.sekilId : undefined;
+          baglayiciOlustur(kaynak, baglayiciUcuBul(ctx, son, haric));
+        }
+      }
+      return;
+    }
     if (arac === "silgi") {
       silgiAktifRef.current = false;
       islemOncesiRef.current = null;
@@ -1327,9 +1681,17 @@ export function CizimEditoruModal({
     // fonksiyonlarındaki aynı setTimeout deseni).
     window.setTimeout(() => secimAyarla([yeni.id]), 0);
     setTaslak(null);
+    // Çizim bitince Seç'e dönülür: öğretmen yeni şekli hemen taşıyabilsin,
+    // "Seç"e tıklamak zorunda kalmasın.
+    setArac("sec");
   }
 
   function isaretciIptal() {
+    setIsaretciBasili(false);
+    portSurukleRef.current = null;
+    noktaSurukleRef.current = null;
+    baglayiciSurukleRef.current = null;
+    setPortCizgisi(null);
     if (islemDegistiRef.current && islemOncesiRef.current) {
       setSekiller(islemOncesiRef.current);
       // Sürükleme/boyutlandırma başında tarihceyeKaydet ile açılan geçmiş
@@ -1393,8 +1755,42 @@ export function CizimEditoruModal({
     setTuvalOlcu(yeni);
   }
 
-  /** Bağlayıcı akışında bir şekle (ya da fizik kipinde boş noktaya) tıklandı. */
+  /**
+   * Bağlayıcıyı kurar. Araç Seç'e DÖNMEZ: öğretmen Esc'e basana ya da başka
+   * araç seçene kadar ardı ardına tel/ok çekebilsin (sürekli bağlayıcı kipi).
+   */
+  function baglayiciOlustur(kaynak: BaglayiciUcu, hedef: BaglayiciUcu) {
+    const ayniSekil = "sekilId" in kaynak && "sekilId" in hedef && kaynak.sekilId === hedef.sekilId && !("dugum" in hedef && hedef.dugum);
+    if (ayniSekil) { setBaglayiciKaynakUcu(null); return; }
+    tarihceyeKaydet();
+    // Öğretmen tür seçmediyse uçlara bakarak akıllı varsayılan: iki devre
+    // elemanı arası devre teli, akış kutusu varsa dik açılı ok, yoksa düz ok.
+    let ayar = baglayiciAyari;
+    if (!baglayiciTuruSecildiRef.current) {
+      const uc = (u: BaglayiciUcu) => ("sekilId" in u ? sekillerRef.current.find((x) => x.id === u.sekilId) : undefined);
+      const a = uc(kaynak), b = uc(hedef);
+      const elektrik = (x?: Sekil) => x?.tur === "fizik" && FIZIK_TANIMLARI[x.nesne]?.grup === "elektrik";
+      ayar = elektrik(a) && elektrik(b) ? { stil: "dik", okUcu: "yok" }
+        : a?.tur === "akis" || b?.tur === "akis" ? { stil: "dik", okUcu: "son" }
+        : { stil: "duz", okUcu: "son" };
+    }
+    const yeni: Sekil = {
+      id: sekilId(),
+      tur: "baglayici",
+      kalinlik,
+      kaynak,
+      hedef,
+      okUcu: ayar.okUcu,
+      // "dik" varsayılan olduğu için eski belge biçimi korunur: alan yazılmaz.
+      ...(ayar.stil !== "dik" ? { stil: ayar.stil } : {}),
+    };
+    setSekiller((mevcut) => [...mevcut, yeni]);
+    setBaglayiciKaynakUcu(null);
+  }
+
+  /** Bağlayıcı akışında bir şekle (ya da boş noktaya) tıklandı. */
   function baglayiciTikla(uc: BaglayiciUcu) {
+    const baglayiciKaynakUcu = baglayiciKaynakUcuRef.current;
     if (!baglayiciKaynakUcu) {
       setBaglayiciKaynakUcu(uc);
       return;
@@ -1413,21 +1809,7 @@ export function CizimEditoruModal({
       setBaglayiciKaynakUcu(null);
       return;
     }
-    tarihceyeKaydet();
-    const yeni: Sekil = {
-      id: sekilId(),
-      tur: "baglayici",
-      kalinlik,
-      kaynak: baglayiciKaynakUcu,
-      hedef: uc,
-      okUcu: baglayiciAyari.okUcu,
-      // "dik" varsayılan olduğu için eski belge biçimi korunur: alan yazılmaz.
-      ...(baglayiciAyari.stil !== "dik" ? { stil: baglayiciAyari.stil } : {}),
-    };
-    setSekiller((mevcut) => [...mevcut, yeni]);
-    setBaglayiciKaynakUcu(null);
-    setArac("sec");
-    window.setTimeout(() => secimAyarla([yeni.id]), 0);
+    baglayiciOlustur(baglayiciKaynakUcu, uc);
   }
 
   /**
@@ -1436,9 +1818,11 @@ export function CizimEditoruModal({
    * ayarlanır). Her yeni nesne tuvalin ortasından küçük kaymalarla gelir ki
    * üst üste binip birbirini gizlemesin.
    */
-  function fizikNesnesiEkle(nesne: FizikNesnesi, ek?: { grafik?: GrafikVerisi; istatistik?: IstatistikVerisi; sema?: SemaVerisi; kimya?: KimyaVerisi }) {
+  function fizikNesnesiEkle(nesne: FizikNesnesi, ek?: { grafik?: GrafikVerisi; istatistik?: IstatistikVerisi; sema?: SemaVerisi; kimya?: KimyaVerisi; geo?: GeometriVerisi }) {
     const t0 = FIZIK_TANIMLARI[nesne];
-    const t = nesne === "kimya" ? { ...t0, ...kimyaBoyutu(ek?.kimya ?? varsayilanKimya()) } : t0;
+    // Kimya ve şema kutusu içeriğe göre ölçülür (birim çember, 3 aşamalı ağaç sıkışmasın).
+    const t = nesne === "kimya" ? { ...t0, ...kimyaBoyutu(ek?.kimya ?? varsayilanKimya()) }
+      : nesne === "sema" ? { ...t0, ...semaBoyutu(ek?.sema ?? varsayilanSema()) } : t0;
     const ctx = canvasRef.current?.getContext("2d");
     const kutular: Kutu[] = ctx
       ? sekiller
@@ -1481,10 +1865,54 @@ export function CizimEditoruModal({
       ...(nesne === "istatistik" ? { istatistik: ek?.istatistik ?? varsayilanIstatistik() } : {}),
       ...(nesne === "sema" ? { sema: ek?.sema ?? varsayilanSema() } : {}),
       ...(nesne === "kimya" ? { kimya: ek?.kimya ?? varsayilanKimya() } : {}),
+      ...(ek?.geo ? { geo: ek.geo } : {}),
     };
     setSekiller((mevcut) => [...mevcut, yeni]);
     setArac("sec");
     window.setTimeout(() => secimAyarla([yeni.id]), 0);
+  }
+
+  /**
+   * Birden çok şekli (hazır sahne, kayıtlı şablon) tuvalde BOŞ bir yere ekler.
+   * Kimlikler ve bağlayıcı uçları yenilenir; eklenenler seçili gelir.
+   */
+  function sekillerEkle(kaynak: Sekil[]) {
+    const yeniler = kimlikleriYenile(kaynak);
+    if (!yeniler.length) return;
+    const ctx = canvasRef.current?.getContext("2d");
+    let tasinmis = yeniler;
+    if (ctx) {
+      const govde = yeniler.filter((x) => x.tur !== "baglayici");
+      if (govde.length) {
+        const k = birlesikSinir(ctx, govde);
+        const kutular: Kutu[] = sekiller
+          .filter((x) => x.tur !== "baglayici" && !(x.tur === "fizik" && x.nesne === "kareliAlan"))
+          .map((x) => sekilTamKutusu(ctx, x));
+        const pay = 24;
+        const konum = bosYerBul(kutular, k.w + pay * 2, k.h + pay * 2, tuvalOlcu);
+        const dx = konum.x + pay - k.x, dy = konum.y + pay - k.y;
+        tasinmis = yeniler.map((x) => sekilTasi(x, dx, dy));
+      }
+    }
+    tarihceyeKaydet();
+    setSekiller((liste) => [...liste, ...tasinmis]);
+    setArac("sec");
+    window.setTimeout(() => secimAyarla(tasinmis.map((x) => x.id)), 0);
+  }
+
+  /** Sol kütüphanedeki bir karta tıklandı. Çekmece AÇIK kalır. */
+  function kutuphanedenEkle(girdi: KutuphaneGirdisi) {
+    const eylem = girdi.ekle();
+    if (eylem.tur === "fizik") fizikNesnesiEkle(eylem.nesne, eylem.ek);
+    else if (eylem.tur === "akis") akisKutusuEkle(eylem.sekil);
+    else if (eylem.tur === "uclu") grafikUcluEkle();
+    else if (girdi.kullaniciSablonuId) {
+      const sb = kullaniciSablonlari.find((x) => x.id === girdi.kullaniciSablonuId);
+      if (sb) kullaniciSablonuEkle(sb);
+    } else sekillerEkle(eylem.sekiller);
+    setSonEklenen(girdi.ad);
+    // Dar ekranda çekmece tuvalin üstünü kaplıyor: eklenen şekil görünsün diye
+    // çekmece AÇIK kalır ama arama metni korunur (ardı ardına ekleme).
   }
 
   /** Hazır grafik şablonunu (x–t, v–t, a–t, sinüs…) tek tıkla ekler. */
@@ -1628,7 +2056,32 @@ export function CizimEditoruModal({
     }, 0);
   }
 
+  // OTOMATİK SIĞDIRMA: tuval kabına sığmıyorsa (iPad, küçük pencere, panel
+  // açıldı) öğretmen elle yakınlaştırmadıkça sığdırılır; çizimin bir kısmı
+  // kaydırma çubuğunun arkasında kalmasın. Kap boyu değişince yeniden ölçülür
+  // (yüzen çubuk da yeni ölçüye göre konumlansın diye yeniden çizilir).
+  const zoomElleRef = useRef(false);
+  const tuvalOlcuGuncelRef = useRef(tuvalOlcu);
+  tuvalOlcuGuncelRef.current = tuvalOlcu;
+  useEffect(() => {
+    const kap = containerRef.current;
+    if (!kap) return;
+    const olc = () => {
+      setKaydirmaSayaci((n) => n + 1);
+      if (zoomElleRef.current || kap.clientWidth <= 0 || kap.clientHeight <= 0) return;
+      const olcu = tuvalOlcuGuncelRef.current;
+      setZoom(Math.min(100, sigdirmaOrani(kap.clientWidth, kap.clientHeight, olcu)));
+    };
+    const t = window.setTimeout(olc, 0);
+    const RO = (window as unknown as { ResizeObserver?: typeof ResizeObserver }).ResizeObserver;
+    const gozcu = RO ? new RO(() => olc()) : null;
+    gozcu?.observe(kap);
+    return () => { window.clearTimeout(t); gozcu?.disconnect(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function pencereyeSigdir() {
+    zoomElleRef.current = false;
     const kap = containerRef.current;
     if (!kap) return;
     setZoom(sigdirmaOrani(kap.clientWidth, kap.clientHeight, tuvalOlcu));
@@ -1649,6 +2102,7 @@ export function CizimEditoruModal({
       const yeni: Sekil = { id: sekilId(), tur: "metin", metin, punto: metinPunto, satirAraligi: metinSatirAraligi, x: metinNoktasi.x, y: metinNoktasi.y };
       setSekiller((mevcut) => [...mevcut, yeni]);
       window.setTimeout(() => secimAyarla([yeni.id]), 0);
+      setArac("sec");
     }
     setMetinNoktasi(null);
     setMetinDeger("");
@@ -1697,16 +2151,247 @@ export function CizimEditoruModal({
     onKapat: onClose,
   });
 
-  const seciliSayisi = seciliIds.length;
-  useEffect(() => { setSagSekme(seciliSayisi > 0 ? "ayarlar" : "sekiller"); }, [seciliSayisi]);
-
-  const railCls =
-    "flex min-w-[68px] flex-col items-center justify-center rounded-xl border px-2 py-1 text-[10px] lg:w-full lg:px-1 lg:py-2 font-semibold leading-tight transition";
   const ustCls =
     "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition";
-  const kutuphaneVar = kip !== "cizim" || kullaniciSablonlari.length > 0;
-  const panelGorunur = kutuphaneVar || seciliIds.length > 0;
-  const etkinSekme: "sekiller" | "ayarlar" = !kutuphaneVar ? "ayarlar" : seciliIds.length === 0 ? "sekiller" : sagSekme;
+  const seciliSekiller = sekiller.filter((s) => seciliIds.includes(s.id));
+  const birincilId = seciliIds.length === 1 ? seciliIds[0] : null;
+  const birincil = birincilId ? sekiller.find((s) => s.id === birincilId) : undefined;
+  // Karmaşık nesne (grafik, istatistik, şema, kimya, geometri…) seçilince
+  // ayrıntılı panel kendiliğinden açılır; basit şekilde yüzen çubuk yeter.
+  useEffect(() => {
+    setSagPanelAcik(karmasikMi(sekillerRef.current.find((s) => s.id === birincilId)));
+  }, [birincilId]);
+  useEffect(() => { if (!seciliIds.length) setSagPanelAcik(false); }, [seciliIds.length]);
+  const panelAcik = sagPanelAcik && seciliIds.length > 0 && !odakKipi;
+  // Tek yan panel kuralı (dar/orta ekran): ayrıntılı panel açılınca kütüphane
+  // yer açmak için kapanır, panel kapanınca geri açılır. Çok geniş ekranda ikisi birlikte.
+  useEffect(() => {
+    const genis = (window.innerWidth || 1440) >= 1700;
+    if (panelAcik && solAcik && !genis) {
+      solOtomatikKapandiRef.current = true;
+      setSolAcik(false);
+    } else if (!panelAcik && solOtomatikKapandiRef.current) {
+      solOtomatikKapandiRef.current = false;
+      setSolAcik(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelAcik]);
+  const kutuphaneListesi = useMemo(() => kutuphaneGirdileri(kullaniciSablonlari), [kullaniciSablonlari]);
+
+  /** Seçimin dünya kutusu (bağlayıcı için uç noktalarından). */
+  function secimKutusuHesapla(): { x: number; y: number; w: number; h: number } | null {
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx || !seciliSekiller.length) return null;
+    const kutular = seciliSekiller.map((s) => {
+      if (s.tur === "fizik" && geometriNesnesiMi(s)) {
+        // Köşesi kutunun dışına sürüklenmiş geometri şekli: köşeler de kapsansın.
+        const k = sekilSinirlari(ctx, s);
+        const noktalar = geometriKoseleri(s);
+        const xs = [k.x, k.x + k.w, ...noktalar.map((p) => p.x - 14), ...noktalar.map((p) => p.x + 14)];
+        const ys = [k.y, k.y + k.h, ...noktalar.map((p) => p.y - 18), ...noktalar.map((p) => p.y + 18)];
+        return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+      }
+      if (s.tur !== "baglayici") return sekilSinirlari(ctx, s);
+      const uc = (u: BaglayiciUcu) => {
+        if (!("sekilId" in u)) return { x: u.x, y: u.y };
+        const h = sekiller.find((x) => x.id === u.sekilId);
+        return h && h.tur !== "baglayici" ? (() => { const k = sekilSinirlari(ctx, h); return { x: k.x + k.w / 2, y: k.y + k.h / 2 }; })() : null;
+      };
+      const a = uc(s.kaynak), b = uc(s.hedef);
+      if (!a || !b) return null;
+      return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(a.x - b.x), h: Math.abs(a.y - b.y) };
+    }).filter((k): k is { x: number; y: number; w: number; h: number } => !!k && Number.isFinite(k.x) && k.x > -1e5);
+    if (!kutular.length) return null;
+    const x = Math.min(...kutular.map((k) => k.x)), y = Math.min(...kutular.map((k) => k.y));
+    return { x, y, w: Math.max(...kutular.map((k) => k.x + k.w)) - x, h: Math.max(...kutular.map((k) => k.y + k.h)) - y };
+  }
+
+  /** Tuval (dünya) noktası → kaydırma kabı içindeki konum. */
+  function ekranKonumu(p: Nokta) {
+    const canvas = canvasRef.current;
+    return { x: (canvas?.offsetLeft ?? 0) + p.x * zoom / 100, y: (canvas?.offsetTop ?? 0) + p.y * zoom / 100 };
+  }
+
+  const YUZEN_W = 470;
+  const yuzenKonum = (() => {
+    if (!seciliSekiller.length || isaretciBasili || odakKipi || metinNoktasi || balon || arac !== "sec") return null;
+    const k = secimKutusuHesapla();
+    if (!k) return null;
+    const kap = containerRef.current;
+    const ust = ekranKonumu({ x: k.x, y: k.y });
+    const alt = ekranKonumu({ x: k.x, y: k.y + k.h });
+    const gorunurUst = (kap?.scrollTop ?? 0) + 4;
+    // Döndürme tutamacının (şeklin 24 birim üstü) da üstünde dursun.
+    let top = ust.y - (24 * zoom) / 100 - 58;
+    if (top < gorunurUst) top = alt.y + 14;
+    const solSinir = (kap?.scrollLeft ?? 0) + 4;
+    const sagSinir = (kap?.scrollLeft ?? 0) + (kap?.clientWidth || 800) - Math.min(YUZEN_W, (kap?.clientWidth || 800) - 8) - 4;
+    const left = Math.max(solSinir, Math.min(sagSinir, ust.x));
+    return { left, top };
+  })();
+
+  /** Seçili şekillere bir dönüşüm uygular (tek geçmiş adımı). */
+  function seciliyeUygula(f: (s: Sekil) => Sekil) {
+    if (!seciliIds.length) return;
+    tarihceyeKaydet();
+    setSekiller((liste) => liste.map((s) => (seciliIds.includes(s.id) ? f(s) : s)));
+  }
+  function alanAyarla(alan: "renk" | "dolgu", deger: string | undefined, turler: string[]) {
+    seciliyeUygula((x) => {
+      if (!turler.includes(x.tur)) return x;
+      const kopya = { ...x } as Record<string, unknown>;
+      if (deger) kopya[alan] = deger; else delete kopya[alan];
+      return kopya as Sekil;
+    });
+  }
+
+  const yuzenAyar: YuzenAracAyarlari | null = (() => {
+    if (!yuzenKonum) return null;
+    const coklu = seciliIds.length > 1;
+    const s = birincil ?? seciliSekiller[seciliSekiller.length - 1];
+    if (!s) return null;
+    const grupVar = seciliSekiller.some((x) => x.grupId);
+    const ortak: YuzenAracAyarlari = {
+      coklu,
+      onCogalt: seciliCogalt,
+      onSil: seciliSil,
+      onAyrintilar: () => setSagPanelAcik((v) => !v),
+      ayrintiAcik: panelAcik,
+      onOne: () => seciliKatmanDegistir(true),
+      onArkaya: () => seciliKatmanDegistir(false),
+      onSablonKaydet: () => setSablonKaydiAcik(true),
+      onGrubuCoz: grupVar ? secilenGrubuCoz : undefined,
+      cizgi: s.tur === "metin" ? undefined : {
+        kalinlik: s.kalinlik,
+        onKalinlik: (k) => { setKalinlik(k); seciliyeUygula((x) => (x.tur === "metin" ? x : { ...x, kalinlik: k } as Sekil)); },
+        cizgiTipi: s.cizgiTipi,
+        onCizgiTipi: s.tur === "baglayici" ? undefined : (t) => { setCizgiTipi(t); seciliyeUygula((x) => (x.tur === "metin" || x.tur === "baglayici" ? x : { ...x, cizgiTipi: t } as Sekil)); },
+        okUcu: s.tur === "dogru" || s.tur === "baglayici" ? (s.okUcu ?? (s.tur === "baglayici" ? "son" : "yok")) : undefined,
+        onOkUcu: !coklu && (s.tur === "dogru" || s.tur === "baglayici") ? (u) => seciliyeUygula((x) => (x.tur === "dogru" || x.tur === "baglayici" ? { ...x, okUcu: u } : x)) : undefined,
+      },
+    };
+    if (coklu) {
+      const temeller = seciliSekiller.filter((x) => TEMEL_RENKLI_TURLER.includes(x.tur));
+      return {
+        ...ortak,
+        onHizala: secilenleriHizala,
+        onDagit: secilenleriDagit,
+        dagitilabilir: seciliSekiller.filter((x) => x.tur !== "baglayici").length >= 3,
+        onGrupla: secilenleriGrupla,
+        renk: temeller.length ? {
+          palet: TEMEL_RENK_PALETI,
+          deger: (temeller[temeller.length - 1] as { renk?: string }).renk,
+          onSec: (d) => alanAyarla("renk", d, TEMEL_RENKLI_TURLER),
+        } : undefined,
+      };
+    }
+    const temelRenkli = TEMEL_RENKLI_TURLER.includes(s.tur);
+    const temelDolgulu = TEMEL_DOLGULU_TURLER.includes(s.tur);
+    const vektor = s.tur === "fizik" && s.nesne.startsWith("vektor");
+    const basitFizik = s.tur === "fizik" && !karmasikMi(s);
+    const veriNesnesi = s.tur === "fizik" && ["grafik", "istatistik", "sema", "kimya"].includes(s.nesne);
+    // Hesaplı fizik sahnelerinde (eğik düzlem kuvvetleri, optik, sıvı kabı) ayna anlamsız.
+    const cevrilemez = veriNesnesi || (s.tur === "fizik" && fizikSahnePaneliVarMi(s.nesne));
+    let onDuzenle: (() => void) | undefined;
+    let duzenleAdi = "Etiket / Metin";
+    if (s.tur === "metin") {
+      duzenleAdi = "Metni düzenle";
+      onDuzenle = () => {
+        setMetinDuzenlenenId(s.id); setMetinNoktasi({ x: s.x, y: s.y }); setMetinDeger(s.metin);
+        setMetinPunto(s.punto ?? METIN_PUNTO); setMetinSatirAraligi(s.satirAraligi ?? METIN_SATIR_ARALIGI);
+      };
+    } else if (s.tur === "akis" || s.tur === "baglayici" || basitFizik) {
+      duzenleAdi = s.tur === "akis" ? "Kutu metni" : "Etiket";
+      const k = secimKutusuHesapla();
+      onDuzenle = () => balonAc({ tur: "metin", sekilId: s.id }, k ? { x: k.x + k.w / 2, y: k.y + k.h / 2 } : { x: 40, y: 40 });
+    }
+    return {
+      ...ortak,
+      onDuzenle,
+      duzenleAdi,
+      renk: temelRenkli || s.tur === "baglayici" || vektor ? {
+        palet: TEMEL_RENK_PALETI,
+        deger: (s as { renk?: string }).renk,
+        onSec: (d) => alanAyarla("renk", d, [...TEMEL_RENKLI_TURLER, "baglayici", "fizik"]),
+      } : undefined,
+      dolgu: temelDolgulu ? {
+        palet: TEMEL_DOLGU_PALETI,
+        deger: (s as { dolgu?: string }).dolgu,
+        onSec: (d) => alanAyarla("dolgu", d, TEMEL_DOLGULU_TURLER),
+      } : s.tur === "akis" || basitFizik ? {
+        palet: AKIS_DOLGU_PALETI,
+        deger: (s as { dolgu?: string }).dolgu,
+        onSec: (d) => alanAyarla("dolgu", d, ["akis", "fizik"]),
+      } : undefined,
+      tarama: temelDolgulu ? {
+        deger: (s as { tarama?: TaramaTipi }).tarama ?? "yok",
+        onSec: (t) => { setTarama(t); seciliyeUygula((x) => (TEMEL_DOLGULU_TURLER.includes(x.tur) ? { ...x, tarama: t } as Sekil : x)); },
+      } : undefined,
+      punto: s.tur === "metin" ? {
+        deger: s.punto ?? METIN_PUNTO,
+        onDegis: (p) => { setMetinPunto(p); seciliyeUygula((x) => (x.tur === "metin" ? { ...x, punto: p } : x)); },
+      } : undefined,
+      // Grafik/istatistik/şema/kimya yazılı veri: çevirmek/döndürmek yazıları bozar.
+      onCevir: cevrilebilirMi(s) && !cevrilemez ? () => seciliyeUygula(sekilYatayCevir) : undefined,
+      onDondur: s.tur !== "baglayici" && !veriNesnesi ? () => seciliyeUygula(sekilDondur90) : undefined,
+    };
+  })();
+
+  const balonSekli = balon ? sekiller.find((s) => s.id === balon.hedef.sekilId) : undefined;
+  const balonKonum = (() => {
+    if (!balon) return null;
+    const p = ekranKonumu(balon.nokta);
+    const kap = containerRef.current;
+    const genislik = kap?.clientWidth || 800;
+    const left = Math.max((kap?.scrollLeft ?? 0) + 8, Math.min(p.x + 14, (kap?.scrollLeft ?? 0) + genislik - 310));
+    // Aşağıda yer yoksa tıklanan yerin üstüne açılır (baloncuk ~320 px).
+    const gorunurAlt = (kap?.scrollTop ?? 0) + (kap?.clientHeight || 600);
+    let top = p.y + 14;
+    if (top + 320 > gorunurAlt) top = Math.max((kap?.scrollTop ?? 0) + 8, p.y - 334, gorunurAlt - 330 > p.y + 14 ? p.y + 14 : (kap?.scrollTop ?? 0) + 8);
+    return { left, top };
+  })();
+
+  const aracDugmesi = (a: CizimAraci) => {
+    const tanim = ARAC_TANIMLARI.find((x) => x.arac === a)!;
+    const Icon = tanim.icon;
+    const aktif = arac === a;
+    return (
+      <button
+        key={a}
+        type="button"
+        title={tanim.ipucu ?? tanim.etiket}
+        aria-label={tanim.etiket}
+        aria-pressed={aktif}
+        data-arac={a}
+        onClick={() => {
+          setDigerAraclarAcik(false);
+          if (a === "baglayici") {
+            // Aynı araca tekrar tıklamak bırakır (Seç'e döner).
+            if (aktif) { setArac("sec"); setBaglayiciKaynakUcu(null); return; }
+            setBaglayiciKaynakUcu(null);
+          }
+          setArac(a);
+          if (a !== "sec") secimAyarla([]);
+        }}
+        className={`flex h-12 min-w-[44px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1.5 text-[10px] font-semibold leading-none transition xl:min-w-[58px] ${
+          aktif ? "bg-brand-100 text-brand-700 ring-1 ring-brand-300" : "text-slate-600 hover:bg-slate-100"
+        }`}
+      >
+        <Icon size={19} />
+        <span className="max-xl:sr-only">{tanim.etiket}</span>
+      </button>
+    );
+  };
+
+  const aracIpucu: Partial<Record<CizimAraci, string>> = {
+    dogru: "Sürükleyerek çizin (Shift: yatay/dikey/45°). Bitince Seç'e dönülür.",
+    dikdortgen: "Sürükleyerek çizin (Shift: kare). Bitince Seç'e dönülür.",
+    elips: "Sürükleyerek çizin (Shift: daire). Bitince Seç'e dönülür.",
+    ucgen: "Sürükleyerek çizin; sonra köşeleri tek tek sürükleyin.",
+    serbest: "Basılı tutup çizin. Bitince Seç'e dönülür.",
+    metin: "Yazının başlayacağı yere tıklayın.",
+    silgi: "Silmek istediğiniz şekillerin üstünden geçin.",
+  };
 
   return (
     <ModalKabuk
@@ -1714,208 +2399,358 @@ export function CizimEditoruModal({
       onClose={kapatma.kapatIstendi}
       genislik="max-w-[1480px]"
       tamYukseklik
-      // Odak kipinde Escape modalı KAPATMAZ: o tuş önce şeritleri geri getirir
-      // (yukarıdaki `tus` dinleyicisi). Aksi halde tuvali büyüten öğretmen
-      // Escape'e basınca çizimi kapatmış oluyordu.
-      kapanabilir={!odakKipi && !sablonKaydiAcik && !temizleOnayi && !kapatma.onayAcik && !silinecekSablon && !denklemKutusuId && !dizmeOnayi}
+      // Escape modalı KAPATMAZ: odak kipindeyken önce şeritleri geri getirir,
+      // bir araç seçiliyken önce aracı bırakır (Seç'e döner), balon açıkken balonu kapatır.
+      kapanabilir={!odakKipi && arac === "sec" && !balon && !sablonKaydiAcik && !temizleOnayi && !kapatma.onayAcik && !silinecekSablon && !denklemKutusuId && !dizmeOnayi}
     >
-      {/* YERLEŞİM: üstte tek ince şerit (kip, geri al, çizgi), solda dikey araç
-          çubuğu, ortada geniş tuval, sağda tek panel (Şekiller / Ayarlar).
-          Eskiden her şey tuvalin üstünde 5–6 satırdı ve tuval alta sıkışıyordu. */}
+      {/* ÜST ARAÇ ÇUBUĞU: kütüphane anahtarı · temel çizim araçları · geri/ileri · görünüm · daha fazla. */}
       {!odakKipi && (
-      <div className="flex shrink-0 flex-wrap items-center gap-2 pb-2 pt-1">
-        {/* KİP ANAHTARI. Araçların hangisinin görüneceğini belirler; şekiller ve
-            tuval ortak — kip değiştirmek çizimi DEĞİŞTİRMEZ, yalnız çubuğu.
-            Kendi satırındaydı ve o satır tek bir anahtardan ibaretti: 32 px'i
-            tek başına yiyordu, araç satırının başına alındı. */}
-        <div className="mr-1 inline-flex items-center gap-1 rounded-lg bg-slate-100 p-1">
-          {([
-            { id: "cizim", deger: "cizim" as const, etiket: "Çizim", grup: undefined },
-            { id: "fizik", deger: "fizik" as const, etiket: "Fizik", grup: "mekanik" as FizikGrubu },
-            // Matematik/Kimya şekilleri "Fizik" paletinin içindeydi ve öğretmen
-            // "Çizim"de arayınca bulamıyordu: üst düzeyde görünür giriş noktaları.
-            // Matematik sekmesinde Fonksiyon / İstatistik / Şema alt sekmeleri var.
-            { id: "matematik", deger: "fizik" as const, etiket: "Matematik", grup: "matematik" as FizikGrubu },
-            { id: "kimya", deger: "fizik" as const, etiket: "Kimya", grup: "kimya" as FizikGrubu },
-            { id: "akis", deger: "akis" as const, etiket: "Akış şeması", grup: undefined },
-          ]).map(({ id, deger, etiket, grup }) => {
-            const aktif = kip === deger && (deger !== "fizik"
-              || (id === "matematik" ? fizikGrubu === "matematik"
-                : id === "kimya" ? fizikGrubu === "kimya"
-                : fizikGrubu !== "matematik" && fizikGrubu !== "kimya"));
-            return (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={aktif}
-              data-kip-sekmesi={id}
-              onClick={() => {
-                if (id === "fizik") { if (fizikGrubu === "matematik" || fizikGrubu === "kimya") setFizikGrubu("mekanik"); }
-                else if (grup) setFizikGrubu(grup);
-                setKip(deger);
-                // Gizlenecek bir araç seçiliyse elde kalmasın: kip değişince
-                // görünmeyen bir araçla çizmeye devam etmek şaşırtıcı olurdu.
-                // Fizik kipi çizim araçlarının HEPSİNİ korur (ok, çizgi, dalga, elips
-                // fizik şemasında lazım) ve bağlayıcıyı da ekler.
-                const kalabilir = deger === "akis"
-                  ? AKIS_KIPI_ARACLARI.includes(arac) || arac === "baglayici"
-                  : deger === "fizik"
-                    ? true
-                    : arac !== "baglayici";
-                if (!kalabilir) { setArac("sec"); setBaglayiciKaynakId(null); }
-              }}
-              className={`rounded-md px-3 py-1 text-xs font-bold transition ${
-                aktif ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              {etiket}
+        <div className="flex shrink-0 flex-wrap items-center gap-1 pb-2" role="toolbar" aria-label="Çizim araçları" data-arac-cubugu>
+          <button
+            type="button"
+            aria-pressed={solAcik}
+            aria-label="Şekil kütüphanesi"
+            title="Şekil ve şablon kütüphanesi"
+            onClick={() => { solOtomatikKapandiRef.current = false; setSolAcik((v) => !v); }}
+            className={`flex h-12 shrink-0 items-center gap-1.5 rounded-xl px-3 text-sm font-bold transition ${solAcik ? "bg-brand-600 text-white" : "bg-brand-50 text-brand-700 hover:bg-brand-100"}`}
+          >
+            <BookOpen size={18} /> <span className="max-md:sr-only">Şekiller</span>
+          </button>
+          <span className="mx-1 h-8 w-px shrink-0 bg-slate-200" />
+          {ARAC_TANIMLARI.map((t) => aracDugmesi(t.arac))}
+          <span className="mx-1 h-8 w-px shrink-0 bg-slate-200" />
+          <button type="button" title={`Geri al (${kisayol("Ctrl+Z")})`} aria-label="Geri al" disabled={gecmisSayisi === 0} onClick={geriAl}
+            className="flex h-12 min-w-[44px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-35">
+            <Undo2 size={19} /><span className="max-xl:sr-only">Geri al</span>
+          </button>
+          <button type="button" title={`İleri al (${kisayol("Ctrl+Y")})`} aria-label="İleri al" disabled={ileriSayisi === 0} onClick={ileriAl}
+            className="flex h-12 min-w-[44px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-35">
+            <Redo2 size={19} /><span className="max-xl:sr-only">İleri al</span>
+          </button>
+          <span className="flex-1" />
+          <div className="inline-flex h-11 shrink-0 items-center overflow-hidden rounded-xl bg-white ring-1 ring-slate-200">
+            {/* Alt sınır %25: büyük tuvalde (1920×1200) %50'de bile ekrana sığmıyor. */}
+            <button type="button" title="Uzaklaştır" aria-label="Uzaklaştır" onClick={() => { zoomElleRef.current = true; setZoom((v) => Math.max(25, v - 25)); }} className="flex h-11 w-10 items-center justify-center hover:bg-slate-50"><ZoomOut size={16} /></button>
+            <button type="button" title="%100" onClick={() => { zoomElleRef.current = true; setZoom(100); }} className="h-11 min-w-12 border-x border-slate-100 px-1.5 text-xs font-semibold">%{zoom}</button>
+            <button type="button" title="Yakınlaştır" aria-label="Yakınlaştır" onClick={() => { zoomElleRef.current = true; setZoom((v) => Math.min(200, v + 25)); }} className="flex h-11 w-10 items-center justify-center hover:bg-slate-50"><ZoomIn size={16} /></button>
+            <button type="button" title="Tuvalin tamamı pencereye sığacak orana geç" onClick={pencereyeSigdir} className="flex h-11 items-center gap-1 border-l border-slate-100 px-2 text-xs font-semibold hover:bg-slate-50">
+              <Maximize2 size={14} /> <span className="max-lg:sr-only">Sığdır</span>
             </button>
-            );
-          })}
+          </div>
+          <div ref={digerAraclarRef} className="relative shrink-0">
+            <button
+              type="button"
+              aria-expanded={digerAraclarAcik}
+              aria-haspopup="menu"
+              title="Daha fazla: ızgara, tuval ölçüsü, temizle…"
+              onClick={() => setDigerAraclarAcik((v) => !v)}
+              className={`flex h-12 min-w-[44px] flex-col items-center justify-center gap-0.5 rounded-xl px-1.5 text-[10px] font-semibold transition ${digerAraclarAcik ? "bg-slate-100 text-slate-800" : "text-slate-600 hover:bg-slate-100"}`}
+            >
+              <MoreHorizontal size={19} /><span className="max-xl:sr-only">Daha fazla</span>
+            </button>
+          </div>
         </div>
-        <span className="mx-1 h-6 w-px bg-slate-200" />
-        <button
-          type="button"
-          title="Geri al"
-          disabled={gecmisSayisi === 0}
-          onClick={geriAl}
-          className={`${ustCls} border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40`}
-        >
-          <Undo2 size={15} />
-          Geri al
-        </button>
-        <button
-          type="button"
-          title={`İleri al (${kisayol("Ctrl+Y")})`}
-          disabled={ileriSayisi === 0}
-          onClick={ileriAl}
-          className={`${ustCls} border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40`}
-        >
-          <Redo2 size={15} /> İleri al
-        </button>
-        <span className="mx-1 h-6 w-px bg-slate-200" />
-        <div className="flex items-center gap-1">
-          {[1, 2, 3].map((deger) => (
-            <TogglePill key={deger} aktif={kalinlik === deger} onClick={() => {
-              setKalinlik(deger);
-              const secili = sekiller.find((s) => s.id === seciliId);
-              if (secili && secili.tur !== "metin") seciliOzellikGuncelle({ kalinlik: deger });
-            }}>
-              {deger === 1 ? "İnce" : deger === 2 ? "Orta" : "Kalın"}
-            </TogglePill>
-          ))}
+      )}
+      {/* "Daha fazla" menüsü araç çubuğunun yatay kaydırmasından etkilenmesin diye dışarıda. */}
+      {digerAraclarAcik && !odakKipi && (
+        <div className="relative z-40 h-0" >
+          <div ref={dahaFazlaMenuRef} role="menu" aria-label="Daha fazla" data-testid="daha-fazla-menusu"
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="absolute right-0 top-0 flex w-[320px] max-w-[calc(100vw-32px)] flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600 shadow-xl">
+            <div className="flex flex-wrap gap-1.5">
+              <button type="button" onClick={() => { setOdakKipi(true); setDigerAraclarAcik(false); }}
+                title="Araç çubuklarını gizle, tuvali büyüt (Esc ile geri gelir)"
+                className="inline-flex h-10 items-center gap-1.5 rounded-lg px-2.5 font-semibold ring-1 ring-slate-200 hover:bg-slate-50">
+                <Maximize2 size={14} /> Sadece tuval
+              </button>
+              <button type="button" aria-pressed={izgaraGoster} onClick={() => setIzgaraGoster((v) => !v)}
+                className={`inline-flex h-10 items-center gap-1.5 rounded-lg px-2.5 font-semibold ${izgaraGoster ? "bg-brand-100 text-brand-700" : "ring-1 ring-slate-200 hover:bg-slate-50"}`}>
+                <Grid3X3 size={14} /> Izgara
+              </button>
+              <label className="inline-flex h-10 items-center gap-1.5 rounded-lg px-2.5 font-semibold ring-1 ring-slate-200">
+                <input type="checkbox" checked={izgarayaYakala} onChange={(e) => setIzgarayaYakala(e.target.checked)} /> Izgaraya yakala
+              </label>
+            </div>
+            {/* TUVAL ÖLÇÜSÜ. Küçültme, dışarıda ŞEKİL KALIYORSA engelleniyor. */}
+            <div>
+              <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Tuval ölçüsü</div>
+              <div className="flex flex-wrap gap-1.5">
+                {TUVAL_OLCULERI.map((o) => (
+                  <button key={o.ad} type="button" title={`${o.w}×${o.h}`}
+                    aria-pressed={tuvalOlcu.w === o.w && tuvalOlcu.h === o.h}
+                    onClick={() => tuvalOlcusunuDegistir({ w: o.w, h: o.h })}
+                    className={`h-10 rounded-lg px-2.5 font-semibold ${tuvalOlcu.w === o.w && tuvalOlcu.h === o.h ? "bg-brand-100 text-brand-700" : "ring-1 ring-slate-200 hover:bg-slate-50"}`}>
+                    {o.ad}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-2">
+              <span title="En fazla 80 işlem saklanır; sınır dolunca en eski işlem otomatik çıkarılır."
+                className={`rounded-md px-2 py-1 text-[10px] font-semibold ${gecmisSayisi >= GECMIS_LIMITI ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-500"}`}>
+                Geçmiş {gecmisSayisi}/{GECMIS_LIMITI}
+              </span>
+              <button type="button" title="Tümünü temizle" disabled={sekiller.length === 0}
+                onClick={() => { setTemizleOnayi(true); setDigerAraclarAcik(false); }}
+                className="inline-flex h-10 items-center gap-1 rounded-lg px-2.5 font-semibold text-rose-600 ring-1 ring-rose-100 hover:bg-rose-50 disabled:opacity-40">
+                {/* Etiket "Tümünü temizle" kalıyor: onay kutusundaki düğme "Temizle". */}
+                <Trash2 size={14} /> Tümünü temizle
+              </button>
+            </div>
+            <p className="text-[11px] leading-snug text-slate-400">
+              {sekiller.length} şekil · Çift tıklama: yerinde düzenle · Shift: düzgün açı · Delete: sil · {kisayol("Ctrl+Z/Y")}: geri/ileri · {kisayol("Ctrl+D")}: çoğalt · Esc: aracı bırak
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <TogglePill aktif={cizgiTipi === "duz"} onClick={() => {
-            setCizgiTipi("duz");
-            const secili = sekiller.find((s) => s.id === seciliId);
-            if (secili && secili.tur !== "metin") seciliOzellikGuncelle({ cizgiTipi: "duz" });
-          }}>Düz</TogglePill>
-          <TogglePill aktif={cizgiTipi === "kesik"} onClick={() => {
-            setCizgiTipi("kesik");
-            const secili = sekiller.find((s) => s.id === seciliId);
-            if (secili && secili.tur !== "metin") seciliOzellikGuncelle({ cizgiTipi: "kesik" });
-          }}>Kesik</TogglePill>
-        </div>
-      </div>
       )}
 
       <p className="sr-only" aria-live="polite">
         Tuvalde {sekiller.length} şekil var. {seciliIds.length} şekil seçili. Etkin araç: {ARAC_TANIMLARI.find((x) => x.arac === arac)?.etiket}.
       </p>
-      {/* Geniş ekranda (≥1024 px) yan yana: araçlar | tuval | panel. Dar ekranda (iPad dikey,
-          küçük pencere) panel tuvalin ALTINA iner; araç çubuğu soldaki dikey şerit kalır. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 lg:flex-row lg:gap-3">
-        {!odakKipi && (
-          <nav aria-label="Çizim araçları" data-arac-cubugu className="flex shrink-0 flex-row flex-wrap gap-1.5 lg:w-[74px] lg:flex-col lg:flex-nowrap lg:pr-0.5">
-        {ARAC_TANIMLARI.filter(({ arac: a }) =>
-          (kip !== "akis" || AKIS_KIPI_ARACLARI.includes(a)) && !NADIR_ARACLAR.includes(a),
-        ).map(({ arac: a, etiket, ipucu, icon: Icon }) => (
-          <button
-            key={a}
-            type="button"
-            title={ipucu ?? etiket}
-            aria-pressed={arac === a}
-            onClick={() => { setArac(a); if (a !== "sec") secimAyarla([]); }}
-            className={`${railCls} ${
-              arac === a
-                ? "border-brand-300 bg-brand-50 text-brand-700"
-                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-            }`}
+      {/* YERLEŞİM: solda kütüphane çekmecesi, ortada tuval, sağda (yalnız
+          gerektiğinde) ayrıntılı panel. Kütüphane DOM'da tuvalden SONRA gelir
+          (önizleme tuvalleri ana tuvalden önce bulunmasın), görsel sırası `order`. */}
+      <div className="relative flex min-h-0 flex-1 gap-3">
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+          <div
+            ref={containerRef}
+            onScroll={() => setKaydirmaSayaci((n) => n + 1)}
+            className="relative min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-2"
           >
-            <Icon size={15} />
-            {etiket}
-          </button>
-        ))}
-        {/* NADİR ARAÇLAR. Seçiliyken düğme vurgulu kalıyor ki "hangi araçtayım"
-            sorusu menü kapalıyken de cevaplansın. */}
-        {kip !== "akis" && (
-          <div ref={digerAraclarRef} className="relative">
-            <button
-              type="button"
-              aria-expanded={digerAraclarAcik}
-              aria-haspopup="menu"
-              onClick={() => setDigerAraclarAcik((v) => !v)}
-              className={`${railCls} ${
-                NADIR_ARACLAR.includes(arac)
-                  ? "border-brand-300 bg-brand-50 text-brand-700"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <MoreHorizontal size={15} /> Diğer
-            </button>
-            {digerAraclarAcik && (
-              <div role="menu" className="absolute left-0 top-full z-20 mt-1 flex lg:left-full lg:top-0 lg:ml-2 lg:mt-0 flex w-max flex-col gap-1 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
-                {ARAC_TANIMLARI.filter(({ arac: a }) => NADIR_ARACLAR.includes(a)).map(({ arac: a, etiket, ipucu, icon: Icon }) => (
-                  <button
-                    key={a}
-                    type="button"
-                    role="menuitem"
-                    title={ipucu ?? etiket}
-                    aria-pressed={arac === a}
-                    onClick={() => { setArac(a); secimAyarla([]); setDigerAraclarAcik(false); }}
-                    className={`${railCls} justify-start ${
-                      arac === a
-                        ? "border-brand-300 bg-brand-50 text-brand-700"
-                        : "border-transparent bg-white text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    <Icon size={15} />
-                    {etiket}
-                  </button>
-                ))}
+            <canvas
+              ref={canvasRef}
+              width={tuvalOlcu.w}
+              height={tuvalOlcu.h}
+              tabIndex={0}
+              role="img"
+              aria-label={`Çizim tuvali. ${sekiller.length} şekil var. Enter veya boşluk etkin araçla ortada şekil oluşturur; ok tuşları seçimi taşır.`}
+              className="mx-auto block rounded border border-slate-200 bg-white touch-none"
+              style={{
+                cursor: arac === "sec" ? "default" : arac === "silgi" ? "cell" : "crosshair",
+                width: `${tuvalOlcu.w * zoom / 100}px`,
+                height: `${tuvalOlcu.h * zoom / 100}px`,
+              }}
+              onPointerDown={isaretciAsagi}
+              onPointerMove={isaretciHareket}
+              onPointerUp={isaretciYukari}
+              onPointerCancel={isaretciIptal}
+              onPointerLeave={() => { if (uzerindekiId && !portSurukleRef.current) setUzerindekiId(null); }}
+              onKeyDown={(e) => {
+                if ((e.key === "Enter" || e.key === " ") && !e.ctrlKey && !e.metaKey) {
+                  e.preventDefault(); klavyeyleSekilEkle();
+                }
+              }}
+            />
+            {metinNoktasi && (
+              <div
+                className="absolute z-10 rounded-lg border border-slate-200 bg-white p-2 shadow-lg"
+                style={{
+                  left: (() => {
+                    const canvas = containerRef.current?.querySelector("canvas");
+                    const bas = canvas?.offsetLeft ?? 0;
+                    return Math.max(bas, Math.min(bas + metinNoktasi.x * zoom / 100, bas + tuvalOlcu.w * zoom / 100 - 224));
+                  })(),
+                  top: (() => {
+                    const canvas = containerRef.current?.querySelector("canvas");
+                    const bas = canvas?.offsetTop ?? 0;
+                    return Math.max(bas, Math.min(bas + metinNoktasi.y * zoom / 100, bas + tuvalOlcu.h * zoom / 100 - 126));
+                  })(),
+                }}
+              >
+                <textarea
+                  autoFocus
+                  value={metinDeger}
+                  onChange={(e) => setMetinDeger(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); metniOnayla(); }
+                    if (e.key === "Escape") setMetinNoktasi(null);
+                  }}
+                  onBlur={metniOnayla}
+                  placeholder="Etiket metni"
+                  className="h-20 w-52 resize-none rounded-md border border-slate-200 px-2 py-1 text-xs outline-none focus:border-brand-400"
+                />
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {["°", "θ", "α", "β", "Δ", "μ", "Ω", "π", "→"].map((s) => (
+                    <button key={s} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setMetinDeger((v) => v + s)}
+                      className="rounded border border-slate-200 px-1.5 py-0.5 text-xs hover:bg-slate-50">{s}</button>
+                  ))}
+                </div>
               </div>
             )}
+            {yuzenKonum && yuzenAyar && <YuzenAracCubugu konum={yuzenKonum} ayar={yuzenAyar} />}
+            {balon && balonSekli && balonKonum && (
+              <YerindeDuzenleBalonu
+                hedef={balon.hedef}
+                sekil={balonSekli}
+                konum={balonKonum}
+                kapat={balonKapat}
+                guncelle={(yeni) => setSekiller((liste) => liste.map((x) => (x.id === yeni.id ? yeni : x)))}
+              />
+            )}
           </div>
-        )}
-          </nav>
-        )}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
-          {!odakKipi && (
-      <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 empty:hidden">
-        {arac === "cokgen" && (
-          <div className="flex items-center gap-1">
-            <span>Kenar sayısı</span>
-            {[3, 4, 5, 6, 7, 8].map((deger) => (
-              <button key={deger} type="button" aria-pressed={cokgenKenar === deger} onClick={() => setCokgenKenar(deger)}
-                className={`rounded-md px-2 py-1 font-semibold ${cokgenKenar === deger ? "bg-brand-100 text-brand-700" : "bg-white ring-1 ring-slate-200"}`}>
-                {deger}
+          {/* ETKİN ARACIN SEÇENEKLERİ: yalnız gerektiğinde, tuvalin sol üstünde. */}
+          {!odakKipi && arac !== "sec" && (
+            <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[calc(100%-24px)] flex-wrap items-center gap-1.5" data-testid="arac-secenekleri">
+              <div className="pointer-events-auto flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white/95 px-2 py-1.5 text-xs text-slate-600 shadow-sm">
+                {arac === "cokgen" && (
+                  <>
+                    <span className="font-semibold">Kenar sayısı</span>
+                    {[3, 4, 5, 6, 7, 8].map((d) => (
+                      <button key={d} type="button" aria-pressed={cokgenKenar === d} onClick={() => setCokgenKenar(d)}
+                        className={`h-9 min-w-9 rounded-lg font-semibold ${cokgenKenar === d ? "bg-brand-100 text-brand-700" : "bg-white ring-1 ring-slate-200"}`}>{d}</button>
+                    ))}
+                  </>
+                )}
+                {arac === "dalga" && (
+                  <>
+                    <span className="font-semibold">Tepe sayısı</span>
+                    {[1, 2, 3, 4].map((d) => (
+                      <button key={d} type="button" aria-pressed={dalgaSayisi === d} onClick={() => setDalgaSayisi(d)}
+                        className={`h-9 min-w-9 rounded-lg font-semibold ${dalgaSayisi === d ? "bg-brand-100 text-brand-700" : "bg-white ring-1 ring-slate-200"}`}>{d}</button>
+                    ))}
+                  </>
+                )}
+                {arac === "baglayici" && (
+                  <>
+                    <button type="button" aria-pressed={!baglayiciTuruSecildi}
+                      title="Tür uçlara göre seçilir: devre elemanları arası tel, akış kutusunda dik ok, diğerlerinde düz ok"
+                      onClick={() => { baglayiciTuruSecildiRef.current = false; setBaglayiciTuruSecildi(false); setBaglayiciKaynakUcu(null); }}
+                      className={`h-9 rounded-lg px-2.5 font-semibold ${!baglayiciTuruSecildi ? "bg-brand-100 text-brand-700" : "bg-white ring-1 ring-slate-200 hover:bg-slate-50"}`}>
+                      Otomatik
+                    </button>
+                    {BAGLAYICI_TURLERI.map((t) => {
+                      const secili = baglayiciTuruSecildi && t.ayar.stil === baglayiciAyari.stil && t.ayar.okUcu === baglayiciAyari.okUcu;
+                      return (
+                        <button key={t.id} type="button" title={t.ipucu} aria-pressed={secili}
+                          onClick={() => { setBaglayiciAyari({ ...t.ayar, ...(baglayiciAyari.serbest ? { serbest: true } : {}) }); setBaglayiciKaynakUcu(null); }}
+                          className={`h-9 rounded-lg px-2.5 font-semibold ${secili ? "bg-brand-100 text-brand-700" : "bg-white ring-1 ring-slate-200 hover:bg-slate-50"}`}>
+                          {t.ad}
+                        </button>
+                      );
+                    })}
+                    <button type="button" aria-pressed={!baglayiciAyari.serbest}
+                      title="Kapalıyken şeklin üstüne tıklamak şekle yapışmaz: ok tıkladığınız noktadan başlar/biter"
+                      onClick={() => setBaglayiciAyariDurum({ ...baglayiciAyari, serbest: !baglayiciAyari.serbest })}
+                      className={`h-9 rounded-lg px-2.5 font-semibold ${!baglayiciAyari.serbest ? "bg-slate-100 text-slate-700" : "bg-amber-50 text-amber-800 ring-1 ring-amber-200"}`}>
+                      Şekle yapış: {baglayiciAyari.serbest ? "kapalı" : "açık"}
+                    </button>
+                    <span className="font-semibold text-brand-700">
+                      {baglayiciKaynakUcu ? "Şimdi HEDEFE tıklayın ya da bırakın" : "Bir şekilden ötekine sürükleyin ya da sırayla tıklayın"}
+                    </span>
+                  </>
+                )}
+                {aracIpucu[arac] && <span>{aracIpucu[arac]}</span>}
+                <button type="button" onClick={() => { setArac("sec"); setBaglayiciKaynakUcu(null); }}
+                  className="h-9 rounded-lg bg-slate-800 px-2.5 font-semibold text-white hover:bg-slate-700">
+                  Bitir (Esc)
+                </button>
+              </div>
+            </div>
+          )}
+          {/* İLK AÇILIŞ İPUCU: boş tuvalde ne yapılacağını söyler. */}
+          {sekiller.length === 0 && !taslak && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
+              <div className="max-w-md rounded-2xl bg-white/90 px-5 py-4 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">
+                <p className="font-semibold text-slate-700">Soldaki kütüphaneden bir şekil seçin ya da üstteki araçlarla çizin.</p>
+                <p className="mt-1">Arama kutusuna <b>makara</b>, <b>parabol</b>, <b>dik üçgen</b> ya da <b>y = x^2 − 4</b> yazabilirsiniz. Köşeleri sürükleyin, etiketlere çift tıklayın, mavi halkalardan sürükleyerek bağlayın.</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {!odakKipi && solAcik && (
+          <aside
+            aria-label="Şekil ve şablon kütüphanesi"
+            className="order-first flex min-h-0 w-[300px] shrink-0 flex-col rounded-xl border border-slate-200 bg-white max-lg:absolute max-lg:inset-y-0 max-lg:left-0 max-lg:z-30 max-lg:shadow-2xl"
+          >
+            <SolKutuphane
+              girdiler={kutuphaneListesi}
+              onEkle={kutuphanedenEkle}
+              onSablonSil={(id) => { const sb = kullaniciSablonlari.find((x) => x.id === id); if (sb) setSilinecekSablon(sb); }}
+              onKapat={() => setSolAcik(false)}
+              sonEklenen={sonEklenen}
+              ekBolumler={{
+                matematik: {
+                  baslik: "Yazarak çiz ve diğer matematik araçları",
+                  icerik: <MatematikSeridi
+                    onGrafik={(grafik) => fizikNesnesiEkle("grafik", { grafik })}
+                    onIstatistik={(istatistik) => fizikNesnesiEkle("istatistik", { istatistik })}
+                    onSema={(sema) => fizikNesnesiEkle("sema", { sema })}
+                  />,
+                },
+                fizik: {
+                  baslik: "Noktaları yazarak grafik çiz",
+                  icerik: <GrafikSeridi onSablon={grafikSablonuEkle} onUclu={() => grafikUcluEkle()} onHizli={(n, b) => fizikNesnesiEkle("grafik", { grafik: noktalardanGrafik(n, b) })} />,
+                },
+                kimya: {
+                  baslik: "Zincir çizici, özel molekül ve diğer kimya araçları",
+                  icerik: <KimyaSeridi
+                    onLab={(nesne) => fizikNesnesiEkle(nesne)}
+                    onKimya={(kimya) => fizikNesnesiEkle("kimya", { kimya })}
+                    onGrafik={(grafik) => fizikNesnesiEkle("grafik", { grafik })}
+                  />,
+                },
+                akis: {
+                  baslik: "Yazarak diz (metinden akış şeması)",
+                  icerik: (
+        <div className="mt-2 rounded-xl border border-brand-200 bg-brand-50/40 p-2">
+          <div className="flex flex-col gap-2">
+            <textarea
+              aria-label="Akış şeması tarifi"
+              value={tarifMetni}
+              onChange={(e) => setTarifMetni(e.target.value)}
+              rows={4}
+              spellCheck={false}
+              className="min-w-0 flex-1 resize-y rounded-md border border-slate-200 px-2 py-1 font-mono text-[11px] leading-relaxed text-slate-700"
+              placeholder={"(Başla) -> /Sayıyı oku/ -> <Çift mi?> -evet-> [Çifttir yazdır] -> (Bitir)\n<Çift mi?> -hayır-> [Tektir yazdır] -> (Bitir)"}
+            />
+            <div className="flex shrink-0 flex-col gap-1">
+              <button
+                type="button"
+                onClick={tarifiDiz}
+                disabled={!tarifMetni.trim()}
+                className="rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Diz
               </button>
-            ))}
+              <span className="text-[10px] leading-snug text-slate-500">
+                ( ) başla · [ ] işlem · &lt; &gt; karar · / / girdi-çıktı ·{" "}
+                <code>-evet-&gt;</code> etiketli ok. Aynı metni tekrar yazmak
+                aynı kutuya bağlar (döngü).
+              </span>
+            </div>
           </div>
+          {tarifUyarilari.length > 0 && (
+            <ul className="mt-1.5 space-y-0.5 text-[10px] font-semibold text-amber-700">
+              {tarifUyarilari.map((u) => <li key={u}>⚠ {u}</li>)}
+            </ul>
+          )}
+        </div>
+                  ),
+                },
+              }}
+            />
+          </aside>
         )}
-        {arac === "dalga" && (
-          <div className="flex items-center gap-1">
-            <span>Tepe sayısı</span>
-            {[1, 2, 3, 4].map((deger) => (
-              <button key={deger} type="button" aria-pressed={dalgaSayisi === deger} onClick={() => setDalgaSayisi(deger)}
-                className={`rounded-md px-2 py-1 font-semibold ${dalgaSayisi === deger ? "bg-brand-100 text-brand-700" : "bg-white ring-1 ring-slate-200"}`}>
-                {deger}
-              </button>
-            ))}
+
+        {/* AYRINTILI PANEL. Seçim varken içerik DOM'da durur (gizliyken `hidden`);
+            karmaşık nesnede kendiliğinden, basit şekilde "Ayrıntılar" ile açılır. */}
+        <aside
+          aria-label="Seçili şekil ayarları"
+          aria-hidden={!panelAcik ? true : undefined}
+          className={`min-h-0 w-[370px] shrink-0 flex-col rounded-xl border border-slate-200 bg-white max-lg:absolute max-lg:inset-y-0 max-lg:right-0 max-lg:z-30 max-lg:max-w-[calc(100%-16px)] max-lg:shadow-2xl ${panelAcik ? "flex" : "hidden"}`}
+        >
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-3 py-1.5">
+            <span className="text-sm font-bold text-slate-700">
+              {seciliIds.length > 1 ? `${seciliIds.length} şekil` : birincil?.tur === "fizik" ? FIZIK_TANIMLARI[birincil.nesne]?.ad ?? "Ayarlar" : "Ayarlar"}
+            </span>
+            <button type="button" aria-label="Ayrıntılı paneli kapat" onClick={() => setSagPanelAcik(false)}
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100"><X size={16} /></button>
           </div>
-        )}
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">
+            {seciliIds.length === 1 && (
+              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-slate-600 empty:hidden">
         {seciliIds.length === 1 && sekiller.find((s) => s.id === seciliId)?.tur === "dikdortgen" && (() => {
           const secili = sekiller.find((s) => s.id === seciliId) as Extract<Sekil, { tur: "dikdortgen" }>;
           const serbest = !!secili.serbestKoseler;
@@ -2010,242 +2845,8 @@ export function CizimEditoruModal({
             </div>
           );
         })()}
-      </div>
-          )}
-      <div
-        ref={containerRef}
-        className="relative min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-2"
-      >
-        <canvas
-          ref={canvasRef}
-          width={tuvalOlcu.w}
-          height={tuvalOlcu.h}
-          tabIndex={0}
-          role="img"
-          aria-label={`Çizim tuvali. ${sekiller.length} şekil var. Enter veya boşluk etkin araçla ortada şekil oluşturur; ok tuşları seçimi taşır.`}
-          className="mx-auto block rounded border border-slate-200 bg-white touch-none"
-          style={{
-            cursor: arac === "sec" ? "crosshair" : arac === "silgi" ? "cell" : "crosshair",
-            width: `${tuvalOlcu.w * zoom / 100}px`,
-            height: `${tuvalOlcu.h * zoom / 100}px`,
-          }}
-          onPointerDown={isaretciAsagi}
-          onPointerMove={isaretciHareket}
-          onPointerUp={isaretciYukari}
-          onPointerCancel={isaretciIptal}
-          onKeyDown={(e) => {
-            if ((e.key === "Enter" || e.key === " ") && !e.ctrlKey && !e.metaKey) {
-              e.preventDefault(); klavyeyleSekilEkle();
-            }
-          }}
-        />
-        {metinNoktasi && (
-          <div
-            className="absolute z-10 rounded-lg border border-slate-200 bg-white p-2 shadow-lg"
-            style={{
-              left: (() => {
-                const canvas = containerRef.current?.querySelector("canvas");
-                const bas = canvas?.offsetLeft ?? 0;
-                return Math.max(bas, Math.min(bas + metinNoktasi.x * zoom / 100, bas + tuvalOlcu.w * zoom / 100 - 224));
-              })(),
-              top: (() => {
-                const canvas = containerRef.current?.querySelector("canvas");
-                const bas = canvas?.offsetTop ?? 0;
-                return Math.max(bas, Math.min(bas + metinNoktasi.y * zoom / 100, bas + tuvalOlcu.h * zoom / 100 - 126));
-              })(),
-            }}
-          >
-            <textarea
-              autoFocus
-              value={metinDeger}
-              onChange={(e) => setMetinDeger(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); metniOnayla(); }
-                if (e.key === "Escape") setMetinNoktasi(null);
-              }}
-              onBlur={metniOnayla}
-              placeholder="Etiket metni"
-              className="h-20 w-52 resize-none rounded-md border border-slate-200 px-2 py-1 text-xs outline-none focus:border-brand-400"
-            />
-            <div className="mt-1 flex flex-wrap gap-1">
-              {["°", "θ", "α", "β", "Δ", "μ", "Ω", "π", "→"].map((s) => (
-                <button key={s} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setMetinDeger((v) => v + s)}
-                  className="rounded border border-slate-200 px-1.5 py-0.5 text-xs hover:bg-slate-50">{s}</button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-        </div>
-      </div>
-        {/* Panel her zaman DOM'da; görünmüyorsa `hidden` (seçim paneli testleri ve odak yönetimi buna güveniyor). */}
-        {/* Geniş ekranda panel gizliyken (çizim kipi, şekil seçili değil) yeri
-            AYRILIR (`lg:invisible`, `hidden` değil): panel ilk şekil çizilince
-            açılıp tuvali ~182 px sola kaydırıyordu. Odak kipinde (tuvali
-            büyütmek için bilerek kapatıldığında) ve dar ekranda yer ayrılmaz. */}
-        <aside aria-label="Seçili şekil ayarları" aria-hidden={!odakKipi && !panelGorunur ? true : undefined} className={`h-[40%] min-h-0 w-full shrink-0 flex-col rounded-xl lg:h-auto lg:w-[370px] border border-slate-200 bg-white ${odakKipi ? "hidden" : !panelGorunur ? "hidden lg:flex lg:invisible" : "flex"}`}>
-            {kutuphaneVar && (
-              <div className="flex shrink-0 gap-1 border-b border-slate-100 p-1.5">
-                {([["sekiller", "Şekiller"], ["ayarlar", "Ayarlar"]] as const).map(([id, ad]) => (
-                  <button key={id} type="button" aria-pressed={etkinSekme === id}
-                    disabled={id === "ayarlar" && seciliIds.length === 0}
-                    onClick={() => setSagSekme(id)}
-                    className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${etkinSekme === id ? "bg-brand-50 text-brand-700" : "text-slate-500 hover:bg-slate-50"}`}>
-                    {ad}
-                  </button>
-                ))}
               </div>
             )}
-            <div className="min-h-0 flex-1 overflow-y-auto p-2">
-              <div className={etkinSekme === "sekiller" ? "flex flex-col gap-2" : "hidden"}>
-      {kullaniciSablonlari.length > 0 && (
-        <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-2.5">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-[11px] font-bold uppercase tracking-wide text-emerald-700">Şablonlarım</span>
-            {kullaniciSablonlari.map((sablon) => (
-              <span key={sablon.id} className="inline-flex overflow-hidden rounded-lg border border-emerald-200 bg-white">
-                <button type="button" title={sablon.ad} onClick={() => kullaniciSablonuEkle(sablon)} className="max-w-[14rem] truncate px-2.5 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50">{sablon.ad}</button>
-                <button type="button" aria-label={`${sablon.ad} şablonunu sil`} title="Şablonu sil"
-                  onClick={() => setSilinecekSablon(sablon)}
-                  className="border-l border-emerald-100 px-2 text-rose-500 hover:bg-rose-50">×</button>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-      {/* FİZİK şeridi: şekil paleti + bağlantı türleri. Akış şeridiyle aynı
-          mantık: bunlar "araç" değil, tek tıkla şekil EKLEYEN eylemler. */}
-      {kip === "fizik" && (
-        <FizikSeridi
-          grup={fizikGrubu}
-          onGrupDegisti={setFizikGrubu}
-          onEkle={fizikNesnesiEkle}
-          kimyaIcerigi={<KimyaSeridi
-            onLab={(nesne) => fizikNesnesiEkle(nesne)}
-            onKimya={(kimya) => fizikNesnesiEkle("kimya", { kimya })}
-            onGrafik={(grafik) => fizikNesnesiEkle("grafik", { grafik })}
-          />}
-          matematikIcerigi={<MatematikSeridi
-            onGrafik={(grafik) => fizikNesnesiEkle("grafik", { grafik })}
-            onIstatistik={(istatistik) => fizikNesnesiEkle("istatistik", { istatistik })}
-            onSema={(sema) => fizikNesnesiEkle("sema", { sema })}
-          />}
-          grafikIcerigi={<GrafikSeridi onSablon={grafikSablonuEkle} onUclu={() => grafikUcluEkle()} onHizli={(n, b) => fizikNesnesiEkle("grafik", { grafik: noktalardanGrafik(n, b) })} />}
-          baglayiciAyari={baglayiciAyari}
-          baglayiciAktif={arac === "baglayici"}
-          kaynakSecildi={!!baglayiciKaynakUcu}
-          onBaglayici={(ayar) => {
-            const ayniAyar = arac === "baglayici" && ayar.stil === baglayiciAyari.stil && ayar.okUcu === baglayiciAyari.okUcu && !!ayar.serbest === !!baglayiciAyari.serbest;
-            setBaglayiciAyari(ayar);
-            setBaglayiciKaynakUcu(null);
-            secimAyarla([]);
-            setArac(ayniAyar ? "sec" : "baglayici");
-          }}
-        />
-      )}
-      {/* AKIŞ ŞEMASI şeridi ayrı: bunlar "araç" değil, tek tıkla kutu EKLEYEN
-          eylemler. Araç çubuğuna karıştırılsaydı `aria-pressed` ile seçili
-          görünürlerdi ama seçili kalacak bir kip yok. */}
-      {kip === "akis" && (
-      <div className="mt-3 flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 p-1.5">
-        <span className="px-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-          Akış şeması
-        </span>
-        {AKIS_ARACLARI.map(({ sekil, etiket, ipucu }) => (
-          <button
-            key={sekil}
-            type="button"
-            title={ipucu}
-            onClick={() => akisKutusuEkle(sekil)}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:border-brand-200 hover:bg-brand-50"
-          >
-            <AkisSimge sekil={sekil} />
-            {etiket}
-          </button>
-        ))}
-        <span className="mx-1 h-6 w-px bg-slate-200" />
-        <button
-          type="button"
-          title="İki kutuya sırayla tıklayın: ok kutulara TUTUNUR, kutuyu taşıyınca ok da gelir"
-          aria-pressed={arac === "baglayici"}
-          onClick={() => {
-            setArac(arac === "baglayici" ? "sec" : "baglayici");
-            setBaglayiciAyari({ stil: "dik", okUcu: "son" });
-            setBaglayiciKaynakId(null);
-            secimAyarla([]);
-          }}
-          className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition ${
-            arac === "baglayici"
-              ? "border-brand-300 bg-brand-50 text-brand-700"
-              : "border-slate-200 bg-white text-slate-600 hover:border-brand-200 hover:bg-brand-50"
-          }`}
-        >
-          <svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true">
-            <path d="M1 2 H8 V8 H13" fill="none" stroke="currentColor" strokeWidth="1.5" />
-            <polygon points="13,5 16,8 13,11" fill="currentColor" transform="translate(-1,-3)" />
-          </svg>
-          Bağlayıcı
-        </button>
-        {arac === "baglayici" && (
-          <span className="text-[10px] font-semibold text-brand-700">
-            {baglayiciKaynakId ? "Şimdi HEDEF kutuya tıklayın" : "Önce KAYNAK kutuya tıklayın"}
-          </span>
-        )}
-        <span className="mx-1 h-6 w-px bg-slate-200" />
-        <button
-          type="button"
-          aria-pressed={tarifAcik}
-          onClick={() => setTarifAcik((v) => !v)}
-          className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition ${
-            tarifAcik
-              ? "border-brand-300 bg-brand-50 text-brand-700"
-              : "border-slate-200 bg-white text-slate-600 hover:border-brand-200 hover:bg-brand-50"
-          }`}
-        >
-          <Type size={14} /> Yazarak diz
-        </button>
-      </div>
-      )}
-      {/* YAZARAK TARİF ETME. Metin TEK KERELİK: kutular dizildikten sonra bağ
-          kopar, öğretmen elle düzenler (öğretmenle konuşuldu, DEVAM §19.5).
-          Bu yüzden metin belgeye kaydedilmiyor — yalnız bu oturumda duruyor. */}
-      {kip === "akis" && tarifAcik && (
-        <div className="mt-2 rounded-xl border border-brand-200 bg-brand-50/40 p-2">
-          <div className="flex flex-col gap-2">
-            <textarea
-              aria-label="Akış şeması tarifi"
-              value={tarifMetni}
-              onChange={(e) => setTarifMetni(e.target.value)}
-              rows={4}
-              spellCheck={false}
-              className="min-w-0 flex-1 resize-y rounded-md border border-slate-200 px-2 py-1 font-mono text-[11px] leading-relaxed text-slate-700"
-              placeholder={"(Başla) -> /Sayıyı oku/ -> <Çift mi?> -evet-> [Çifttir yazdır] -> (Bitir)\n<Çift mi?> -hayır-> [Tektir yazdır] -> (Bitir)"}
-            />
-            <div className="flex shrink-0 flex-col gap-1">
-              <button
-                type="button"
-                onClick={tarifiDiz}
-                disabled={!tarifMetni.trim()}
-                className="rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Diz
-              </button>
-              <span className="text-[10px] leading-snug text-slate-500">
-                ( ) başla · [ ] işlem · &lt; &gt; karar · / / girdi-çıktı ·{" "}
-                <code>-evet-&gt;</code> etiketli ok. Aynı metni tekrar yazmak
-                aynı kutuya bağlar (döngü).
-              </span>
-            </div>
-          </div>
-          {tarifUyarilari.length > 0 && (
-            <ul className="mt-1.5 space-y-0.5 text-[10px] font-semibold text-amber-700">
-              {tarifUyarilari.map((u) => <li key={u}>⚠ {u}</li>)}
-            </ul>
-          )}
-        </div>
-      )}
-              </div>
-              <div className={etkinSekme === "ayarlar" ? "" : "hidden"}>
       {seciliIds.length > 0 && (
         <div className="mb-2 flex flex-wrap items-center gap-1.5">
           <>
@@ -2659,94 +3260,13 @@ export function CizimEditoruModal({
           />
         );
       })()}
-              </div>
-            </div>
+          </div>
         </aside>
       </div>
       {hata && (
         <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-600">{hata}</p>
       )}
-      {/* ALT ŞERİT — GÖRÜNÜM.
-          Üstteki eylem şeridinden ayrı duruyor: üstte "ne yapıyorum" (araçlar),
-          altta "nasıl bakıyorum" (ızgara, yakınlaştırma, tuval ölçüsü). Alt
-          sıra zaten vardı ve 1120 px'in 837 px'i boştu; bu kontroller 624 px
-          tutuyor, yani taşınmaları dikeyde 42 px'i BEDAVA geri veriyor. */}
-      <div className="mt-2 flex shrink-0 flex-wrap items-center gap-2 border-t border-slate-100 bg-white pt-2 text-xs text-slate-600">
-        <button type="button" onClick={() => setOdakKipi((v) => !v)}
-          title={odakKipi ? "Şeritleri geri getir (Esc)" : "Araç çubuklarını gizle, tuvali büyüt"}
-          aria-pressed={odakKipi}
-          className={`inline-flex items-center gap-1 rounded-md px-2 py-1 font-semibold ${odakKipi ? "bg-brand-100 text-brand-700" : "bg-white ring-1 ring-slate-200 hover:bg-slate-50"}`}>
-          <Maximize2 size={14} /> {odakKipi ? "Şeritleri göster" : "Sadece tuval"}
-        </button>
-        <span className="mx-0.5 h-5 w-px bg-slate-200" />
-        <button type="button" onClick={() => setIzgaraGoster((v) => !v)}
-          className={`inline-flex items-center gap-1 rounded-md px-2 py-1 font-semibold ${izgaraGoster ? "bg-brand-100 text-brand-700" : "bg-white ring-1 ring-slate-200"}`}>
-          <Grid3X3 size={14} /> Izgara
-        </button>
-        <label className="inline-flex items-center gap-1.5">
-          <input type="checkbox" checked={izgarayaYakala} onChange={(e) => setIzgarayaYakala(e.target.checked)} /> Izgaraya yakala
-        </label>
-        <div className="inline-flex items-center overflow-hidden rounded-md bg-white ring-1 ring-slate-200">
-          {/* Alt sınır %25: büyük tuvalde (1920×1200) %50'de bile ekrana
-              sığmıyor ve öğretmen şemanın tamamını göremiyordu. */}
-          <button type="button" title="Uzaklaştır" onClick={() => setZoom((v) => Math.max(25, v - 25))} className="p-1.5 hover:bg-slate-50"><ZoomOut size={14} /></button>
-          <button type="button" title="%100" onClick={() => setZoom(100)} className="min-w-12 border-x border-slate-100 px-2 py-1 font-semibold">%{zoom}</button>
-          <button type="button" title="Yakınlaştır" onClick={() => setZoom((v) => Math.min(200, v + 25))} className="p-1.5 hover:bg-slate-50"><ZoomIn size={14} /></button>
-        </div>
-        {/* PENCEREYE SIĞDIR: 25'lik adımlarla aramak yerine tek tık. Oran
-            tuvalin GERÇEK kabından okunuyor, sabitten değil — tuval ölçüsü
-            de pencere de değişebiliyor. */}
-        <button
-          type="button"
-          title="Tuvalin tamamı pencereye sığacak orana geç"
-          onClick={pencereyeSigdir}
-          className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-semibold ring-1 ring-slate-200 hover:bg-slate-50"
-        >
-          <Maximize2 size={14} /> Sığdır
-        </button>
-        {/* TUVAL ÖLÇÜSÜ. Öğretmenin örnek şeması ~1900×1300'dü; 960×600'e
-            sığdırınca kutular okunmaz oluyordu. Küçültme, dışarıda ŞEKİL
-            KALIYORSA engelleniyor — sessizce kırpmak yerine söylemek. */}
-        <div className="inline-flex items-center gap-1">
-          <span className="text-slate-400">Tuval</span>
-          {TUVAL_OLCULERI.map((o) => (
-            <button
-              key={o.ad}
-              type="button"
-              title={`${o.w}×${o.h}`}
-              aria-pressed={tuvalOlcu.w === o.w && tuvalOlcu.h === o.h}
-              onClick={() => tuvalOlcusunuDegistir({ w: o.w, h: o.h })}
-              className={`rounded-md px-2 py-1 font-semibold ${
-                tuvalOlcu.w === o.w && tuvalOlcu.h === o.h
-                  ? "bg-brand-100 text-brand-700"
-                  : "bg-white ring-1 ring-slate-200 hover:bg-slate-50"
-              }`}
-            >
-              {o.ad}
-            </button>
-          ))}
-        </div>
-        <span className="mx-0.5 h-5 w-px bg-slate-200" />
-        <span title="En fazla 80 işlem saklanır; sınır dolunca en eski işlem otomatik çıkarılır."
-          className={`rounded-md px-2 py-1 text-[10px] font-semibold ${gecmisSayisi >= GECMIS_LIMITI ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-500"}`}>
-          Geçmiş {gecmisSayisi}/{GECMIS_LIMITI}
-        </span>
-        <button
-          type="button"
-          title="Tümünü temizle"
-          disabled={sekiller.length === 0}
-          onClick={() => setTemizleOnayi(true)}
-          className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-semibold ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {/* Etiket "Tümünü temizle" kalıyor: onay kutusundaki düğme "Temizle"
-              ve testler ikisini TAM METİNLE ayırıyor. Kısaltmak iki düğmeyi
-              birbirine karıştırılabilir yapıyordu. */}
-          <Trash2 size={14} /> Tümünü temizle
-        </button>
-        <span className="ml-auto text-[10px] text-slate-400">
-          {sekiller.length} şekil · Shift: düzgün açı · Delete: sil · {kisayol("Ctrl+Z/Y")}: geri/ileri
-        </span>
-      </div>
+
       <div className="mt-2 flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-100 bg-white pt-2">
         {inlineMod && satirIciYukseklik && (
           <div className="mr-auto flex flex-wrap items-center gap-1.5 text-xs" role="group" aria-label="Metin içindeki çizim boyu">

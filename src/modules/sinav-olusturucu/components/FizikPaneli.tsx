@@ -18,6 +18,7 @@ import { izgaraBoyutu } from "../cizim/geometri";
 import type { BaglayiciUcu, BaglayiciStili, BaglayiciYonu, FizikEtiketYeri, FizikNesnesi, Sekil } from "../cizim/tipler";
 import { TogglePill } from "./ModalParcalari";
 import { GeoEkPaneli } from "./GeometriPaneli";
+import { FizikSahnePaneli, fizikSahnePaneliVarMi } from "./FizikSahnePaneli";
 
 export type BaglayiciAyari = {
   stil: BaglayiciStili;
@@ -260,6 +261,19 @@ export function FizikSecimPaneli({
   }
   const t = FIZIK_TANIMLARI[sekil.nesne];
   const yer = sekil.etiketYeri ?? t.etiketYeri;
+  // Hesaplı düzenekler (eğik düzlem kuvvetleri, optik, sıvı kabı) yazılarını kendisi
+  // çizer: genel etiket kutusu ve etiket yeri yerine sade ayar paneli gösterilir.
+  if (fizikSahnePaneliVarMi(sekil.nesne)) {
+    return (
+      <div className="mt-2 rounded-xl border border-brand-200 bg-brand-50/50 p-2" data-testid="fizik-secim-paneli">
+        <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{t.ad}</span>
+        <FizikSahnePaneli sekil={sekil} guncelle={guncelle} tarihceyeKaydet={tarihceyeKaydet} />
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] text-slate-500">Değerleri değiştirince oklar, ışınlar ve görüntü yeniden hesaplanır.</span>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="mt-2 rounded-xl border border-brand-200 bg-brand-50/50 p-2" data-testid="fizik-secim-paneli">
       <div className="flex flex-wrap items-center gap-2">

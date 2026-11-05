@@ -15,6 +15,8 @@ import { istatistikPayi } from "./istatistik";
 import { semaPayi } from "./sema";
 import { kimyaPayi } from "./kimya";
 import { enerjiDuzeyiDisPayi } from "./fizikEk";
+import { egikKuvvetDisPayi } from "./fizikSahneler";
+import { siviDisPayi } from "./sivi";
 import { geometriDisPayi, geometriMi } from "./geometriSekilleri";
 import {
   baglayiciYolu,
@@ -209,6 +211,10 @@ function fizikEtiketSiniri(ctx: CanvasRenderingContext2D, s: Extract<Sekil, { tu
  */
 function fizikDisPayKutusu(ctx: CanvasRenderingContext2D, s: Extract<Sekil, { tur: "fizik" }>) {
   const pay = s.nesne === "enerjiDuzeyi" ? enerjiDuzeyiDisPayi(ctx, s)
+    // v1.2: eğik düzlem kuvvet okları/yazıları ve sıvı kabı ölçü okları kutu dışına taşar (optik düzenek kutuya kırpılı çizilir).
+    : s.nesne === "egikKuvvet" ? egikKuvvetDisPayi(ctx, s)
+    : s.nesne === "siviKabi" ? siviDisPayi(s)
+    : s.nesne === "optikDuzenek" ? { sol: 16, ust: 6, sag: 24, alt: 6 }
     : geometriMi(s.nesne) ? geometriDisPayi(ctx, s)
     : null;
   if (!pay) return null;

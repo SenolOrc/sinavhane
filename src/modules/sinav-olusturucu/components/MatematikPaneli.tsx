@@ -27,8 +27,15 @@ import {
   varsayilanIstatistik,
 } from "../cizim/istatistik";
 import {
+  agacDerinligi,
+  agacKur,
   agacOkuAyrinti,
+  agacSatirlari,
+  agacYaprakSayisi,
   agacYaz,
+  EN_COK_AGAC_ASAMA,
+  EN_COK_YAPRAK,
+  vennGorunurBolgeler,
   EN_COK_DAL_ADI,
   EN_COK_SEMA_AD,
   SAYI_DOGRUSU_SINIRI,
@@ -42,8 +49,25 @@ import {
   varsayilanSema,
   vennBolgeAdlari,
 } from "../cizim/sema";
-import type { GrafikVerisi, IstatistikVerisi, SemaVerisi, Sekil } from "../cizim/tipler";
-import { MetinGirdisi, OndalikGirdisi } from "./GrafikPaneli";
+import {
+  BIRIM_CEMBER_ACI_SINIRI,
+  birimCemberDegerleri,
+  cozumAraliklari,
+  cozumKumesiYaz,
+  EN_COK_ELEMAN,
+  EN_COK_ELEMAN_YAZISI,
+  EN_COK_ISARET_SATIRI,
+  EN_COK_KOK,
+  EN_COK_KOK_YAZISI,
+  fonksiyonDurumu,
+  isaretleriKuralaGoreDoldur,
+  isaretTablosuVerisi,
+  kokSirasiUyarisi,
+  oklariYenidenNumarala,
+} from "../cizim/semaEk";
+import type { AgacDali, GrafikVerisi, IsaretKoku, IstatistikVerisi, SemaVerisi, Sekil, VennDuzeni } from "../cizim/tipler";
+import { MetinOlarakYapistir, MiniTablo, type MiniTabloOlayi } from "./MiniTablo";
+import { HIZLI_FONKSIYON_ORNEKLERI, MetinGirdisi, OndalikGirdisi, OrnekCipleri, okunurHata } from "./GrafikPaneli";
 import { TogglePill } from "./ModalParcalari";
 
 type FizikSekliTipi = Extract<Sekil, { tur: "fizik" }>;
@@ -102,6 +126,7 @@ export function MatematikSeridi({ onGrafik, onIstatistik, onSema }: {
   onSema: (veri: SemaVerisi) => void;
 }) {
   const [metin, setMetin] = useState("");
+  const girdiRef = useRef<HTMLInputElement>(null);
   const sonuc = metin.trim() ? hizliMatematik(metin) : null;
   const hata = sonuc && "hata" in sonuc ? sonuc.hata : null;
   const ciz = () => {
@@ -118,7 +143,7 @@ export function MatematikSeridi({ onGrafik, onIstatistik, onSema }: {
           <TogglePill key={id} aktif={sekme === id} onClick={() => setSekme(id)}>{ad}</TogglePill>
         ))}
         <span className="text-[10px] text-slate-500">
-          {sekme === "fonksiyon" ? "Aşağıya yazın ya da hazır grafiğe tıklayın" : sekme === "istatistik" ? "Hazır grafiğe tıklayın, sayıları sonra değiştirin" : "Venn, olasılık ağacı, sayı doğrusu"}
+          {sekme === "fonksiyon" ? "Aşağıya yazın ya da hazır grafiğe tıklayın" : sekme === "istatistik" ? "Hazır grafiğe tıklayın, sayıları sonra değiştirin" : "Venn, olasılık ağacı, sayı doğrusu, birim çember, işaret tablosu, fonksiyon şeması"}
         </span>
       </div>
 
@@ -126,6 +151,7 @@ export function MatematikSeridi({ onGrafik, onIstatistik, onSema }: {
         <div className="flex w-full flex-wrap items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5" data-testid="matematik-hizli">
           <span className="text-[10px] font-bold uppercase tracking-wide text-brand-700">Yazarak çiz</span>
           <input
+            ref={girdiRef}
             aria-label="Hızlı fonksiyon"
             value={metin}
             onChange={(e) => setMetin(e.target.value)}
@@ -134,8 +160,9 @@ export function MatematikSeridi({ onGrafik, onIstatistik, onSema }: {
             className={`min-w-[16rem] flex-1 rounded-md border bg-white px-2 py-1 font-mono text-[11px] ${hata ? "border-red-400" : "border-slate-300"}`}
           />
           <button type="button" disabled={!sonuc || !!hata} onClick={ciz} className={`${DUGME} font-bold`}>Çiz</button>
-          <span className={`w-full text-[10px] ${hata ? "text-red-600" : "text-slate-500"}`}>
-            {hata ?? "Birden fazla ifade ; ile ayrılır. > < >= <= yazarsanız bölge boyanır. Çember/elips: x^2+y^2=25. Alan: alan(x, x^2, 0, 1). Teğet: teget(x^2, 1). Kesişim noktaları: kesisim. Parçalı: {x<0: -x, x>=0: x^2} (açık/kapalı uç otomatik). Adlı nokta: A(2,3) ; F1(-3,0). Birden çok eğri düz/kesikli/noktalı çizgiyle ayrılır; sin/cos yazarsanız x ekseni π katlarıyla gelir."}
+          <OrnekCipleri ornekler={HIZLI_FONKSIYON_ORNEKLERI.map((o) => ({ ad: o.ad, deger: o.ifade, ipucu: o.ipucu }))} onSec={(m) => { setMetin(m); girdiRef.current?.focus(); }} etiket="Tek tıkla örnek" />
+          <span className={`w-full text-[10px] ${hata ? "text-red-600" : "text-slate-500"}`} role={hata ? "alert" : undefined}>
+            {hata ? okunurHata(hata) : "Örneğe tıklayıp değiştirin ya da yazın, Enter ile çizin. Birden fazla ifade ; ile ayrılır. > < >= <= yazarsanız bölge boyanır. Çember/elips: x^2+y^2=25. Alan: alan(x, x^2, 0, 1). Teğet: teget(x^2, 1). Kesişim noktaları: kesisim. Parçalı: {x<0: -x, x>=0: x^2} (açık/kapalı uç otomatik). Adlı nokta: A(2,3) ; F1(-3,0). Birden çok eğri düz/kesikli/noktalı çizgiyle ayrılır; sin/cos yazarsanız x ekseni π katlarıyla gelir."}
           </span>
         </div>
       )}
@@ -487,7 +514,8 @@ export function SemaPaneli({ sekil, guncelle, tarihceyeKaydet }: {
       </div>
 
       {veri.tur === "venn" && (() => {
-        const adlar = vennBolgeAdlari(veri.kume, veri.adlar);
+        const adlar = vennBolgeAdlari(veri.kume, veri.adlar, veri.duzen);
+        const gorunur = new Set(vennGorunurBolgeler(veri.kume, veri.duzen));
         const bolgeler = adlar.map((_, i) => veri.bolgeler[i] ?? "");
         const boyali = new Set(veri.boyali ?? []);
         return (
@@ -505,13 +533,23 @@ export function SemaPaneli({ sekil, guncelle, tarihceyeKaydet }: {
                 <MetinGirdisi key={i} etiket={`${i + 1}. küme adı`} deger={a} genislik="w-16" enCok={EN_COK_SEMA_AD} onOdak={tarihceyeKaydet}
                   onDegis={(v) => yaz({ ...veri, adlar: veri.adlar.map((x, j) => (j === i ? v : x)) })} />
               ))}
+              {veri.kume === 2 && ([["kesisen", "Kesişen"], ["altKume", "Alt küme A ⊂ B"], ["ayrik", "Ayrık A ∩ B = ∅"]] as [VennDuzeni, string][]).map(([id, ad]) => (
+                <TogglePill key={id} aktif={(veri.duzen ?? "kesisen") === id} onClick={() => {
+                  if ((veri.duzen ?? "kesisen") === id) return;
+                  tarihceyeKaydet();
+                  // Boş küme olan bölgenin değeri ve boyası temizlenir (A ⊂ B'de "yalnız A", ayrıkta A∩B).
+                  const gorunur = new Set(vennGorunurBolgeler(2, id));
+                  const { duzen: _eski, ...geri } = veri;
+                  yaz({ ...geri, ...(id === "kesisen" ? {} : { duzen: id }), bolgeler: veri.bolgeler.map((b, i) => (gorunur.has(i) ? b : "")), boyali: (veri.boyali ?? []).filter((i) => gorunur.has(i)) });
+                }}>{ad}</TogglePill>
+              ))}
               <TogglePill aktif={veri.evrensel} onClick={() => { tarihceyeKaydet(); yaz({ ...veri, evrensel: !veri.evrensel }); }}>Evrensel küme kutusu</TogglePill>
               {veri.evrensel && <MetinGirdisi etiket="Evrensel ad" deger={veri.evrenselAd ?? ""} genislik="w-14" enCok={EN_COK_SEMA_AD} onOdak={tarihceyeKaydet} onDegis={(v) => yaz({ ...veri, evrenselAd: v })} yerTutucu="E" />}
               <MetinGirdisi etiket="Başlık" deger={veri.baslik ?? ""} genislik="w-24" onOdak={tarihceyeKaydet} onDegis={(v) => yaz({ ...veri, baslik: v })} />
             </div>
             {/* Sağ panel ~370 px: her bölge kendi satırında; etiket kısalır (truncate+title), giriş ve Boya düğmesi daima görünür. */}
             <div className="flex min-w-0 flex-col gap-1">
-              {adlar.map((ad, i) => (
+              {adlar.map((ad, i) => !gorunur.has(i) ? null : (
                 <div key={i} className="flex min-w-0 items-center gap-1.5" data-testid="venn-bolge">
                   <label className="flex min-w-0 flex-1 items-center gap-1 text-[11px] font-semibold text-slate-600">
                     <span className="min-w-0 flex-1 truncate" title={ad}>{ad}</span>
@@ -541,23 +579,10 @@ export function SemaPaneli({ sekil, guncelle, tarihceyeKaydet }: {
         );
       })()}
 
-      {veri.tur === "agac" && (
-        <div className="mt-2 flex flex-col gap-2 border-t border-brand-100 pt-2" data-testid="sema-agac">
-          <YaziAlani
-            etiket="Dallar"
-            satir={Math.min(10, agacYaz(veri.dallar).split("\n").length + 1)}
-            deger={agacYaz(veri.dallar)}
-            ornek={"K: 1/3\n- K: 1/2\n- M: 1/2\nM: 2/3\n- K: 1/2\n- M: 1/2"}
-            onOdak={tarihceyeKaydet}
-            gecerli={(m) => "dallar" in agacOkuAyrinti(m)}
-            neden={(m) => { const r = agacOkuAyrinti(m); return "hata" in r ? r.hata : null; }}
-            uyari={(m) => { const r = agacOkuAyrinti(m); return "dallar" in r ? r.uyari : undefined; }}
-            onYaz={(m) => { const r = agacOkuAyrinti(m); if ("dallar" in r) yaz({ ...veri, dallar: r.dallar }); }}
-          />
-          <span className="text-[10px] text-slate-500">Her satır bir dal: "ad: olasılık". Alt dallar "-" ile başlar ve üstündeki dala bağlanır. Sona ulaşan yolların çarpımı sağda yazılır. Dal adı en çok {EN_COK_DAL_ADI}, olasılık en çok 20 karakter.</span>
-          <MetinGirdisi etiket="Başlık" deger={veri.baslik ?? ""} onOdak={tarihceyeKaydet} onDegis={(v) => yaz({ ...veri, baslik: v })} />
-        </div>
-      )}
+      {veri.tur === "agac" && <AgacPaneli veri={veri} yaz={yaz} tarihceyeKaydet={tarihceyeKaydet} />}
+      {veri.tur === "birimCember" && <BirimCemberPaneli veri={veri} yaz={yaz} tarihceyeKaydet={tarihceyeKaydet} />}
+      {veri.tur === "isaretTablosu" && <IsaretTablosuPaneli veri={veri} yaz={yaz} tarihceyeKaydet={tarihceyeKaydet} />}
+      {veri.tur === "fonksiyonSema" && <FonksiyonSemaPaneli veri={veri} yaz={yaz} tarihceyeKaydet={tarihceyeKaydet} />}
 
       {veri.tur === "sayiDogrusu" && (
         <div className="mt-2 flex flex-col gap-2 border-t border-brand-100 pt-2" data-testid="sema-sayi">
@@ -590,6 +615,334 @@ export function SemaPaneli({ sekil, guncelle, tarihceyeKaydet }: {
           <span className="text-[10px] text-slate-500">( ) açık uç ○, [ ] kapalı uç ●. ∞ ya da boş uç sonsuzu gösterir. Noktada "bos" yazarsanız içi boş daire olur.</span>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Olasılık ağacı (3 aşama) ───────────────────────────────────────────────
+
+type AltPanel<T extends SemaVerisi["tur"]> = { veri: Extract<SemaVerisi, { tur: T }>; yaz: (v: SemaVerisi) => void; tarihceyeKaydet: () => void };
+
+const ASAMA_SECENEKLERI = Array.from({ length: EN_COK_AGAC_ASAMA }, (_, i) => ({ deger: String(i + 1), ad: `${i + 1}. aşama` }));
+
+function AgacPaneli({ veri, yaz, tarihceyeKaydet }: AltPanel<"agac">) {
+  const derinlik = agacDerinligi(veri.dallar);
+  const yaprak = agacYaprakSayisi(veri.dallar);
+  const asamaEkle = () => {
+    const ekle = (ds: AgacDali[]): AgacDali[] => ds.map((d) => (d.alt?.length ? { ...d, alt: ekle(d.alt) } : { ...d, alt: [{ ad: "K", olasilik: "1/2" }, { ad: "M", olasilik: "1/2" }] }));
+    tarihceyeKaydet();
+    yaz({ ...veri, dallar: ekle(veri.dallar) });
+  };
+  const kur = (h: string[][]) => agacKur(h.map(([a, ad, p]) => ({ asama: Number(a), ad, olasilik: p })));
+  return (
+    <div className="mt-2 flex flex-col gap-2 border-t border-brand-100 pt-2" data-testid="sema-agac">
+      <MiniTablo
+        etiket="Olasılık ağacı dalları"
+        testId="agac-tablosu"
+        sutunlar={[
+          { baslik: "Aşama", tur: "secim", secenekler: ASAMA_SECENEKLERI, genislik: "w-24" },
+          { baslik: "Dal adı", tur: "metin", enCok: EN_COK_DAL_ADI, bosOlabilir: false, yerTutucu: "K", genislik: "w-20" },
+          { baslik: "Olasılık", tur: "metin", enCok: 20, bosOlabilir: false, yerTutucu: "1/2", genislik: "w-16" },
+        ]}
+        satirlar={agacSatirlari(veri.dallar).map((d) => [String(d.asama), d.ad, d.olasilik])}
+        enAz={1}
+        enCok={60}
+        satirGirintisi={(r) => Number(r[0]) - 1}
+        yeniSatir={(m) => [m[m.length - 1]?.[0] ?? "1", "", ""]}
+        tabloDogrula={(h) => { const r = kur(h); return "hata" in r ? r.hata : null; }}
+        onOdak={tarihceyeKaydet}
+        onDegis={(h) => { const r = kur(h); if ("dallar" in r) yaz({ ...veri, dallar: r.dallar }); }}
+        ipucu="Alt dal, üstündeki en yakın bir üst aşama dalına bağlanır."
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className={DUGME} disabled={derinlik >= EN_COK_AGAC_ASAMA || yaprak * 2 > EN_COK_YAPRAK} onClick={asamaEkle}
+          title="Her uca iki alt dal (K, M) ekler; adları ve olasılıkları sonra değiştirin">+ Aşama ekle (her uca 2 dal)</button>
+        <span className="text-[10px] text-slate-500">{derinlik} aşama · {yaprak} sonuç (en çok {EN_COK_AGAC_ASAMA} aşama, {EN_COK_YAPRAK} sonuç)</span>
+      </div>
+      <MetinOlarakYapistir>
+        <YaziAlani
+          etiket="Dallar"
+          satir={Math.min(10, agacYaz(veri.dallar).split("\n").length + 1)}
+          deger={agacYaz(veri.dallar)}
+          ornek={"K: 1/3\n- K: 1/2\n-- M: 1/2\nM: 2/3\n- K: 1/2"}
+          onOdak={tarihceyeKaydet}
+          gecerli={(m) => "dallar" in agacOkuAyrinti(m)}
+          neden={(m) => { const r = agacOkuAyrinti(m); return "hata" in r ? r.hata : null; }}
+          uyari={(m) => { const r = agacOkuAyrinti(m); return "dallar" in r ? r.uyari : undefined; }}
+          onYaz={(m) => { const r = agacOkuAyrinti(m); if ("dallar" in r) yaz({ ...veri, dallar: r.dallar }); }}
+        />
+        <span className="text-[10px] text-slate-500">Her satır "ad: olasılık"; 2. aşama "- ", 3. aşama "-- " ile başlar. Uçlarda sonuç adı yazılır (3 aşamada sıralı üçlü). Dal adı en çok {EN_COK_DAL_ADI}, olasılık en çok 20 karakter.</span>
+      </MetinOlarakYapistir>
+      <MetinGirdisi etiket="Başlık" deger={veri.baslik ?? ""} onOdak={tarihceyeKaydet} onDegis={(v) => yaz({ ...veri, baslik: v })} />
+    </div>
+  );
+}
+
+// ── Birim çember ───────────────────────────────────────────────────────────
+
+const OZEL_ACILAR = [0, 30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330];
+const ROMA_BOLGE = ["", "I", "II", "III", "IV"];
+
+function BirimCemberPaneli({ veri, yaz, tarihceyeKaydet }: AltPanel<"birimCember">) {
+  const [uyari, setUyari] = useState<string | null>(null);
+  const d = birimCemberDegerleri(veri.aci);
+  const g = (yama: Partial<typeof veri>) => yaz({ ...veri, ...yama });
+  const a = (veri.aciEtiketi ?? "α").trim() || "α";
+  return (
+    <div className="mt-2 flex flex-col gap-2 border-t border-brand-100 pt-2" data-testid="sema-birim-cember">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <OndalikGirdisi etiket="Açı α (°)" deger={veri.aci} onOdak={tarihceyeKaydet} onDegis={(v) => {
+          if (v === undefined) return;
+          if (Math.abs(v) > BIRIM_CEMBER_ACI_SINIRI) { setUyari(`Açı −${BIRIM_CEMBER_ACI_SINIRI}° ile ${BIRIM_CEMBER_ACI_SINIRI}° arasında olmalı`); return; }
+          setUyari(null); g({ aci: v });
+        }} />
+        {OZEL_ACILAR.map((x) => (
+          <TogglePill key={x} aktif={veri.aci === x} onClick={() => { tarihceyeKaydet(); setUyari(null); g({ aci: x }); }}>{x}°</TogglePill>
+        ))}
+      </div>
+      {uyari && <span className="text-[10px] text-red-600" role="alert">{uyari}</span>}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className={BASLIK}>Göster</span>
+        <TogglePill aktif={veri.izdusum !== false} onClick={() => { tarihceyeKaydet(); g({ izdusum: veri.izdusum === false }); }}>İzdüşümler (cos, sin)</TogglePill>
+        <TogglePill aktif={!!veri.tan} onClick={() => { tarihceyeKaydet(); g({ tan: !veri.tan }); }}>tan doğrusu (x = 1)</TogglePill>
+        <TogglePill aktif={!!veri.cot} onClick={() => { tarihceyeKaydet(); g({ cot: !veri.cot }); }}>cot doğrusu (y = 1)</TogglePill>
+        <TogglePill aktif={!!veri.bolgeler} onClick={() => { tarihceyeKaydet(); g({ bolgeler: !veri.bolgeler }); }}>Bölgeler ve işaretler</TogglePill>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <MetinGirdisi etiket="Nokta adı" deger={veri.noktaAdi ?? "P"} genislik="w-12" enCok={12} onOdak={tarihceyeKaydet} onDegis={(v) => g({ noktaAdi: v })} />
+        <MetinGirdisi etiket="Açı yazısı" deger={veri.aciEtiketi ?? "α"} genislik="w-16" enCok={16} onOdak={tarihceyeKaydet} onDegis={(v) => g({ aciEtiketi: v })} />
+        {["α", "θ", "x", `${veri.aci}°`].map((t) => (
+          <button key={t} type="button" aria-label={`Açı yazısı: ${t}`} onClick={() => { tarihceyeKaydet(); g({ aciEtiketi: t }); }} className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600 hover:bg-brand-50">{t}</button>
+        ))}
+        <MetinGirdisi etiket="Başlık" deger={veri.baslik ?? ""} genislik="w-24" onOdak={tarihceyeKaydet} onDegis={(v) => g({ baslik: v })} />
+      </div>
+      <div className="rounded-md bg-slate-50 px-2 py-1 text-[11px] text-slate-700" data-testid="birim-degerler">
+        {veri.aci}° · {d.bolge ? `${ROMA_BOLGE[d.bolge]}. bölge` : "eksen üstünde"} · cos {a} = {d.yazi.cos} · sin {a} = {d.yazi.sin} · tan {a} = {d.yazi.tan} · cot {a} = {d.yazi.cot}
+      </div>
+      <span className="text-[10px] text-slate-500">P(cos α, sin α) birim çember üstündedir. tan α, OP doğrusunun x = 1 doğrusunu kestiği T(1, tan α); cot α, y = 1 doğrusunu kestiği K(cot α, 1) noktasından okunur.</span>
+    </div>
+  );
+}
+
+// ── İşaret tablosu ─────────────────────────────────────────────────────────
+
+type Esitsizlik = "" | "<" | "<=" | ">" | ">=";
+const ESITSIZLIKLER: { id: Esitsizlik; ad: string }[] = [
+  { id: "<", ad: "< 0" }, { id: "<=", ad: "≤ 0" }, { id: ">", ad: "> 0" }, { id: ">=", ad: "≥ 0" }, { id: "", ad: "Yalnız tablo" },
+];
+const ISARET_ORNEKLERI = ["x^2-x-6", "(x+2)(x-1)^2/(x-4)", "(3-x)(x+1)", "x(x-2)/(x+1)^2", "(x^2+1)(x-3)"];
+const sonrakiIsaret = (s: string) => (s === "+" ? "-" : s === "-" ? "" : "+");
+const eksiYaz = (s: string) => (s === "-" ? "−" : s);
+
+function IsaretTablosuPaneli({ veri, yaz, tarihceyeKaydet }: AltPanel<"isaretTablosu">) {
+  const [ifade, setIfade] = useState(veri.ifade ?? "");
+  const [esitsizlik, setEsitsizlik] = useState<Esitsizlik>(veri.esitsizlik ?? "<");
+  const [ayrintili, setAyrintili] = useState(veri.satirlar.length > 1);
+  const [hata, setHata] = useState<string | null>(null);
+  const n = veri.kokler.length;
+  const g = (yama: Partial<typeof veri>) => yaz({ ...veri, ...yama });
+  const hesapla = (m = ifade, e = esitsizlik, ay = ayrintili) => {
+    const v = isaretTablosuVerisi(m, e, ay, veri.satirlar[veri.satirlar.length - 1]?.ad || "f(x)");
+    if ("hata" in v) { setHata(v.hata); return; }
+    setHata(null);
+    tarihceyeKaydet();
+    yaz({ ...v, ...(veri.baslik ? { baslik: veri.baslik } : {}) });
+  };
+  const aralikAdi = (j: number) => {
+    const sol = j === 0 ? "−∞" : veri.kokler[j - 1].deger;
+    const sag = j === n ? "+∞" : veri.kokler[j].deger;
+    return `(${sol}, ${sag})`.replace(/-/g, "−");
+  };
+  /** Kök eklenip silinince işaret/nokta dizileri ve çözüm aralıkları kaydırılır. */
+  const koklerDegisti = (h: string[][], olay: MiniTabloOlayi) => {
+    const kokler: IsaretKoku[] = h.map(([deger, kat, tur, dahil]) => ({
+      deger: deger.trim(), kat: kat === "cift" ? "cift" : "tek",
+      ...(tur === "tanimsiz" ? { tanimsiz: true } : {}),
+      ...(dahil === "evet" && tur !== "tanimsiz" ? { dahil: true } : {}),
+    }));
+    let satirlar = veri.satirlar;
+    let cozum = veri.cozum ?? [];
+    if (olay.tur === "sil") {
+      const i = olay.index; // i. kök silinir: (i) ve (i+1) aralıkları birleşir, soldaki kalır
+      satirlar = satirlar.map((s) => ({ ...s, isaretler: s.isaretler.filter((_, j) => j !== i + 1), ...(s.noktalar ? { noktalar: s.noktalar.filter((_, j) => j !== i) } : {}) }));
+      cozum = cozum.filter((j) => j !== i + 1).map((j) => (j > i + 1 ? j - 1 : j));
+    } else if (olay.tur === "ekle") {
+      const i = olay.index; // yeni kök i. sırada: (i) aralığı ikiye bölünür
+      satirlar = satirlar.map((s) => ({ ...s, isaretler: [...s.isaretler.slice(0, i + 1), s.isaretler[i] ?? "", ...s.isaretler.slice(i + 1)], ...(s.noktalar ? { noktalar: [...s.noktalar.slice(0, i), "", ...s.noktalar.slice(i)] } : {}) }));
+      cozum = cozum.flatMap((j) => (j < i ? [j] : j === i ? [j, j + 1] : [j + 1]));
+    }
+    satirlar = satirlar.map((s) => ({
+      ...s,
+      isaretler: Array.from({ length: kokler.length + 1 }, (_, j) => s.isaretler[j] ?? ""),
+      ...(s.noktalar ? { noktalar: Array.from({ length: kokler.length }, (_, j) => s.noktalar![j] ?? "") } : {}),
+    }));
+    const { ifade: _i, ...geri } = veri;
+    yaz({ ...geri, kokler, satirlar, cozum: cozum.filter((j) => j <= kokler.length) });
+  };
+  const siraUyari = kokSirasiUyarisi(veri.kokler);
+  const cozumYazi = cozumKumesiYaz(veri.kokler, veri.cozum ?? []);
+  return (
+    <div className="mt-2 flex flex-col gap-2 border-t border-brand-100 pt-2" data-testid="sema-isaret">
+      <div className="flex flex-col gap-1 rounded-lg border border-brand-200 bg-white/70 p-2" data-testid="isaret-otomatik">
+        <span className={BASLIK}>Otomatik: ifadeyi yazın</span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <label className="flex min-w-0 flex-1 items-center gap-1 text-[11px] font-semibold text-slate-600">
+            f(x) =
+            <input
+              aria-label="İşaret tablosu ifadesi"
+              value={ifade}
+              maxLength={120}
+              placeholder="(x+2)(x-1)^2/(x-4)"
+              onChange={(e) => { setIfade(e.target.value); setHata(null); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); hesapla(); } }}
+              className={`min-w-[10rem] flex-1 rounded-md border bg-white px-2 py-1 font-mono text-[11px] ${hata ? "border-red-400" : "border-slate-300"}`}
+            />
+          </label>
+          <select aria-label="Eşitsizlik" value={esitsizlik} onChange={(e) => setEsitsizlik(e.target.value as Esitsizlik)} className="rounded-md border border-slate-300 bg-white px-1 py-1 text-[11px]">
+            {ESITSIZLIKLER.map((x) => <option key={x.id} value={x.id}>{x.ad}</option>)}
+          </select>
+          <button type="button" className={`${DUGME} font-bold`} disabled={!ifade.trim()} onClick={() => hesapla()}>Tabloyu hesapla</button>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <TogglePill aktif={ayrintili} onClick={() => setAyrintili(!ayrintili)}>Her çarpan ayrı satır</TogglePill>
+          <span className="text-[10px] text-slate-500">Örnek:</span>
+          {ISARET_ORNEKLERI.map((o) => (
+            <button key={o} type="button" aria-label={`Örnek ifade: ${o}`} onClick={() => { setIfade(o); hesapla(o); }} className="rounded-full border border-slate-300 bg-white px-2 py-0.5 font-mono text-[10px] text-slate-600 hover:bg-brand-50">{o}</button>
+          ))}
+        </div>
+        <span className={`text-[10px] ${hata ? "text-red-600" : "text-slate-500"}`} role={hata ? "alert" : undefined} data-testid="isaret-hata">
+          {hata ?? "Çarpanlarına ayrılmış yazın: (x+2)(x-1)^2/(x-4). Birinci/ikinci derece çarpanlar; çift katlı kökte işaret değişmez, paydanın kökü tanımsızdır (||), en sağ aralığın işareti baş katsayıdandır."}
+        </span>
+      </div>
+
+      <span className={BASLIK}>Kökler (soldan sağa)</span>
+      <MiniTablo
+        etiket="İşaret tablosu kökleri"
+        testId="isaret-kok-tablosu"
+        sutunlar={[
+          { baslik: "Değer", tur: "metin", enCok: EN_COK_KOK_YAZISI, bosOlabilir: false, yerTutucu: "-2", genislik: "w-16" },
+          { baslik: "Kat", tur: "secim", secenekler: [{ deger: "tek", ad: "tek katlı" }, { deger: "cift", ad: "çift katlı" }], genislik: "w-24" },
+          { baslik: "Tür", tur: "secim", secenekler: [{ deger: "kok", ad: "kök (0)" }, { deger: "tanimsiz", ad: "tanımsız ||" }], genislik: "w-24" },
+          { baslik: "Çözüme dahil", tur: "secim", secenekler: [{ deger: "hayir", ad: "○ hayır" }, { deger: "evet", ad: "● evet" }], genislik: "w-20" },
+        ]}
+        satirlar={veri.kokler.map((k) => [k.deger, k.kat, k.tanimsiz ? "tanimsiz" : "kok", k.dahil ? "evet" : "hayir"])}
+        enAz={0}
+        enCok={EN_COK_KOK}
+        yeniSatir={() => ["", "tek", "kok", "hayir"]}
+        onOdak={tarihceyeKaydet}
+        onDegis={koklerDegisti}
+        ekleYazisi="+ Kök ekle"
+      />
+      {siraUyari && <span className="text-[10px] text-amber-700">{siraUyari}</span>}
+
+      <span className={BASLIK}>İşaretler (aralığa tıklayın: + → − → boş)</span>
+      <div className="flex flex-col gap-1" data-testid="isaret-satirlari">
+        {veri.satirlar.map((s, r) => (
+          <div key={r} className="flex flex-wrap items-center gap-1">
+            <MetinGirdisi etiket={`${r + 1}. satır adı`} deger={s.ad} genislik="w-20" enCok={40} onOdak={tarihceyeKaydet} onDegis={(v) => g({ satirlar: veri.satirlar.map((x, i) => (i === r ? { ...x, ad: v } : x)) })} />
+            {Array.from({ length: n + 1 }, (_, j) => (
+              <button
+                key={j}
+                type="button"
+                title={aralikAdi(j)}
+                aria-label={`${s.ad || r + 1}: ${aralikAdi(j)} işareti ${s.isaretler[j] ? eksiYaz(s.isaretler[j]) : "boş"}`}
+                onClick={() => { tarihceyeKaydet(); g({ satirlar: veri.satirlar.map((x, i) => (i === r ? { ...x, isaretler: Array.from({ length: n + 1 }, (_, k) => (k === j ? sonrakiIsaret(x.isaretler[k] ?? "") : x.isaretler[k] ?? "")) } : x)) }); }}
+                className="h-7 w-7 rounded-md border border-slate-300 bg-white text-[14px] font-bold text-slate-700 hover:bg-brand-50"
+              >
+                {eksiYaz(s.isaretler[j] ?? "") || "·"}
+              </button>
+            ))}
+            <button type="button" aria-label={`${r + 1}. işaret satırını sil`} disabled={veri.satirlar.length <= 1} onClick={() => { tarihceyeKaydet(); g({ satirlar: veri.satirlar.filter((_, i) => i !== r) }); }} className="rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-[11px] font-semibold text-slate-500 disabled:opacity-40">Sil</button>
+          </div>
+        ))}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button type="button" className={DUGME} disabled={veri.satirlar.length >= EN_COK_ISARET_SATIRI} onClick={() => { tarihceyeKaydet(); g({ satirlar: [{ ad: "g(x)", isaretler: Array.from({ length: n + 1 }, () => "") }, ...veri.satirlar] }); }}>+ İşaret satırı ekle</button>
+          <span className="text-[10px] text-slate-500">Son satırı kurala göre doldur:</span>
+          {(["+", "-"] as const).map((x) => (
+            <button key={x} type="button" className={DUGME} onClick={() => {
+              tarihceyeKaydet();
+              const son = veri.satirlar.length - 1;
+              const isaretler = isaretleriKuralaGoreDoldur(veri.kokler, x);
+              g({ satirlar: veri.satirlar.map((s, i) => (i === son ? { ...s, isaretler } : s)), ...(veri.esitsizlik ? { cozum: cozumAraliklari(isaretler, veri.esitsizlik) } : {}) });
+            }}>en sağ {eksiYaz(x)}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className={BASLIK}>Çözüm (taranacak aralıklar)</span>
+        {Array.from({ length: n + 1 }, (_, j) => {
+          const secili = (veri.cozum ?? []).includes(j);
+          return <TogglePill key={j} aktif={secili} onClick={() => { tarihceyeKaydet(); g({ cozum: secili ? (veri.cozum ?? []).filter((k) => k !== j) : [...(veri.cozum ?? []), j].sort((a, b) => a - b), cozumSatiri: true }); }}>{aralikAdi(j)}</TogglePill>;
+        })}
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <TogglePill aktif={!!veri.cozumSatiri} onClick={() => { tarihceyeKaydet(); g({ cozumSatiri: !veri.cozumSatiri }); }}>Çözüm kümesi satırı</TogglePill>
+        <TogglePill aktif={veri.katGoster !== false} onClick={() => { tarihceyeKaydet(); g({ katGoster: veri.katGoster === false }); }}>Kök işaretleri (○ ○○ ● ||)</TogglePill>
+        <MetinGirdisi etiket="Başlık" deger={veri.baslik ?? ""} genislik="w-24" onOdak={tarihceyeKaydet} onDegis={(v) => g({ baslik: v })} />
+      </div>
+      <div className="rounded-md bg-slate-50 px-2 py-1 text-[11px] text-slate-700" data-testid="isaret-cozum">Ç.K. = {cozumYazi} <span className="text-[10px] text-slate-500">(cevap anahtarı için; şekle yazılmaz)</span></div>
+    </div>
+  );
+}
+
+// ── Fonksiyon ok diyagramı ─────────────────────────────────────────────────
+
+function FonksiyonSemaPaneli({ veri, yaz, tarihceyeKaydet }: AltPanel<"fonksiyonSema">) {
+  const g = (yama: Partial<typeof veri>) => yaz({ ...veri, ...yama });
+  const durum = fonksiyonDurumu(veri);
+  const elemanTablosu = (taraf: "a" | "b") => (
+    <MiniTablo
+      etiket={taraf === "a" ? "Tanım kümesi elemanları" : "Değer kümesi elemanları"}
+      testId={`fonksiyon-${taraf}-tablosu`}
+      sutunlar={[{ baslik: `${(taraf === "a" ? veri.adlar[0] : veri.adlar[1]) || (taraf === "a" ? "A" : "B")} elemanı`, tur: "metin", enCok: EN_COK_ELEMAN_YAZISI, bosOlabilir: false, genislik: "w-20" }]}
+      satirlar={veri[taraf].map((e) => [e])}
+      enAz={1}
+      enCok={EN_COK_ELEMAN}
+      yeniSatir={(m) => [taraf === "a" ? String(m.length + 1) : "abcdefgh"[m.length] ?? "x"]}
+      onOdak={tarihceyeKaydet}
+      onDegis={(h, olay) => {
+        let oklar = veri.oklar;
+        const t = taraf === "a" ? 0 : 1;
+        if (olay.tur === "sil") oklar = oklariYenidenNumarala(oklar, taraf, olay.index);
+        else if (olay.tur === "ekle") oklar = oklar.map((o) => { const y: [number, number] = [o[0], o[1]]; if (y[t] >= olay.index) y[t] += 1; return y; });
+        g({ [taraf]: h.map((r) => r[0]), oklar: oklar.filter((o) => o[t] < h.length) } as Partial<typeof veri>);
+      }}
+      ekleYazisi="+ Eleman ekle"
+    />
+  );
+  return (
+    <div className="mt-2 flex flex-col gap-2 border-t border-brand-100 pt-2" data-testid="sema-fonksiyon">
+      <div className="flex flex-wrap items-center gap-2">
+        <MetinGirdisi etiket="Fonksiyon adı" deger={veri.fonkAd} genislik="w-10" enCok={12} onOdak={tarihceyeKaydet} onDegis={(v) => g({ fonkAd: v })} yerTutucu="f" />
+        <MetinGirdisi etiket="Tanım kümesi" deger={veri.adlar[0] ?? ""} genislik="w-12" enCok={12} onOdak={tarihceyeKaydet} onDegis={(v) => g({ adlar: [v, veri.adlar[1] ?? "B"] })} />
+        <MetinGirdisi etiket="Değer kümesi" deger={veri.adlar[1] ?? ""} genislik="w-12" enCok={12} onOdak={tarihceyeKaydet} onDegis={(v) => g({ adlar: [veri.adlar[0] ?? "A", v] })} />
+        <MetinGirdisi etiket="Başlık" deger={veri.baslik ?? ""} genislik="w-24" onOdak={tarihceyeKaydet} onDegis={(v) => g({ baslik: v })} />
+      </div>
+      <div className="flex flex-wrap gap-4">
+        {elemanTablosu("a")}
+        {elemanTablosu("b")}
+      </div>
+      <span className={BASLIK}>Eşleme okları (her eleman için görüntüsüne tıklayın)</span>
+      <div className="flex flex-col gap-1" data-testid="fonksiyon-oklar">
+        {veri.a.map((e, i) => (
+          <div key={i} className="flex flex-wrap items-center gap-1">
+            <span className="w-14 truncate text-[11px] font-semibold text-slate-600" title={e}>{e} →</span>
+            {veri.b.map((b, j) => {
+              const var0 = veri.oklar.some(([x, y]) => x === i && y === j);
+              return (
+                <TogglePill key={j} aktif={var0} onClick={() => {
+                  tarihceyeKaydet();
+                  g({ oklar: var0 ? veri.oklar.filter(([x, y]) => !(x === i && y === j)) : [...veri.oklar, [i, j]] });
+                }}><span aria-label={`${e} → ${b}`}>{b}</span></TogglePill>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      <div className={`rounded-md px-2 py-1 text-[11px] ${durum.fonksiyon ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`} data-testid="fonksiyon-durum">
+        {durum.ozet}
+      </div>
     </div>
   );
 }

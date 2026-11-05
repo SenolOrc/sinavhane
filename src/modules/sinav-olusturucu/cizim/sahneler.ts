@@ -14,6 +14,7 @@
 // - `aramaKelimeleri`: Türkçe anahtar kelimeler ("makara, atwood, palanga").
 
 import type { Sekil } from "./tipler";
+import { FIZIK_HAZIR_SAHNELER } from "./fizikSahneSablonlari";
 
 export type HazirSahne = {
   id: string;
@@ -23,4 +24,7 @@ export type HazirSahne = {
   olustur: () => Sekil[];
 };
 
-export const HAZIR_SAHNELER: HazirSahne[] = [];
+export const HAZIR_SAHNELER: HazirSahne[] = [
+  // Fizik (F ajanı): eğik düzlem, makara, Atwood, palanga, tam devre, optik, sıvı kapları.
+  ...FIZIK_HAZIR_SAHNELER,
+];

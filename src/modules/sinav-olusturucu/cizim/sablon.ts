@@ -13,6 +13,9 @@ import { istatistikVerisiGecerliMi } from "./istatistik";
 import { semaVerisiGecerliMi } from "./sema";
 import { kimyaVerisiGecerliMi } from "./kimya";
 import { fizikEkGecerliMi, geometriVerisiGecerliMi } from "./geometriSekilleri";
+import { egikKuvvetVerisiGecerliMi } from "./fizikSahneler";
+import { optikVerisiGecerliMi } from "./optik";
+import { siviVerisiGecerliMi } from "./sivi";
 
 // localStorage'daki özel şablonlar dışarıdan (elle düzenlenmiş dosya, eski
 // sürümden kalma bozuk kayıt vb.) gelebilir; JSON.parse şemayı doğrulamaz.
@@ -45,6 +48,9 @@ export function sekilGecerliMi(sekil: unknown): sekil is CizimSekli {
     if (s.geo !== undefined && !geometriVerisiGecerliMi(s.geo)) return false;
     if (s.ek !== undefined && !fizikEkGecerliMi(s.ek)) return false;
     if (s.seviye !== undefined && !(typeof s.seviye === "number" && s.seviye >= 0 && s.seviye <= 1)) return false;
+    if (s.kuvvet !== undefined && !egikKuvvetVerisiGecerliMi(s.kuvvet)) return false;
+    if (s.optik !== undefined && !optikVerisiGecerliMi(s.optik)) return false;
+    if (s.sivi !== undefined && !siviVerisiGecerliMi(s.sivi)) return false;
   }
   // Temel şekillerin rengi/dolgusu yalnız #rrggbb (serbest metin çizime ulaşmasın).
   if (["dogru", "dikdortgen", "elips", "ucgen", "cokgen", "dalga", "serbest", "metin"].includes(s.tur)) {

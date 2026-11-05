@@ -22,6 +22,7 @@ import {
   noktalardanEvreler,
   ayniXUyarisi,
   EN_COK_IFADE,
+  EN_COK_NOKTA,
   HAREKET_SINIRI,
   noktalariOku,
   noktalariOkuAyrinti,
@@ -34,6 +35,7 @@ import {
 import { denklemOku, esitsizlikOku, fonksiyonOku } from "../cizim/ifade";
 import type { GrafikBuyuklugu, GrafikCizgiDeseni, GrafikEgrisi, GrafikVerisi, Nokta, Sekil } from "../cizim/tipler";
 import { RenkSecici } from "./FizikPaneli";
+import { MetinOlarakYapistir, MiniTablo, miniSayi, miniSayiYaz } from "./MiniTablo";
 import { TogglePill } from "./ModalParcalari";
 
 type FizikSekliTipi = Extract<Sekil, { tur: "fizik" }>;
@@ -124,11 +126,87 @@ export function MetinGirdisi({ etiket, deger, onDegis, onOdak, yerTutucu, genisl
 
 const BASLIK = "text-[10px] font-bold uppercase tracking-wide text-slate-500";
 
-function NoktaListesi({ egri, yaz, tarihceyeKaydet, onUcluEkle }: {
+/** Hızlı yazım için tek tıkla örnekler: öğretmen sözdizimini ezberlemek zorunda kalmasın. */
+export const HIZLI_FONKSIYON_ORNEKLERI: { ad: string; ifade: string; ipucu: string }[] = [
+  { ad: "y = x²", ifade: "y = x^2", ipucu: "Parabol (üs için ^)" },
+  { ad: "y = |x|", ifade: "y = |x|", ipucu: "Mutlak değer" },
+  { ad: "y = sin x", ifade: "y = sin(x)", ipucu: "Sinüs; yatay eksen π katlarıyla gelir" },
+  { ad: "y = √x", ifade: "y = sqrt(x)", ipucu: "Karekök" },
+  { ad: "y = 1/x", ifade: "y = 1/x", ipucu: "Hiperbol (ters orantı)" },
+  { ad: "y = 2ˣ", ifade: "y = 2^x", ipucu: "Üstel fonksiyon" },
+  { ad: "y = ln x", ifade: "y = ln(x)", ipucu: "Doğal logaritma" },
+  { ad: "Parçalı", ifade: "{x<0: -x, x>=0: x^2}", ipucu: "Parçalı fonksiyon; açık/kapalı uçlar otomatik" },
+  { ad: "Çember", ifade: "x^2+y^2=9", ipucu: "Çember denklemi" },
+  { ad: "Bölge", ifade: "y > x + 1", ipucu: "Eşitsizlik bölgesi (boyanır)" },
+  { ad: "Kesişim", ifade: "y = x^2; y = x + 2; kesisim", ipucu: "İki eğri ve kesişim noktaları" },
+  { ad: "Teğet", ifade: "y = x^2; teget(x^2, 1)", ipucu: "x = 1'de teğet doğrusu" },
+  { ad: "A(2,3)", ifade: "A(2,3); B(-1,2)", ipucu: "Adlı noktalar" },
+];
+
+/** Panelde tek eğri için (y = f(x)) örnekler. */
+export const FONKSIYON_ORNEKLERI = ["x^2", "|x|", "sin(x)", "sqrt(x)", "1/x", "2^x", "ln(x)", "x^3-3x"];
+
+/** Grafik (fizik) hızlı çiz: (zaman, değer) örnekleri. */
+export const HIZLI_NOKTA_ORNEKLERI: { ad: string; metin: string }[] = [
+  { ad: "Sabit", metin: "0,10; 6,10" },
+  { ad: "Düzgün hızlanan", metin: "0,0; 5,20" },
+  { ad: "Hızlan–sabit–yavaşla", metin: "0,0; 4,12; 8,12; 10,0" },
+  { ad: "Yön değiştiren", metin: "0,10; 5,0; 8,-6" },
+];
+
+/** İfade okuma hatasına öğretmenin anlayacağı bir öneri ekler. */
+export function okunurHata(hata: string): string {
+  if (/yarım kaldı/i.test(hata)) return `${hata} — sona bir sayı ya da x ekleyin (ör. x^2 + 1)`;
+  if (/Tanınmayan ad/i.test(hata)) return `${hata} — çarpma için 2*x ya da 2x; fonksiyonlar: sin, cos, tan, sqrt, ln, log, abs`;
+  if (/Beklenmeyen/i.test(hata)) return `${hata} — iki işlem işareti yan yana olamaz`;
+  if (/kapanmadı|parantez/i.test(hata)) return `${hata} — açtığınız ( ya da | işaretini kapatın`;
+  if (/Boş ifade/i.test(hata)) return `${hata} — eşittirin iki yanını da yazın (ör. x^2 + y^2 = 9)`;
+  return hata;
+}
+
+/** Tek tıkla örnek çipleri. */
+export function OrnekCipleri({ ornekler, onSec, etiket = "Örnekler" }: { ornekler: { ad: string; deger: string; ipucu?: string }[]; onSec: (deger: string) => void; etiket?: string }) {
+  return (
+    <div className="flex w-full flex-wrap items-center gap-1" role="group" aria-label={etiket} data-testid="ornek-cipleri">
+      <span className="text-[10px] font-semibold text-slate-500">{etiket}:</span>
+      {ornekler.map((o) => (
+        <button
+          key={o.ad}
+          type="button"
+          title={o.ipucu ? `${o.ipucu} — ${o.deger}` : o.deger}
+          aria-label={`Örnek: ${o.ad}`}
+          onClick={() => onSec(o.deger)}
+          className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+        >
+          {o.ad}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Yeni satır: son iki noktanın x farkı kadar ilerle (yoksa +1), y aynı kalsın. */
+function sonrakiNokta(m: string[][]): string[] {
+  const son = m[m.length - 1];
+  if (!son) return ["0", "0"];
+  const x1 = miniSayi(son[0]) ?? 0;
+  const x0 = m.length >= 2 ? miniSayi(m[m.length - 2][0]) : null;
+  const dx = x0 !== null && x1 - x0 > 0 ? x1 - x0 : 1;
+  return [miniSayiYaz(x1 + dx), son[1] ?? "0"];
+}
+
+const NOKTA_SUTUNLARI = (xAd?: string, yAd?: string) => [
+  { baslik: "x", aciklama: xAd || "yatay / zaman", tur: "sayi" as const, min: -HAREKET_SINIRI, max: HAREKET_SINIRI, yerTutucu: "0" },
+  { baslik: "y", aciklama: yAd || "dikey / değer", tur: "sayi" as const, min: -HAREKET_SINIRI, max: HAREKET_SINIRI, yerTutucu: "0" },
+];
+
+function NoktaListesi({ egri, yaz, tarihceyeKaydet, onUcluEkle, xAd, yAd }: {
   egri: Extract<GrafikEgrisi, { tur: "noktalar" }>;
   yaz: (yama: Partial<GrafikEgrisi>) => void;
   tarihceyeKaydet: () => void;
   onUcluEkle?: (x0: number, v0: number, evreler: { sure: number; ivme: number }[]) => void;
+  xAd?: string;
+  yAd?: string;
 }) {
   const evre = noktalardanEvreler(egri.noktalar);
   const [metin, setMetin] = useState(() => noktalariYaz(egri.noktalar));
@@ -139,30 +217,44 @@ function NoktaListesi({ egri, yaz, tarihceyeKaydet, onUcluEkle }: {
   }, [dis]);
   const ayrinti = noktalariOkuAyrinti(metin);
   const okunan = "noktalar" in ayrinti ? ayrinti.noktalar : null;
-  const ayniX = okunan ? ayniXUyarisi(okunan) : null;
+  const ayniX = ayniXUyarisi(egri.noktalar);
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-1">
-      <label className="flex flex-wrap items-center gap-1 text-[11px] font-semibold text-slate-600">
-        Noktalar (x,y)
-        <input
-          aria-label="Grafik noktaları"
-          value={metin}
-          onFocus={() => { odakta.current = true; tarihceyeKaydet(); }}
-          onBlur={() => { odakta.current = false; setMetin(dis); }}
-          onChange={(e) => {
-            setMetin(e.target.value);
-            const n = noktalariOku(e.target.value);
-            if (n) yaz({ noktalar: n } as Partial<GrafikEgrisi>);
-          }}
-          placeholder="0,0; 4,20; 8,20; 10,0"
-          className={`w-full min-w-0 flex-1 rounded-md border bg-white px-2 py-1 font-mono text-[11px] ${okunan ? "border-slate-300" : "border-red-400"}`}
-        />
-      </label>
-      <span className={`text-[10px] ${okunan ? "text-slate-500" : "text-red-600"}`}>
-        {okunan
-          ? "Her nokta x,y — noktalar ; ile ayrılır. Çizgi noktaları sırayla birleştirir."
-          : `Okunamadı: ${"hata" in ayrinti ? ayrinti.hata : ""} (ör. 0,0; 4,20; 8,20)`}
-      </span>
+    <div className="flex min-w-0 flex-1 flex-col gap-1" data-testid="grafik-noktalar">
+      <MiniTablo
+        etiket="Grafik noktaları tablosu"
+        testId="grafik-nokta-tablosu"
+        sutunlar={NOKTA_SUTUNLARI(xAd, yAd)}
+        satirlar={egri.noktalar.map((p) => [miniSayiYaz(p.x), miniSayiYaz(p.y)])}
+        enAz={2}
+        enCok={EN_COK_NOKTA}
+        yeniSatir={sonrakiNokta}
+        onOdak={tarihceyeKaydet}
+        onDegis={(h) => yaz({ noktalar: h.map(([x, y]) => ({ x: miniSayi(x)!, y: miniSayi(y)! })) } as Partial<GrafikEgrisi>)}
+        ipucu="Enter: alt satır / yeni nokta · Excel'den iki sütun yapıştırılabilir · noktalar sırayla birleşir"
+      />
+      <MetinOlarakYapistir>
+        <label className="flex flex-wrap items-center gap-1 text-[11px] font-semibold text-slate-600">
+          Noktalar (x,y)
+          <input
+            aria-label="Grafik noktaları"
+            value={metin}
+            onFocus={() => { odakta.current = true; tarihceyeKaydet(); }}
+            onBlur={() => { odakta.current = false; setMetin(dis); }}
+            onChange={(e) => {
+              setMetin(e.target.value);
+              const n = noktalariOku(e.target.value);
+              if (n) yaz({ noktalar: n } as Partial<GrafikEgrisi>);
+            }}
+            placeholder="0,0; 4,20; 8,20; 10,0"
+            className={`w-full min-w-0 flex-1 rounded-md border bg-white px-2 py-1 font-mono text-[11px] ${okunan ? "border-slate-300" : "border-red-400"}`}
+          />
+        </label>
+        <span className={`text-[10px] ${okunan ? "text-slate-500" : "text-red-600"}`}>
+          {okunan
+            ? "Her nokta x,y — noktalar ; ile ayrılır."
+            : `Okunamadı: ${"hata" in ayrinti ? ayrinti.hata : ""} (ör. 0,0; 4,20; 8,20)`}
+        </span>
+      </MetinOlarakYapistir>
       {ayniX && <span className="text-[10px] text-amber-700" data-testid="grafik-ayni-x">{ayniX}</span>}
       {onUcluEkle && (
         <div className="flex flex-wrap items-center gap-2">
@@ -307,7 +399,7 @@ function IfadeKutusu({ etiket, deger, onDegis, onOdak, hata, ornek }: {
         />
       </label>
       <span className={`text-[10px] ${hata ? "text-red-600" : "text-slate-500"}`}>
-        {hata ?? "x^2 üs, sqrt(x) kök, |x| mutlak değer, sin(x), ln(x), 2^x, pi. Dikey doğru: x=3"}
+        {hata ? okunurHata(hata) : "x^2 üs, sqrt(x) kök, |x| mutlak değer, sin(x), ln(x), 2^x, pi. Dikey doğru: x=3"}
       </span>
     </div>
   );
@@ -328,6 +420,7 @@ function FonksiyonDuzenleyici({ egri, yaz, tarihceyeKaydet }: {
     <div className="flex flex-col gap-2" data-testid="grafik-fonksiyon">
       <IfadeKutusu etiket="Fonksiyon" deger={egri.ifade} onOdak={tarihceyeKaydet} ornek="y = x^2 - 4" hata={hata}
         onDegis={(v) => yaz({ ifade: v } as Partial<GrafikEgrisi>)} />
+      <OrnekCipleri ornekler={FONKSIYON_ORNEKLERI.map((f) => ({ ad: f, deger: f }))} onSec={(f) => { tarihceyeKaydet(); yaz({ ifade: f } as Partial<GrafikEgrisi>); }} />
       <div className="flex flex-wrap items-center gap-2">
         <span className={BASLIK}>Parça</span>
         <OndalikGirdisi etiket="x başlangıç" deger={egri.baslangic} bos="oto" onOdak={tarihceyeKaydet} onDegis={(v) => yaz({ baslangic: v } as Partial<GrafikEgrisi>)} />
@@ -431,27 +524,48 @@ function IsaretDuzenleyici({ egri, yaz, tarihceyeKaydet }: {
   const odakta = useRef(false);
   useEffect(() => { if (!odakta.current) setMetin(dis); }, [dis]);
   const okunan = adliNoktalariOku(metin);
+  const sonrakiAd = (m: string[][]) => {
+    const kullanilan = new Set(m.map((r) => r[0].trim()));
+    return "ABCDEFGHKLMNPRSTUVYZ".split("").find((h) => !kullanilan.has(h)) ?? "";
+  };
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1" data-testid="grafik-isaret">
-      <label className="flex flex-wrap items-center gap-1 text-[11px] font-semibold text-slate-600">
-        Adlı noktalar
-        <input
-          aria-label="Adlı noktalar"
-          value={metin}
-          onFocus={() => { odakta.current = true; tarihceyeKaydet(); }}
-          onBlur={() => { odakta.current = false; setMetin(dis); }}
-          onChange={(e) => {
-            setMetin(e.target.value);
-            const n = adliNoktalariOku(e.target.value);
-            if (n) yaz({ noktalar: n } as Partial<GrafikEgrisi>);
-          }}
-          placeholder="A(2,3); B(-1,2)"
-          className={`w-full min-w-0 flex-1 rounded-md border bg-white px-2 py-1 font-mono text-[11px] ${okunan ? "border-slate-300" : "border-red-400"}`}
-        />
-      </label>
-      <span className={`text-[10px] ${okunan ? "text-slate-500" : "text-red-600"}`}>
-        {okunan ? "Ad(x,y) biçiminde, ; ile ayırın. Ad noktanın yanına yazılır." : "Okunamadı: örnek A(2,3); B(-1,2)"}
-      </span>
+      <MiniTablo
+        etiket="Adlı noktalar tablosu"
+        testId="grafik-isaret-tablosu"
+        sutunlar={[
+          { baslik: "Ad", tur: "metin", enCok: 12, genislik: "w-14", yerTutucu: "A", yasak: /[;()\n]/, yasakAciklama: "; ( ) kullanmayın" },
+          ...NOKTA_SUTUNLARI("x", "y").map((s) => ({ ...s, aciklama: undefined })),
+        ]}
+        satirlar={egri.noktalar.map((p) => [p.ad ?? "", miniSayiYaz(p.x), miniSayiYaz(p.y)])}
+        enAz={1}
+        enCok={40}
+        yeniSatir={(m) => [sonrakiAd(m), "0", "0"]}
+        onOdak={tarihceyeKaydet}
+        onDegis={(h) => yaz({ noktalar: h.map(([ad, x, y]) => ({ x: miniSayi(x)!, y: miniSayi(y)!, ...(ad.trim() ? { ad: ad.trim() } : {}) })) } as Partial<GrafikEgrisi>)}
+        ipucu="Ad noktanın yanına yazılır (A, F_1, B′). Tuvalde noktayı sürükleyerek de taşıyabilirsiniz."
+      />
+      <MetinOlarakYapistir>
+        <label className="flex flex-wrap items-center gap-1 text-[11px] font-semibold text-slate-600">
+          Adlı noktalar
+          <input
+            aria-label="Adlı noktalar"
+            value={metin}
+            onFocus={() => { odakta.current = true; tarihceyeKaydet(); }}
+            onBlur={() => { odakta.current = false; setMetin(dis); }}
+            onChange={(e) => {
+              setMetin(e.target.value);
+              const n = adliNoktalariOku(e.target.value);
+              if (n) yaz({ noktalar: n } as Partial<GrafikEgrisi>);
+            }}
+            placeholder="A(2,3); B(-1,2)"
+            className={`w-full min-w-0 flex-1 rounded-md border bg-white px-2 py-1 font-mono text-[11px] ${okunan ? "border-slate-300" : "border-red-400"}`}
+          />
+        </label>
+        <span className={`text-[10px] ${okunan ? "text-slate-500" : "text-red-600"}`}>
+          {okunan ? "Ad(x,y) biçiminde, ; ile ayırın." : "Okunamadı: örnek A(2,3); B(-1,2)"}
+        </span>
+      </MetinOlarakYapistir>
     </div>
   );
 }
@@ -520,6 +634,7 @@ export function GrafikSeridi({ onSablon, onUclu, onHizli }: {
           >
             Çiz
           </button>
+          <OrnekCipleri ornekler={HIZLI_NOKTA_ORNEKLERI.map((o) => ({ ad: o.ad, deger: o.metin }))} onSec={setMetin} />
           {nedeni && <span className="w-full text-[10px] text-red-600" data-testid="grafik-hizli-hata">{nedeni}</span>}
           {ayniX && <span className="w-full text-[10px] text-amber-700" data-testid="grafik-hizli-uyari">{ayniX}</span>}
           <span className="w-full text-[10px] text-slate-500">(zaman, değer) çiftleri ; ile ayrılır (en çok 80 nokta). Köşelere kesikli kılavuz ve sayılar otomatik gelir.</span>
@@ -650,7 +765,7 @@ export function GrafikSecimPaneli({ sekil, guncelle, tarihceyeKaydet, onUcluEkle
           {egri.tur === "hareket" && (
             <HareketDuzenleyici egri={egri} yaz={egriYaz} tarihceyeKaydet={tarihceyeKaydet} yEtiketiniGuncelle={yEtiketiniGuncelle} onUcluEkle={onUcluEkle} />
           )}
-          {egri.tur === "noktalar" && <NoktaListesi egri={egri} yaz={egriYaz} tarihceyeKaydet={tarihceyeKaydet} onUcluEkle={onUcluEkle} />}
+          {egri.tur === "noktalar" && <NoktaListesi egri={egri} yaz={egriYaz} tarihceyeKaydet={tarihceyeKaydet} onUcluEkle={onUcluEkle} xAd={veri.xEtiket} yAd={veri.yEtiket} />}
           {egri.tur === "sinus" && <SinusDuzenleyici egri={egri} yaz={egriYaz} tarihceyeKaydet={tarihceyeKaydet} />}
           {egri.tur === "fonksiyon" && <FonksiyonDuzenleyici egri={egri} yaz={egriYaz} tarihceyeKaydet={tarihceyeKaydet} />}
           {egri.tur === "bolge" && <BolgeDuzenleyici egri={egri} yaz={egriYaz} tarihceyeKaydet={tarihceyeKaydet} />}

@@ -77,16 +77,28 @@ async function main() {
       girdi.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
     });
   };
+  // v1.2: kip sekmeleri yok; şekiller sol kütüphanede (kategori + katlanır "ayrıntılı araçlar").
+  const kategoriAc = async (kategori: string) => {
+    const baslik = document.querySelector(`section[data-kategori="${kategori}"] > button`) as HTMLButtonElement | null;
+    dogrula(baslik, `“${kategori}” kütüphane kategorisi yok`);
+    if (baslik!.getAttribute("aria-expanded") !== "true") await act(async () => { baslik!.click(); });
+  };
+  const kutuphaneEk = async (kategori: string) => {
+    await kategoriAc(kategori);
+    const ek = document.querySelector(`button[data-ek-bolum="${kategori}"]`) as HTMLButtonElement | null;
+    dogrula(ek, `“${kategori}” ayrıntılı araçlar bölümü yok`);
+    if (ek!.getAttribute("aria-expanded") !== "true") await act(async () => { ek!.click(); });
+  };
   const dugmeVar = (metin: string) => [...document.querySelectorAll("button")].some((b) => b.textContent?.trim().includes(metin));
 
   // ——— 1) Fizik kipi: ekle, bağla, etiketle, kaydet ———
   let cikti: any = null;
   await act(async () => root.render(<CizimEditoruModal key="fizik" onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
-  dogrula(!document.querySelector('[data-testid="fizik-seridi"]'), "fizik şeridi kip seçilmeden görünüyor");
-  await tikla("Fizik");
-  dogrula(document.querySelector('[data-testid="fizik-seridi"]'), "Fizik kipinde şekil paleti yok");
-  // Fizik kipi çizim araçlarını KORUR (ok/çizgi/elips fizik şemasında lazım).
-  dogrula(dugmeVar("Dikdörtgen") && dugmeVar("Seç / Taşı"), "fizik kipinde çizim araçları kaybolmuş");
+  dogrula(!document.querySelector("[data-kip-sekmesi]"), "eski kip sekmeleri hâlâ var");
+  await kategoriAc("fizik");
+  dogrula(document.querySelector('button[aria-label="Ekle: Kütle"]'), "Kütüphanenin Fizik kategorisinde şekil yok");
+  // Temel çizim araçları her zaman üst çubukta (ok/çizgi/elips fizik şemasında lazım).
+  dogrula(dugmeVar("Dikdörtgen") && dugmeVar("Seç / Taşı"), "çizim araçları kaybolmuş");
 
   await etiketiyleTikla("Ekle: Kütle");
   await etiketiyleTikla("Ekle: Kütle");
@@ -95,8 +107,9 @@ async function main() {
   // İlk blok (430,270)-(520,330); ikincisi boş yere, ilkinin üstüne (430,170)-(520,230).
 
   // Bağlantı: İp / Çubuk → blok 1 (yalnız onda olan nokta) → blok 2 (yalnız onda olan nokta)
+  await tikla("Ok / Bağlayıcı");
   await tikla("İp / Çubuk");
-  dogrula(document.body.textContent?.includes("Önce KAYNAĞA"), "bağlantı yönergesi görünmüyor");
+  dogrula(document.body.textContent?.includes("Bir şekilden ötekine sürükleyin ya da sırayla tıklayın"), "bağlantı yönergesi görünmüyor");
   await tuvaleTikla(canvas, 440, 275);
   dogrula(document.body.textContent?.includes("Şimdi HEDEFE"), "kaynak seçilince yönerge değişmiyor");
   await tuvaleTikla(canvas, 440, 175);
@@ -137,8 +150,8 @@ async function main() {
       baslangicBelgesi={{ surum: 1, genislik: 960, yukseklik: 600, sekiller: [{ id: "f1", tur: "fizik", nesne: "makara", kalinlik: 2, x: 100, y: 100, w: 70, h: 70 }] }}
     />,
   ));
-  dogrula(document.querySelector('[data-testid="fizik-seridi"]'), "fizik içerikli çizim Fizik kipinde açılmadı");
-  console.log("✓ Kullanıcı akışı: fizik içerikli çizim Fizik kipinde açılıyor");
+  dogrula(document.querySelector('canvas[role="img"]')?.getAttribute("aria-label")?.includes("1 şekil"), "fizik içerikli çizim açılınca şekil kayboldu");
+  console.log("✓ Kullanıcı akışı: fizik içerikli çizim olduğu gibi açılıyor");
 
   // ——— 3) Seçili bağlantının biçimi değiştirilebiliyor ———
   await act(async () => root.render(
@@ -197,8 +210,7 @@ async function main() {
   // ——— Kareli alan: ekle, satır sayısını değiştir, köşelerden vektör ekle ———
   let cikti2: any = null;
   await act(async () => root.render(<CizimEditoruModal key="kareli" onClose={() => {}} onOlustur={(v) => { cikti2 = v; }} />));
-  await tikla("Fizik");
-  await tikla("Vektör / Izgara");
+  await kategoriAc("fizik");
   await etiketiyleTikla("Ekle: Kareli alan");
   dogrula(document.querySelector('[data-testid="kareli-alan-paneli"]'), "kareli alan eklenince paneli açılmıyor");
   const satirGirdisi = document.querySelector('input[aria-label="Satır"]') as HTMLInputElement;
@@ -218,8 +230,7 @@ async function main() {
   // ——— Grafik: şablon ekle, evre süresini değiştir, sinüs genliğini değiştir, üçlü ekle ———
   let cikti3: any = null;
   await act(async () => root.render(<CizimEditoruModal key="grafik" onClose={() => {}} onOlustur={(v) => { cikti3 = v; }} />));
-  await tikla("Fizik");
-  await tikla("Grafik");
+  await kutuphaneEk("fizik");
   await etiketiyleTikla("Grafik ekle: v–t");
   dogrula(document.querySelector('[data-testid="grafik-paneli"]'), "grafik eklenince paneli açılmıyor");
   dogrula(document.querySelectorAll('[data-testid="grafik-evre"]').length === 3, "v–t şablonu 3 evre içermeli");
@@ -241,8 +252,7 @@ async function main() {
   console.log("✓ Kullanıcı akışı: v–t grafiği ekle, evre düzenle, noktalara geç");
 
   await act(async () => root.render(<CizimEditoruModal key="grafik2" onClose={() => {}} onOlustur={(v) => { cikti3 = v; }} />));
-  await tikla("Fizik");
-  await tikla("Grafik");
+  await kutuphaneEk("fizik");
   await etiketiyleTikla("Grafik ekle: Sinüs");
   await yaz(document.querySelector('input[aria-label="Genlik A"]') as HTMLInputElement, "3");
   await tikla("Yeni Soru Olarak Ekle");
@@ -250,8 +260,7 @@ async function main() {
   dogrula(sn && sn.grafik.egriler[0].tur === "sinus" && sn.grafik.egriler[0].genlik === 3, `sinüs genliği kaydedilmedi: ${JSON.stringify(sn?.grafik?.egriler?.[0])}`);
 
   await act(async () => root.render(<CizimEditoruModal key="grafik3" onClose={() => {}} onOlustur={(v) => { cikti3 = v; }} />));
-  await tikla("Fizik");
-  await tikla("Grafik");
+  await kutuphaneEk("fizik");
   await etiketiyleTikla("Grafik ekle: x–t, v–t, a–t üçlü");
   await tikla("Yeni Soru Olarak Ekle");
   const ucluler = (cikti3?.cizimVerisi?.sekiller as any[]).filter((s) => s.nesne === "grafik");
@@ -264,8 +273,7 @@ async function main() {
 
   // ——— Hızlı çiz: noktaları yaz → grafik; v–t'den x–t ve a–t üret ———
   await act(async () => root.render(<CizimEditoruModal key="grafik4" onClose={() => {}} onOlustur={(v) => { cikti3 = v; }} />));
-  await tikla("Fizik");
-  await tikla("Grafik");
+  await kutuphaneEk("fizik");
   const hizli = document.querySelector('input[aria-label="Hızlı grafik noktaları"]') as HTMLInputElement;
   dogrula(hizli, "hızlı çiz kutusu görünmeli");
   await yaz(hizli, "0,5; 5,15; 9,15; 11,9");
@@ -281,8 +289,7 @@ async function main() {
 
   // ——— Matematik: hızlı fonksiyon, istatistik tablosu, Venn ———
   await act(async () => root.render(<CizimEditoruModal key="mat1" onClose={() => {}} onOlustur={(v) => { cikti3 = v; }} />));
-  await tikla("Fizik");
-  await tikla("Matematik");
+  await kutuphaneEk("matematik");
   dogrula(document.querySelector('[data-testid="matematik-seridi"]'), "matematik şeridi görünmeli");
   dogrula(!dugmeVar("Devre teli"), "Matematik sekmesinde bağlantı satırı gizli olmalı");
   const hizliF = document.querySelector('input[aria-label="Hızlı fonksiyon"]') as HTMLInputElement;
@@ -299,8 +306,7 @@ async function main() {
   console.log("✓ Kullanıcı akışı: hızlı fonksiyon + eşitsizlik, ifade düzenleme");
 
   await act(async () => root.render(<CizimEditoruModal key="mat1b" onClose={() => {}} onOlustur={(v) => { cikti3 = v; }} />));
-  await tikla("Fizik");
-  await tikla("Matematik");
+  await kutuphaneEk("matematik");
   await yaz(document.querySelector('input[aria-label="Hızlı fonksiyon"]') as HTMLInputElement, "x^2+y^2=25; y=x+1; kesisim");
   await tamTikla("Çiz");
   dogrula(document.querySelector('[data-testid="grafik-paneli"]'), "denklem çizilince grafik paneli açılmalı");
@@ -314,8 +320,7 @@ async function main() {
   console.log("✓ Kullanıcı akışı: hızlı çember denklemi + kesişim, düzenleme");
 
   await act(async () => root.render(<CizimEditoruModal key="mat2" onClose={() => {}} onOlustur={(v) => { cikti3 = v; }} />));
-  await tikla("Fizik");
-  await tikla("Matematik");
+  await kutuphaneEk("matematik");
   await tamTikla("İstatistik");
   await etiketiyleTikla("İstatistik ekle: Sütun");
   dogrula(document.querySelector('[data-testid="istatistik-paneli"]'), "istatistik paneli açılmalı");
@@ -332,8 +337,7 @@ async function main() {
   console.log("✓ Kullanıcı akışı: istatistik şablonu, tablo yapıştır, daireye çevir");
 
   await act(async () => root.render(<CizimEditoruModal key="mat3" onClose={() => {}} onOlustur={(v) => { cikti3 = v; }} />));
-  await tikla("Fizik");
-  await tikla("Matematik");
+  await kutuphaneEk("matematik");
   await tamTikla("Şema");
   await etiketiyleTikla("Şema ekle: Venn (2 küme)");
   dogrula(document.querySelector('[data-testid="sema-venn"]'), "Venn paneli açılmalı");
@@ -349,8 +353,7 @@ async function main() {
 
   // ——— Uç durumlar: açık uyarılar, çökme yok, şekil korunur ———
   await act(async () => root.render(<CizimEditoruModal key="uc1" onClose={() => {}} onOlustur={(v) => { cikti3 = v; }} />));
-  await tikla("Fizik");
-  await tikla("Matematik");
+  await kutuphaneEk("matematik");
   const hizliU = document.querySelector('input[aria-label="Hızlı fonksiyon"]') as HTMLInputElement;
   await yaz(hizliU, "y=x^2;x=1e300");
   dogrula(document.body.textContent?.includes("çizilemeyecek kadar büyük/belirsiz"), "çok büyük değer için açık hata görünmeli");
@@ -361,8 +364,7 @@ async function main() {
   console.log("✓ Kullanıcı akışı: çok büyük/uzun ifade açık hata verir");
 
   await act(async () => root.render(<CizimEditoruModal key="uc2" onClose={() => {}} onOlustur={(v) => { cikti3 = v; }} />));
-  await tikla("Fizik");
-  await tikla("Grafik");
+  await kutuphaneEk("fizik");
   const hizliN = document.querySelector('input[aria-label="Hızlı grafik noktaları"]') as HTMLInputElement;
   await yaz(hizliN, Array.from({ length: 81 }, (_, i) => `${i},${i}`).join("; "));
   dogrula(document.querySelector('[data-testid="grafik-hizli-hata"]')?.textContent === "En çok 80 nokta", "81 nokta nedeni yazmalı");
@@ -373,8 +375,7 @@ async function main() {
   console.log("✓ Kullanıcı akışı: hızlı grafik noktası nedenleri ve aynı x uyarısı");
 
   await act(async () => root.render(<CizimEditoruModal key="uc3" onClose={() => {}} onOlustur={(v) => { cikti3 = v; }} />));
-  await tikla("Fizik");
-  await tikla("Matematik");
+  await kutuphaneEk("matematik");
   await tamTikla("Şema");
   await etiketiyleTikla("Şema ekle: Venn (3 küme)");
   const satirlar3 = [...document.querySelectorAll('[data-testid="venn-bolge"]')];
@@ -386,8 +387,7 @@ async function main() {
   console.log("✓ Kullanıcı akışı: Venn 3 küme satırları ve Hiçbiri boyama");
 
   await act(async () => root.render(<CizimEditoruModal key="uc4" onClose={() => {}} onOlustur={(v) => { cikti3 = v; }} />));
-  await tikla("Fizik");
-  await tikla("Matematik");
+  await kutuphaneEk("matematik");
   await tamTikla("Şema");
   await etiketiyleTikla("Şema ekle: Olasılık ağacı");
   const dallar = document.querySelector('textarea[aria-label="Dallar"]') as HTMLTextAreaElement;
@@ -402,8 +402,7 @@ async function main() {
   console.log("✓ Kullanıcı akışı: ağaçta uzun ad/olasılık kesilir ve uyarılır");
 
   await act(async () => root.render(<CizimEditoruModal key="uc5" onClose={() => {}} onOlustur={(v) => { cikti3 = v; }} />));
-  await tikla("Fizik");
-  await tikla("Matematik");
+  await kutuphaneEk("matematik");
   await tamTikla("İstatistik");
   await etiketiyleTikla("İstatistik ekle: Gövde–yaprak");
   const deg = document.querySelector('input[aria-label="Değerler"]') as HTMLInputElement;
@@ -419,8 +418,7 @@ async function main() {
   console.log("✓ Kullanıcı akışı: gövde–yaprak çok geniş aralık uyarısı, önceki şekil korunur");
 
   await act(async () => root.render(<CizimEditoruModal key="uc6" onClose={() => {}} onOlustur={(v) => { cikti3 = v; }} />));
-  await tikla("Fizik");
-  await tikla("Grafik");
+  await kutuphaneEk("fizik");
   await etiketiyleTikla("Grafik ekle: x–t (ivmeli)");
   const sureK = document.querySelector('input[aria-label="Evre 1 süre (s)"]') as HTMLInputElement;
   dogrula(sureK, "evre süre kutusu bulunamadı");
@@ -433,10 +431,8 @@ async function main() {
 
   // ——— Kimya: laboratuvar, atom, periyodik tablo ———
   await act(async () => root.render(<CizimEditoruModal key="kim1" onClose={() => {}} onOlustur={(v) => { cikti3 = v; }} />));
-  await tikla("Fizik");
-  await tamTikla("Kimya");
+  await kutuphaneEk("kimya");
   dogrula(document.querySelector('[data-testid="kimya-seridi"]'), "kimya şeridi görünmeli");
-  dogrula(!dugmeVar("Devre teli"), "Kimya sekmesinde bağlantı satırı gizli olmalı");
   await etiketiyleTikla("Ekle: Beher");
   const seviye = document.querySelector('input[aria-label="Sıvı seviyesi"]') as HTMLInputElement;
   dogrula(seviye, "beher seçilince sıvı seviyesi çıkmalı");
@@ -449,8 +445,7 @@ async function main() {
   console.log("✓ Kullanıcı akışı: beher ekle, sıvı seviyesi ve rengi");
 
   await act(async () => root.render(<CizimEditoruModal key="kim2" onClose={() => {}} onOlustur={(v) => { cikti3 = v; }} />));
-  await tikla("Fizik");
-  await tamTikla("Kimya");
+  await kutuphaneEk("kimya");
   await tamTikla("Atom / Molekül");
   await etiketiyleTikla("Kimya ekle: Bohr atomu (Cl)");
   dogrula((document.querySelector('[data-testid="kimya-dizilim"]')?.textContent ?? "").includes("2, 8, 7"), "Cl dizilimi 2, 8, 7 olmalı");
@@ -465,8 +460,7 @@ async function main() {
   console.log("✓ Kullanıcı akışı: atom ekle, elementi Na yap, +1 yük");
 
   await act(async () => root.render(<CizimEditoruModal key="kim3" onClose={() => {}} onOlustur={(v) => { cikti3 = v; }} />));
-  await tikla("Fizik");
-  await tamTikla("Kimya");
+  await kutuphaneEk("kimya");
   await tamTikla("Periyodik tablo");
   await etiketiyleTikla("Kimya ekle: İlk 20 element");
   const boyali = document.querySelector('input[aria-label="Boyalı elementler"]') as HTMLInputElement;

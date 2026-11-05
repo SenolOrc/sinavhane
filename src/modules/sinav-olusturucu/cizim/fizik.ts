@@ -19,6 +19,9 @@ import { semaCiz, semaPayi, varsayilanSema } from "./sema";
 import { KIMYA_LAB_NESNELERI, KIMYA_LAB_TANIMLARI, kimyaCiz, kimyaLabCiz, kimyaPayi, varsayilanKimya } from "./kimya";
 import { geometriCiz, geometriIsaretiCiz } from "./geometriSekilleri";
 import { fizikEkCiz } from "./fizikEk";
+import { egikKuvvetCiz, varsayilanEgikKuvvet } from "./fizikSahneler";
+import { optikCiz, varsayilanOptik } from "./optik";
+import { siviCiz, varsayilanSivi } from "./sivi";
 import { YUNANCA } from "../yunanHarfleri";
 
 type FizikSekli = Extract<Sekil, { tur: "fizik" }>;
@@ -40,6 +43,8 @@ export type FizikTanimi = {
   /** Başka gruplarda da listelenir (ör. açı yayı: Geometri + Mekanik + Optik). */
   ekGruplar?: FizikGrubu[];
   ipucu: string;
+  /** Kütüphane araması için Türkçe anahtar kelimeler ("makara, atwood, ip"). */
+  aramaKelimeleri?: string[];
 };
 
 export type FizikGrubu = "mekanik" | "elektrik" | "optik" | "vektor" | "grafik" | "matematik" | "geometri" | "kimya" | "diger";
@@ -107,6 +112,11 @@ export const FIZIK_TANIMLARI: Record<FizikNesnesi, FizikTanimi> = {
   aciYayi: { ad: "Açı yayı", grup: "geometri", ekGruplar: ["mekanik", "optik"], w: 150, h: 110, etiketYeri: "alt", etiket: "", ipucu: "İki kol ve derece etiketli açı yayı. Derece panelden; etiket boşsa derece yazılır" },
   dikAci: { ad: "Dik açı işareti", grup: "geometri", ekGruplar: ["mekanik"], w: 70, h: 70, etiketYeri: "alt", etiket: "", ipucu: "İki kol ve dik açı karesi" },
   esIsaret: { ad: "Eş kenar işareti", grup: "geometri", w: 100, h: 24, etiketYeri: "alt", etiket: "", ipucu: "Doğru parçası ortasında 1–3 tırtık (eş uzunluk işareti)" },
+  // v1.2 geometri (bkz. geometriEk.ts)
+  dogrudaAcilar: { ad: "Doğruda açılar (d₁ ∥ d₂)", grup: "geometri", w: 280, h: 190, etiketYeri: "alt", etiket: "", ipucu: "Paralel iki doğru ve kesen; Z, U, M, kalem ucu, zikzak kuralları; açı etiketleri" },
+  dortgenGeo: { ad: "Özel dörtgen", grup: "geometri", w: 260, h: 170, etiketYeri: "alt", etiket: "", ipucu: "Paralelkenar, eşkenar dörtgen, yamuk, deltoid, dikdörtgen, kare; köşegen, yükseklik" },
+  katiCisim: { ad: "Katı cisim (3B)", grup: "geometri", w: 220, h: 200, etiketYeri: "alt", etiket: "", ipucu: "Küp, prizma, silindir, koni, piramit, küre; arka ayrıtlar kesikli" },
+  kagitKatlama: { ad: "Kağıt katlama", grup: "geometri", w: 420, h: 220, etiketYeri: "alt", etiket: "", ipucu: "Dikdörtgen/kare/dik üçgen kağıt; köşegenden, noktadan ya da köşeyi bir noktaya getirerek katla" },
   // Fizik ek şekilleri
   isinOk: { ad: "Işın + ara ok", grup: "optik", w: 170, h: 26, etiketYeri: "ust", etiket: "", ipucu: "Işın çizgisi; üzerinde yön oku (1–4 ara ok). Döndürerek eğik ışın yapın" },
   halkaAkim: { ad: "Halka akım", grup: "elektrik", w: 210, h: 170, etiketYeri: "alt", etiket: "", ipucu: "Halka akımın kesiti (⊙ ⊗) ve manyetik alan çizgileri. Yön ayarı panelden" },
@@ -116,6 +126,10 @@ export const FIZIK_TANIMLARI: Record<FizikNesnesi, FizikTanimi> = {
   dalgaGirisim: { ad: "Girişim deseni", grup: "optik", w: 270, h: 180, etiketYeri: "alt", etiket: "", ipucu: "İki kaynaklı dalga girişimi: dalga cepheleri ve (isteğe bağlı) sönüm çizgileri" },
   enerjiDuzeyi: { ad: "Enerji düzeyleri", grup: "optik", ekGruplar: ["diger"], w: 290, h: 210, etiketYeri: "alt", etiket: "", ipucu: "Bohr/atom enerji düzeyleri ve geçiş okları (ışıma/soğurma); düzeyleri panelden yazın" },
   dugum: { ad: "Düğüm noktası", grup: "elektrik", w: 11, h: 11, etiketYeri: "ust", etiket: "", elips: true, ipucu: "Devrede T-bağlantı noktası (dolu nokta); teller buna bağlanır" },
+  // v1.2 hesaplı düzenekler (hazır ayarlı sürümleri "Hazır Soru Sahneleri"nde: sahneler.ts)
+  egikKuvvet: { ad: "Eğik düzlem + kuvvet bileşenleri", grup: "mekanik", w: 320, h: 185, etiketYeri: "alt", etiket: "", ipucu: "α, m, μ panelden; mg, mg·sinα, mg·cosα, N, fs okları kuvvetle orantılı (g = 10). Kütle yüzeye paralel", aramaKelimeleri: ["eğik düzlem", "kuvvet", "bileşen", "normal", "sürtünme", "mg sin", "mg cos"] },
+  optikDuzenek: { ad: "Optik ışın düzeneği", grup: "optik", w: 460, h: 220, etiketYeri: "alt", etiket: "", ipucu: "Çukur/tümsek ayna, ince/kalın kenarlı mercek; asal eksen, 2F–F–O–F–2F, KL cismi, özel ışınlar; görüntü 1/f = 1/dₒ + 1/dᵢ ile otomatik", aramaKelimeleri: ["optik", "ayna", "mercek", "çukur ayna", "tümsek ayna", "odak", "asal eksen", "görüntü", "ışın"] },
+  siviKabi: { ad: "Sıvı kabı (U borusu, kaldırma, bölmeli)", grup: "mekanik", w: 260, h: 220, etiketYeri: "alt", etiket: "", ipucu: "U borusu (d₁·h₁ = d₂·h₂), yüzen/askıda/batan cisimler, m×n bölmeli basınç kabı", aramaKelimeleri: ["sıvı", "u borusu", "kaldırma kuvveti", "bölmeli kap", "basınç", "yüzen", "batan", "askıda", "musluk"] },
   koordinat: { ad: "Eksen takımı", grup: "diger", w: 260, h: 180, etiketYeri: "ic", etiket: "v|t", ipucu: "Grafik için eksenler. Etiket: dikey|yatay (ör. v|t)" },
 };
 
@@ -857,6 +871,7 @@ function govdeCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
       kimyaCiz(ctx, s);
       return;
     case "ucgenABC": case "dikUcgen": case "benzerUcgen": case "cemberGeo": case "cokgenAd":
+    case "dogrudaAcilar": case "dortgenGeo": case "katiCisim": case "kagitKatlama":
       geometriCiz(ctx, s);
       return;
     case "aciYayi": case "dikAci": case "esIsaret":
@@ -864,6 +879,15 @@ function govdeCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
       return;
     case "isinOk": case "halkaAkim": case "solenoid": case "telAlan": case "alanNokta": case "dalgaGirisim": case "enerjiDuzeyi":
       fizikEkCiz(ctx, s);
+      return;
+    case "egikKuvvet":
+      egikKuvvetCiz(ctx, s);
+      return;
+    case "optikDuzenek":
+      optikCiz(ctx, s);
+      return;
+    case "siviKabi":
+      siviCiz(ctx, s);
       return;
     case "dugum":
       ctx.beginPath();
@@ -964,7 +988,8 @@ export function fizikCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
   ctx.save();
   ctx.translate(merkezX, merkezY);
   if (Math.abs(donus) >= 0.01) ctx.rotate((donus * Math.PI) / 180);
-  if (s.ayna) ctx.scale(-1, 1);
+  // Hesaplı düzenekler yazılarını gövdeyle birlikte çizer; aynalama yazıyı ters çevirirdi.
+  if (s.ayna && s.nesne !== "egikKuvvet" && s.nesne !== "optikDuzenek" && s.nesne !== "siviKabi") ctx.scale(-1, 1);
   ctx.translate(-merkezX, -merkezY);
   ctx.strokeStyle = MUREKKEP;
   ctx.fillStyle = MUREKKEP;
@@ -982,7 +1007,9 @@ export function fizikCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
   // Grafikte başlık (etiket) grafiğin kendi çiziminde, eksen sayılarının altında.
   if (s.nesne === "grafik" || s.nesne === "istatistik" || s.nesne === "sema" || s.nesne === "kimya") return;
   // Geometri şekilleri ve açı yayı etiketlerini köşeye/yaya bağlı kendileri çizer.
-  if (["ucgenABC", "dikUcgen", "benzerUcgen", "cemberGeo", "cokgenAd", "aciYayi"].includes(s.nesne)) return;
+  if (["ucgenABC", "dikUcgen", "benzerUcgen", "cemberGeo", "cokgenAd", "aciYayi", "dogrudaAcilar", "dortgenGeo", "katiCisim", "kagitKatlama"].includes(s.nesne)) return;
+  // Hesaplı düzenekler kendi yazılarını çizer.
+  if (s.nesne === "egikKuvvet" || s.nesne === "optikDuzenek" || s.nesne === "siviKabi") return;
 
   if (s.nesne === "koordinat") {
     const [dikey, yatay] = etiket.split("|");
@@ -1033,6 +1060,9 @@ export function fizikSimgeCiz(ctx: CanvasRenderingContext2D, nesne: FizikNesnesi
     ...(nesne === "istatistik" ? { istatistik: { ...varsayilanIstatistik(), sade: true } } : {}),
     ...(nesne === "sema" ? { sema: varsayilanSema() } : {}),
     ...(nesne === "kimya" ? { kimya: varsayilanKimya() } : {}),
+    ...(nesne === "egikKuvvet" ? { kuvvet: { ...varsayilanEgikKuvvet(), aciEtiketi: "", kutleEtiketi: "" } } : {}),
+    ...(nesne === "optikDuzenek" ? { optik: { ...varsayilanOptik(), bilgi: false, isaretler: false } } : {}),
+    ...(nesne === "siviKabi" ? { sivi: varsayilanSivi() } : {}),
   };
   govdeCiz(ctx, simge);
   govdeYazilariCiz(ctx, simge);

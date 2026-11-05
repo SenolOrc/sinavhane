@@ -56,6 +56,28 @@ async function main() {
     dogrula(buton, `“${baslik}” başlıklı buton bulunamadı`);
     await act(async () => { (buton as HTMLButtonElement).click(); });
   };
+  // v1.2: ızgara, tuval ölçüsü, temizle, geçmiş, "Sadece tuval" → "Daha fazla" menüsünde.
+  const dahaFazlaAc = async () => {
+    if (document.querySelector('[data-testid="daha-fazla-menusu"]')) return;
+    await basligaTikla("Daha fazla: ızgara, tuval ölçüsü, temizle…");
+  };
+  // v1.2: kütüphane kategorisini aç (açık/kapalı durumu tarayıcıda hatırlanıyor).
+  const etiketliTiklaOnce = async (etiket: string) => {
+    const buton = document.querySelector(`button[aria-label="${etiket}"]`);
+    dogrula(buton, `“${etiket}” etiketli düğme bulunamadı`);
+    await act(async () => { (buton as HTMLButtonElement).click(); });
+  };
+  const kategoriAc = async (kategori: string) => {
+    const baslik = document.querySelector(`section[data-kategori="${kategori}"] > button`) as HTMLButtonElement | null;
+    dogrula(baslik, `“${kategori}” kütüphane kategorisi yok`);
+    if (baslik!.getAttribute("aria-expanded") !== "true") await act(async () => { baslik!.click(); });
+  };
+  const kutuphaneKarti = async (kategori: string, ad: string) => {
+    await kategoriAc(kategori);
+    const kart = document.querySelector(`button[aria-label="Ekle: ${ad}"]`) as HTMLButtonElement | null;
+    dogrula(kart, `“${ad}” kütüphane kartı yok`);
+    await act(async () => { kart!.click(); });
+  };
   const pointer = async (canvas: HTMLCanvasElement, tur: string, x: number, y: number, shiftKey = false) => {
     const olay = new dom.window.MouseEvent(tur, { bubbles: true, clientX: x, clientY: y, shiftKey, buttons: tur === "pointermove" ? 1 : 0 });
     Object.defineProperty(olay, "pointerId", { value: 1 });
@@ -71,16 +93,15 @@ async function main() {
   let cikti: any = null;
   await act(async () => root.render(<CizimEditoruModal key="manuel" onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
   const canvas = document.querySelector("canvas")!;
-  await tikla("Dikdörtgen");
-  await ciz(canvas, 70, 55, 570, 345);
-  await ciz(canvas, 135, 105, 505, 295);
-  await ciz(canvas, 215, 155, 425, 245);
-  await tikla("Daire / Elips");
-  await ciz(canvas, 120, 45, 430, 355);
-  await ciz(canvas, 205, 130, 345, 270);
-  await tikla("Üçgen");
-  await ciz(canvas, 145, 80, 500, 330);
-  await ciz(canvas, 210, 115, 430, 285);
+  // v1.2: çizim bitince araç kendiliğinden Seç'e döner; her şekil için araç yeniden seçilir.
+  for (const [arac, x1, y1, x2, y2] of [
+    ["Dikdörtgen", 70, 55, 570, 345], ["Dikdörtgen", 135, 105, 505, 295], ["Dikdörtgen", 215, 155, 425, 245],
+    ["Daire / Elips", 120, 45, 430, 355], ["Daire / Elips", 205, 130, 345, 270],
+    ["Üçgen", 145, 80, 500, 330], ["Üçgen", 210, 115, 430, 285],
+  ] as const) {
+    await tikla(arac);
+    await ciz(canvas, x1, y1, x2, y2);
+  }
   await tikla("Yeni Soru Olarak Ekle");
   dogrula(cikti?.cizimVerisi?.sekiller.length === 7, "Karmaşık manuel çizimde şekil kaybı var");
   dogrula(cikti.oran > 1.2 && cikti.oran < 2, "Karmaşık çizimin otomatik kırpma oranı mantıksız");
@@ -176,6 +197,7 @@ async function main() {
 
   // Senaryo 6: Tamamen temizlenmiş düzenleme de kaydetmeden kapanmamalı.
   await act(async () => root.render(<CizimEditoruModal key="kapatma" baslangicBelgesi={tekSekil} duzenlemeModu onClose={() => {}} onOlustur={() => {}} />));
+  await dahaFazlaAc();
   await tiklaTam("Tümünü temizle");
   await tiklaTam("Temizle");
   await tiklaTam("Vazgeç");
@@ -214,7 +236,7 @@ async function main() {
   await tiklaTam("Kaydet");
   dogrula(window.localStorage.getItem("ogretmen-asistani:cizim-sablonlari:v1")?.includes("Özel kutu"), "Kullanıcı şablonu kalıcı saklanmadı");
   await act(async () => root.render(<CizimEditoruModal key="sablon-yeni" onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
-  await tiklaTam("Özel kutu");
+  await kutuphaneKarti("sablonlarim", "Özel kutu");
   await tikla("Yeni Soru Olarak Ekle");
   dogrula(cikti.cizimVerisi.sekiller.length === 1, "Kullanıcı şablonu yeni editöre eklenmedi");
   console.log("✓ Kullanıcı akışı: oturumlar arası kullanıcı şablonu");
@@ -232,7 +254,7 @@ async function main() {
 
   // Senaryo 12: Sağ-alt köşedeki metin kutusu tuvalin dışına taşmamalı.
   await act(async () => root.render(<CizimEditoruModal key="metin-sinir" onClose={() => {}} onOlustur={() => {}} />));
-  await tiklaTam("Metin etiketi");
+  await tiklaTam("Metin");
   const metinCanvas = document.querySelector("canvas")!;
   await pointer(metinCanvas, "pointerdown", 955, 595);
   const metinKutusu = document.querySelector('textarea[placeholder="Etiket metni"]')?.parentElement as HTMLDivElement;
@@ -248,40 +270,31 @@ async function main() {
     await act(async () => { gecmisCanvas.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Enter", bubbles: true })); });
     if (i < 84) await tiklaTam("Dikdörtgen");
   }
+  await dahaFazlaAc();
   dogrula(document.body.textContent?.includes("Geçmiş 80/80"), "Geçmiş sınırı görünür değil veya 80'i aştı");
   console.log("✓ Kullanıcı akışı: 80 adımlık görünür geçmiş sınırı");
 
-  // Senaryo 13: ARAÇ ÇUBUĞU KİPİ.
-  //
-  // KORUDUĞU ŞEY ekran alanı: akış şeması çizen öğretmen üçgen/dalga/çokgen
-  // kullanmıyor ama hepsi tuvalin ÜSTÜNDE yer kaplıyordu ("ekran çok küçük
-  // kalıyor, yapılanlar görünmüyor"). Kip yalnız ÇUBUĞU değiştirir; şekiller
-  // ve tuval ortaktır — bu yüzden ikinci iddia var.
+  // Senaryo 13 (v1.2): KİP YOK. Eskiden Çizim/Fizik/Matematik/Kimya/Akış kip
+  // sekmeleri vardı; öğretmen şekli bulmak için 4 katman geziyordu. Artık temel
+  // araçlar HEP üst çubukta, akış kutuları da sol kütüphanede.
   const dugmeVar = (metin: string) =>
     [...document.querySelectorAll("button")].some((b) => b.textContent?.trim() === metin);
 
   await act(async () => root.render(<CizimEditoruModal key="kip" onClose={() => {}} onOlustur={() => {}} />));
-  dogrula(dugmeVar("Üçgen") && !dugmeVar("Karar"), "Çizim kipinde genel araçlar yok ya da akış şeridi açık");
-  await tiklaTam("Akış şeması");
-  dogrula(dugmeVar("Karar"), "Akış kipinde akış şeması şeridi görünmüyor");
-  dogrula(!dugmeVar("Üçgen") && !dugmeVar("Dalga"), "Akış kipinde ilgisiz genel araçlar hâlâ ekranda");
-  dogrula(dugmeVar("Seç / Taşı") && dugmeVar("Silgi"), "Akış kipinde seçim/silgi kaybolmuş — kutu taşınamaz");
-
-  // Kip ŞEKİLLERİ değiştirmemeli: akışta kutu ekle, çizime dön, kutu dursun.
-  await tiklaTam("İşlem");
+  dogrula(!document.querySelector("[data-kip-sekmesi]"), "Eski kip sekmeleri hâlâ duruyor");
+  for (const arac of ["Seç / Taşı", "Çizgi", "Ok / Bağlayıcı", "Dikdörtgen", "Daire / Elips", "Üçgen", "Çokgen", "Dalga", "Serbest çizgi", "Metin", "Silgi"]) {
+    dogrula(document.querySelector(`button[data-arac][aria-label="${arac}"]`), `Temel araç üst çubukta yok: ${arac}`);
+  }
+  await kutuphaneKarti("akis", "İşlem");
   const kipCanvas = document.querySelector("canvas")!;
-  dogrula(kipCanvas.getAttribute("aria-label")?.includes("1 şekil"), "Akış kipinde kutu eklenmedi");
-  await tiklaTam("Çizim");
-  dogrula(
-    kipCanvas.getAttribute("aria-label")?.includes("1 şekil"),
-    "Kip değiştirince şekil kayboldu — kip yalnız çubuğu değiştirmeli",
-  );
-  dogrula(dugmeVar("Üçgen") && !dugmeVar("Karar"), "Çizim kipine dönülünce çubuk eski hâline gelmedi");
-  console.log("✓ Kullanıcı akışı: araç çubuğu kipi (çizim / akış şeması)");
+  dogrula(kipCanvas.getAttribute("aria-label")?.includes("1 şekil"), "Kütüphaneden akış kutusu eklenmedi");
+  dogrula(document.querySelector('button[aria-label="Ekle: Karar"]'), "Kart eklenince kütüphane kapandı — ardı ardına ekleme yapılamaz");
+  await kutuphaneKarti("akis", "Karar");
+  dogrula(kipCanvas.getAttribute("aria-label")?.includes("2 şekil"), "İkinci akış kutusu eklenmedi");
+  dogrula(dugmeVar("Üçgen") || !!document.querySelector('button[aria-label="Üçgen"]'), "Akış kutusu eklenince genel araçlar kayboldu");
+  console.log("✓ Kullanıcı akışı: kipsiz araç çubuğu + kütüphaneden ardı ardına akış kutusu");
 
-  // Senaryo 14: İÇİNDE AKIŞ KUTUSU OLAN çizim, akış kipinde AÇILMALI.
-  // Öğretmen kaldığı yerden devam eder; her açılışta kipi elle seçmek zorunda
-  // kalması, kipin kendisini bir engele çevirirdi.
+  // Senaryo 14: Eski (akış kutulu) çizim olduğu gibi açılır, şekil kaybı yok.
   await act(async () => root.render(
     <CizimEditoruModal
       key="kip-hatirlama"
@@ -293,11 +306,11 @@ async function main() {
         genislik: 960,
         yukseklik: 600,
         sekiller: [{ id: "k1", tur: "akis", akisSekli: "islem", kalinlik: 2, cizgiTipi: "duz", x: 10, y: 10, w: 120, h: 60, metin: "x" }],
-      }}
+      } as any}
     />,
   ));
-  dogrula(dugmeVar("Karar"), "Akış kutusu içeren çizim, çizim kipinde açıldı — öğretmen kipi her seferinde elle seçer");
-  console.log("✓ Kullanıcı akışı: akış kutulu çizim akış kipinde açılıyor");
+  dogrula(document.querySelector("canvas")!.getAttribute("aria-label")?.includes("1 şekil"), "Akış kutulu eski çizim açılınca şekil kayboldu");
+  console.log("✓ Kullanıcı akışı: akış kutulu eski çizim açılıyor");
 
   // ——— Senaryo: araç çubuğu düzeni ———
   // KORUDUĞU ŞEY: tuvalin görünen yüksekliği. 1200×800 gerçek pencerede
@@ -334,16 +347,17 @@ async function main() {
   // dolu saymıyor (dolgusuz şekilde içeriden tıklamak seçmez).
   await pointer(olcuTuvali, "pointerdown", 100, 40);
   await pointer(olcuTuvali, "pointerup", 100, 40);
-  dogrula(
-    !(panel() as HTMLElement).className.includes("hidden"),
-    "şekil seçilince sağ sütun açılmıyor",
-  );
+  // v1.2: basit şekilde ayrıntılı panel KENDİLİĞİNDEN açılmaz; yüzen çubuk yeter.
+  dogrula((panel() as HTMLElement).className.includes("hidden"), "basit şekil seçilince ayrıntılı panel kendiliğinden açıldı");
+  dogrula(document.querySelector('[data-testid="yuzen-arac-cubugu"]'), "şekil seçilince yüzen araç çubuğu çıkmadı");
+  await etiketliTiklaOnce("Ayrıntılar");
+  dogrula(!(panel() as HTMLElement).className.includes("hidden"), "“Ayrıntılar” ayrıntılı paneli açmadı");
 
   // 2) Araç çubuğu KENDİ İÇİNDE KAYMIYOR. `max-h-[30vh] overflow-y-auto`
   //    geri gelirse kontroller yine ikinci bir kaydırma çubuğunun arkasında
   //    kaybolur — iddia sınıfı doğrudan yokluyor.
   // (Yeni yerleşim: araçlar solda dikey çubukta.)
-  const cubuk = document.querySelector('nav[aria-label="Çizim araçları"]') as HTMLElement | null;
+  const cubuk = document.querySelector('[aria-label="Çizim araçları"]') as HTMLElement | null;
   dogrula(cubuk, "araç çubuğu bulunamadı — iddia bir şey yoklamıyor");
   dogrula(
     !cubuk!.className.includes("overflow-y-auto") && !cubuk!.className.includes("max-h-"),
@@ -355,6 +369,7 @@ async function main() {
     !cubuk!.textContent?.includes("Izgaraya yakala"),
     "görünüm ayarları araç çubuğuna geri dönmüş",
   );
+  await dahaFazlaAc();
   dogrula(dugmeVar("Sadece tuval"), "odak kipi düğmesi yok");
   console.log("✓ Kullanıcı akışı: seçim paneli sağda, çubuk kaymıyor, görünüm altta");
 
@@ -409,6 +424,7 @@ async function main() {
     const tuval = document.querySelector("canvas")!;
     const silmeler: number[][] = [];
     const eskiClear = sahteCtx.clearRect;
+    await dahaFazlaAc();
     sahteCtx.clearRect = (...a: number[]) => { silmeler.push(a); };
     await basligaTikla("1440×900");
     sahteCtx.clearRect = eskiClear;
@@ -430,6 +446,7 @@ async function main() {
     ] };
     await act(async () => root.render(<CizimEditoruModal key="genis-tus" baslangicBelgesi={belge} duzenlemeModu onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
     const tuval = document.querySelector("canvas")!;
+    await dahaFazlaAc();
     await basligaTikla("1440×900");
     await tikla("Seç / Taşı");
     await pointer(tuval, "pointerdown", 100, 140); await pointer(tuval, "pointerup", 100, 140);
@@ -523,9 +540,7 @@ async function main() {
     ]));
     for (const ad of [uzunAd, "Eski devre"]) {
       await act(async () => root.render(<CizimEditoruModal key={`sablon-ekle-${ad}`} onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
-      const dugme = [...document.querySelectorAll("button")].find((b) => b.getAttribute("title") === ad);
-      dogrula(dugme, `“${ad}” şablon düğmesi yok`);
-      await act(async () => { (dugme as HTMLButtonElement).click(); });
+      await kutuphaneKarti("sablonlarim", ad);
       await tikla("Yeni Soru Olarak Ekle");
       const eklenen = cikti.cizimVerisi.sekiller as any[];
       dogrula(eklenen.some((s) => s.tur === "baglayici"), `“${ad}”: bağlayıcı eklenmedi`);

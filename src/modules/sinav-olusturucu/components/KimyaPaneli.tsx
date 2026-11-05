@@ -23,6 +23,9 @@ import {
   ozelMolekulVerisi,
   zincirAdi,
   zincirVerisi,
+  KIMYA_SIKLO_SABLONLARI,
+  ORGANIK_YAN_GRUPLAR,
+  organikAdVeFormul,
   elementListesiOku,
   elementListesiYaz,
   kabukDizilimi,
@@ -32,7 +35,7 @@ import {
   molekulCoz,
   varsayilanKimya,
 } from "../cizim/kimya";
-import type { GrafikVerisi, KimyaVerisi, Sekil } from "../cizim/tipler";
+import type { GrafikVerisi, KimyaVerisi, OrganikYanGrup, Sekil } from "../cizim/tipler";
 import { FizikSimgesi } from "./FizikPaneli";
 import { MetinGirdisi, OndalikGirdisi } from "./GrafikPaneli";
 import { Onizleme, SablonDugmesi } from "./MatematikPaneli";
@@ -106,6 +109,12 @@ export function KimyaSeridi({ onLab, onKimya, onGrafik }: {
         <>
           <span className={`${BASLIK} w-full`}>Hazır organik yapılar (iskelet formülü)</span>
           {KIMYA_ORGANIK_SABLONLARI.map((sb) => (
+            <SablonDugmesi key={sb.id} ad={sb.ad} ipucu={sb.ipucu} etiket={`Organik ekle: ${sb.ad}`} onClick={() => onKimya(sb.olustur())}>
+              {kimyaOnizleme({ ...sb.olustur(), geometri: false } as KimyaVerisi, 0.2)}
+            </SablonDugmesi>
+          ))}
+          <span className={`${BASLIK} w-full pt-0.5`}>Sikloalkanlar ve dallanmış yapılar (IUPAC adı otomatik)</span>
+          {KIMYA_SIKLO_SABLONLARI.map((sb) => (
             <SablonDugmesi key={sb.id} ad={sb.ad} ipucu={sb.ipucu} etiket={`Organik ekle: ${sb.ad}`} onClick={() => onKimya(sb.olustur())}>
               {kimyaOnizleme({ ...sb.olustur(), geometri: false } as KimyaVerisi, 0.2)}
             </SablonDugmesi>
@@ -310,11 +319,11 @@ export function KimyaPaneli({ sekil, guncelle, tarihceyeKaydet }: {
                 <label className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600">
                   Karbon sayısı
                   <input type="number" aria-label="Karbon sayısı" min={2} max={12} value={z.n} onFocus={tarihceyeKaydet}
-                    onChange={(e) => { const n = Math.round(Number(e.target.value)); if (n >= 2 && n <= 12) yazZ({ n, konum: Math.min(z.konum, n - 1) }); }}
+                    onChange={(e) => { const n = Math.round(Number(e.target.value)); if (n >= (z.halka ? 3 : 2) && n <= (z.halka ? 8 : 12)) yazZ({ n, konum: Math.min(z.konum, n - 1), yanGruplar: z.yanGruplar?.filter((y) => y.k <= n) }); }}
                     className="w-14 rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[11px]" />
                 </label>
                 {([["alkan", "Alkan"], ["alken", "Alken"], ["alkin", "Alkin"]] as const).map(([id, ad]) => (
-                  <TogglePill key={id} aktif={z.tur === id} onClick={() => { tarihceyeKaydet(); yazZ({ tur: id }); }}>{ad}</TogglePill>
+                  <TogglePill key={id} aktif={z.tur === id} onClick={() => { tarihceyeKaydet(); yazZ({ tur: id, ...(id !== "alkan" ? { halka: undefined, yanGruplar: undefined } : {}) }); }}>{ad}</TogglePill>
                 ))}
                 {z.tur !== "alkan" && (
                   <label className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600">
@@ -325,6 +334,7 @@ export function KimyaPaneli({ sekil, guncelle, tarihceyeKaydet }: {
                   </label>
                 )}
                 <span className="text-[10px] text-slate-500">{zincirAdi(z.n, z.tur, z.konum)}</span>
+                <OrganikYanGrupPaneli z={z} yazZ={(yama) => { tarihceyeKaydet(); yazZ(yama); }} />
               </div>
             );
           })()}
@@ -405,6 +415,67 @@ export function KimyaPaneli({ sekil, guncelle, tarihceyeKaydet }: {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+type ZincirTam = NonNullable<Extract<KimyaVerisi, { tur: "molekul" }>["zincir"]>;
+
+/**
+ * Sikloalkan (halka) ve ana zincire yan grup bağlama. Ad, çizilen iskeletten
+ * IUPAC kurallarıyla hesaplanır (en uzun zincir yeniden seçilir): öğretmen
+ * bütanın 2. karbonuna −C₂H₅ eklerse ad "3-metilpentan" olur.
+ */
+export function OrganikYanGrupPaneli({ z, yazZ }: { z: ZincirTam; yazZ: (yama: Partial<ZincirTam>) => void }) {
+  const [yeni, setYeni] = useState<{ k: number; g: OrganikYanGrup }>({ k: Math.min(2, z.n), g: "CH3" });
+  const yanlar = z.yanGruplar ?? [];
+  const sonuc = organikAdVeFormul(z);
+  const ekle = () => {
+    const aday = { ...z, tur: "alkan" as const, yanGruplar: [...yanlar, { k: Math.min(yeni.k, z.n), g: yeni.g }] };
+    const r = organikAdVeFormul(aday);
+    if ("hata" in r) return;
+    yazZ({ tur: "alkan", yanGruplar: aday.yanGruplar });
+  };
+  const ekleHata = (() => {
+    const r = organikAdVeFormul({ ...z, tur: "alkan", yanGruplar: [...yanlar, { k: Math.min(yeni.k, z.n), g: yeni.g }] });
+    return "hata" in r ? r.hata : yanlar.length >= 8 ? "En çok 8 yan grup" : null;
+  })();
+  return (
+    <div className="flex w-full flex-col gap-1.5 border-t border-brand-100 pt-1.5" data-testid="kimya-yan-grup">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <TogglePill aktif={!!z.halka} onClick={() => {
+          const halka = !z.halka;
+          const n = halka ? Math.min(8, Math.max(3, z.n)) : z.n;
+          yazZ({ halka, n, tur: "alkan", yanGruplar: yanlar.filter((y) => y.k <= n) });
+        }}>Halka (sikloalkan)</TogglePill>
+        <span className={BASLIK}>Yan grup</span>
+        <label className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600">
+          Karbon
+          <select aria-label="Yan grubun karbonu" value={Math.min(yeni.k, z.n)} onChange={(e) => setYeni({ ...yeni, k: Number(e.target.value) })} className="rounded-md border border-slate-300 bg-white px-1 py-1 text-[11px]">
+            {Array.from({ length: z.n }, (_, i) => <option key={i} value={i + 1}>C{i + 1}</option>)}
+          </select>
+        </label>
+        <select aria-label="Yan grup" value={yeni.g} onChange={(e) => setYeni({ ...yeni, g: e.target.value as OrganikYanGrup })} className="rounded-md border border-slate-300 bg-white px-1 py-1 text-[11px]">
+          {ORGANIK_YAN_GRUPLAR.map((t) => <option key={t.g} value={t.g}>{t.yazi} ({t.ad})</option>)}
+        </select>
+        <button type="button" disabled={!!ekleHata} title={ekleHata ?? "Seçili karbona bağla"} onClick={ekle}
+          className="rounded-md border border-brand-300 bg-white px-2 py-1 text-[11px] font-bold text-brand-700 hover:bg-brand-50 disabled:opacity-40">+ Bağla</button>
+      </div>
+      {yanlar.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1">
+          {yanlar.map((y, i) => (
+            <span key={i} className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] text-slate-700">
+              C{y.k}: {ORGANIK_YAN_GRUPLAR.find((t) => t.g === y.g)?.yazi}
+              <button type="button" aria-label={`C${y.k} yan grubunu sil`} onClick={() => yazZ({ yanGruplar: yanlar.filter((_, j) => j !== i) })} className="text-rose-500 hover:text-rose-700">×</button>
+            </span>
+          ))}
+        </div>
+      )}
+      <span className="text-[11px] text-slate-600" data-testid="organik-ad">
+        {"hata" in sonuc ? <span className="text-rose-600">{sonuc.hata}</span> : <>IUPAC adı: <b>{sonuc.ad}</b> · Kapalı formül: <b>{sonuc.formul}</b></>}
+      </span>
+      {(z.halka || yanlar.length > 0) && z.tur !== "alkan" && <span className="text-[10px] text-slate-500">Halka ve yan gruplar alkan zincirinde kullanılır.</span>}
+      <span className="text-[10px] text-slate-500">Ad, çizilen iskeletten hesaplanır: en uzun zincir ve en küçük numaralar kendiliğinden seçilir (ör. bütanın C2'sine −C₂H₅ → 3-metilpentan).</span>
     </div>
   );
 }

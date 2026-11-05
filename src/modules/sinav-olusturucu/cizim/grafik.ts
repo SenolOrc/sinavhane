@@ -503,7 +503,11 @@ function sinusGrafigi(fonksiyon: "sin" | "cos", pi: boolean): GrafikVerisi {
   };
 }
 
-export type GrafikSablonu = { id: string; ad: string; ipucu: string; olustur: () => GrafikVerisi };
+export type GrafikSablonu = {
+  id: string; ad: string; ipucu: string; olustur: () => GrafikVerisi;
+  /** Sol kütüphane araması için Türkçe anahtar kelimeler. */
+  aramaKelimeleri?: string[];
+};
 
 export const GRAFIK_SABLONLARI: GrafikSablonu[] = [
   {
@@ -606,6 +610,36 @@ export const MAT_GRAFIK_SABLONLARI: GrafikSablonu[] = [
       return matGrafik([{ tur: "noktalar", noktalar: n, nokta: true, cizgisiz: true, renk: "#111827" }, fn(`${temizle(r.a)}x+${temizle(r.b)}`, MAT_RENKLER[1], { baslangic: 0, bitis: 8, kesik: true })], { xMin: 0, xMax: 8, yMin: 0, yMax: 10, xAdim: 1, yAdim: 1, xEtiket: "x", yEtiket: "y" });
     } },
 ];
+
+// Arama kelimeleri (sol kütüphane). Şablon tanımlarını kalabalıklaştırmamak için ayrı tablo.
+const GRAFIK_ARAMA: Record<string, string[]> = {
+  "x-t-sabit": ["konum zaman", "x-t", "sabit hız", "düzgün doğrusal hareket", "hareket grafiği"],
+  "x-t-ivmeli": ["konum zaman", "x-t", "ivmeli hareket", "parabol", "hareket grafiği"],
+  "v-t": ["hız zaman", "v-t", "hızlanma", "yavaşlama", "hareket grafiği"],
+  "a-t": ["ivme zaman", "a-t", "ivme", "hareket grafiği"],
+  sin: ["sinüs", "dalga", "basit harmonik hareket", "periyot", "genlik"],
+  cos: ["kosinüs", "dalga", "basit harmonik hareket", "periyot"],
+  "sin-pi": ["sinüs", "radyan", "pi", "trigonometri", "dalga"],
+  ozel: ["noktalar", "grafik", "köşe noktaları", "elle"],
+  "m-dogru": ["doğru", "doğrusal fonksiyon", "eğim", "y=ax+b", "fonksiyon grafiği"],
+  "m-parabol": ["parabol", "ikinci derece", "kök", "tepe noktası", "x kare"],
+  "m-mutlak": ["mutlak değer", "fonksiyon grafiği", "|x|"],
+  "m-ustel": ["üstel", "logaritma", "log", "ters fonksiyon"],
+  "m-tan": ["tanjant", "tan", "asimptot", "trigonometri"],
+  "m-parcali": ["parçalı fonksiyon", "açık uç", "kapalı uç", "süreklilik"],
+  "m-parcali-yazim": ["parçalı fonksiyon", "mutlak", "parçalı"],
+  "m-hiperbol-asimptot": ["hiperbol", "asimptot", "konik", "odak"],
+  "m-bolge": ["eşitsizlik", "bölge", "doğrusal programlama", "taralı bölge"],
+  "m-cember": ["çember", "çember denklemi", "konik", "analitik geometri"],
+  "m-elips": ["elips", "konik", "analitik geometri"],
+  "m-hiperbol": ["hiperbol", "konik", "analitik geometri"],
+  "m-arasi": ["integral", "iki eğri arası alan", "alan", "belirli integral"],
+  "m-alt-alan": ["integral", "eğri altı alan", "alan", "belirli integral"],
+  "m-teget": ["teğet", "türev", "eğim", "teğet doğrusu"],
+  "m-noktalar": ["koordinat düzlemi", "nokta", "analitik", "adlı nokta"],
+  "m-serpme": ["serpme diyagramı", "regresyon", "korelasyon", "istatistik"],
+};
+for (const sb of [...GRAFIK_SABLONLARI, ...MAT_GRAFIK_SABLONLARI]) sb.aramaKelimeleri ??= GRAFIK_ARAMA[sb.id];
 
 /** Üst düzey ayırıcı: `;` ve satır sonu, ama `{ … }` parçalı fonksiyon bloğunun içinde değil. */
 function ustDuzeyBol(metin: string): string[] {
@@ -1089,12 +1123,12 @@ function benzersiz(degerler: number[]): number[] {
   return s.filter((v, i) => i === 0 || Math.abs(v - s[i - 1]) > 1e-9);
 }
 
-export function grafikCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
-  const veri = s.grafik && grafikVerisiGecerliMi(s.grafik) ? s.grafik : varsayilanGrafik();
-  const sade = veri.sade === true;
-  const { x, y, w, h } = s;
-  const d = grafikDuzeni(veri);
-  // Çember/elips için eksen birimleri eşit olmalı: kutunun en-boy oranına göre kısa eksenin aralığı genişletilir.
+/**
+ * Çizimde kullanılan pencere: `grafikDuzeni` + çember/elips varsa eşit eksen birimi
+ * (kutunun en-boy oranına göre kısa eksenin aralığı genişletilir).
+ */
+export function grafikPenceresi(veri: GrafikVerisi, w: number, h: number): GrafikDuzeni {
+  const d = { ...grafikDuzeni(veri) };
   if (veri.egriler.some((e) => e.tur === "denklem") && w > 0 && h > 0) {
     const orta = (a: number, b: number) => (a + b) / 2;
     const birimX = (d.xMax - d.xMin) / w;
@@ -1109,6 +1143,67 @@ export function grafikCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
       d.xMin = m - yarim; d.xMax = m + yarim;
     }
   }
+  return d;
+}
+
+/**
+ * Grafik şeklinin kutusunda (dönüşsüz, şeklin yerel koordinatı) veri ↔ piksel dönüşümü —
+ * `grafikCiz` ile birebir aynı hesap. Tuvalde nokta tutamaçları için: `noktaPikselleri(i)`
+ * i. eğrinin (noktalar / adlı noktalar) köşelerinin pikselleri; sürüklerken `veriye(p)`.
+ * Döndürülmüş şekilde fare noktası önce şeklin yerel koordinatına çevrilmelidir (sinirlar.ts noktaYerel).
+ */
+export function grafikPikselDonusumu(veri: GrafikVerisi, kutu: { x: number; y: number; w: number; h: number }) {
+  const d = grafikPenceresi(veri, kutu.w, kutu.h);
+  const px = (X: number) => kutu.x + ((X - d.xMin) / (d.xMax - d.xMin)) * kutu.w;
+  const py = (Y: number) => kutu.y + kutu.h - ((Y - d.yMin) / (d.yMax - d.yMin)) * kutu.h;
+  const veriye = (p: Nokta): Nokta => ({
+    x: d.xMin + ((p.x - kutu.x) / kutu.w) * (d.xMax - d.xMin),
+    y: d.yMin + ((kutu.y + kutu.h - p.y) / kutu.h) * (d.yMax - d.yMin),
+  });
+  const noktaPikselleri = (egriIndex: number): Nokta[] => {
+    const e = veri.egriler[egriIndex];
+    if (!e || (e.tur !== "noktalar" && e.tur !== "isaret")) return [];
+    return e.noktalar.map((p) => ({ x: px(p.x), y: py(p.y) }));
+  };
+  return { pencere: d, px, py, veriye, noktaPikselleri };
+}
+
+/** Sürükleme başında otomatik pencereyi sabitler (nokta taşındıkça eksenler kaymasın). */
+export function grafikPenceresiniSabitle(veri: GrafikVerisi): GrafikVerisi {
+  const d = grafikDuzeni(veri);
+  return { ...veri, xMin: veri.xMin ?? d.xMin, xMax: veri.xMax ?? d.xMax, yMin: veri.yMin ?? d.yMin, yMax: veri.yMax ?? d.yMax, xAdim: veri.xAdim ?? d.xAdim, yAdim: veri.yAdim ?? d.yAdim };
+}
+
+/**
+ * `noktalar` / `isaret` eğrisinin bir köşesini taşır (saf: yeni veri döner; indeks geçersizse
+ * AYNI nesne). Varsayılan olarak değer eksen adımının yarısına yakalanır (kılavuza oturur) ve
+ * ±1 000 000 içine kıstırılır.
+ */
+export function grafikNoktaTasi(
+  veri: GrafikVerisi, egriIndex: number, noktaIndex: number, yeniDeger: Nokta,
+  secenek: { yakala?: boolean } = {},
+): GrafikVerisi {
+  const e = veri.egriler[egriIndex];
+  if (!e || (e.tur !== "noktalar" && e.tur !== "isaret") || !e.noktalar[noktaIndex]) return veri;
+  if (!Number.isFinite(yeniDeger.x) || !Number.isFinite(yeniDeger.y)) return veri;
+  const d = grafikDuzeni(veri);
+  const yakala = (v: number, adim: number) => {
+    if (secenek.yakala === false || !(adim > 0)) return v;
+    const a = adim / 2;
+    return temizle(Math.round(v / a) * a);
+  };
+  const kis = (v: number) => Math.max(-HAREKET_SINIRI, Math.min(HAREKET_SINIRI, v));
+  const x = kis(yakala(yeniDeger.x, d.xAdim));
+  const y = kis(yakala(yeniDeger.y, d.yAdim));
+  const noktalar = e.noktalar.map((p, i) => (i === noktaIndex ? { ...p, x, y } : p));
+  return { ...veri, egriler: veri.egriler.map((eg, i) => (i === egriIndex ? ({ ...eg, noktalar } as GrafikEgrisi) : eg)) };
+}
+
+export function grafikCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
+  const veri = s.grafik && grafikVerisiGecerliMi(s.grafik) ? s.grafik : varsayilanGrafik();
+  const sade = veri.sade === true;
+  const { x, y, w, h } = s;
+  const d = grafikPenceresi(veri, w, h);
   const px = (X: number) => x + ((X - d.xMin) / (d.xMax - d.xMin)) * w;
   const py = (Y: number) => y + h - ((Y - d.yMin) / (d.yMax - d.yMin)) * h;
   // Eksenler 0'dan geçer; 0 görünür aralıkta değilse kenara yaslanır.

@@ -1,14 +1,24 @@
-// Matematik şemaları: Venn (2–3 küme), olasılık ağacı, sayı doğrusu (aralıklı).
+// Matematik şemaları: Venn (2–3 küme; kesişen / alt küme / ayrık), olasılık ağacı (3 aşamaya kadar),
+// sayı doğrusu (aralıklı). Birim çember, işaret tablosu ve fonksiyon ok diyagramı `semaEk.ts`'te.
 //
 // Hepsi tek şekil (kutu = çizim alanı) ve veriyle tanımlı: bölge değerleri,
 // dal olasılıkları, aralık uçları panelden yazılır. Çizim saf geometri — Venn
 // bölgesi boyama, bölgenin kümelere üyeliğini ızgaradan örnekleyerek buluyor
 // (kesişim/fark için tek tek kırpma yolu kurmak yerine; hata payı 2 piksel).
 
-import type { AgacDali, SemaVerisi, Sekil } from "./tipler";
+import type { AgacDali, SemaVerisi, Sekil, VennDuzeni } from "./tipler";
 import { MUREKKEP } from "./sabitler";
 import { fizikMetniCiz } from "./fizik";
 import { sayiYaz } from "./grafik";
+import {
+  birimCemberCiz,
+  fonksiyonSemaCiz,
+  isaretTablosuCiz,
+  isaretTablosuVerisi,
+  semaEkGecerliMi,
+  varsayilanBirimCember,
+  varsayilanFonksiyonSema,
+} from "./semaEk";
 
 type FizikSekli = Extract<Sekil, { tur: "fizik" }>;
 
@@ -20,22 +30,48 @@ export const EN_COK_DAL_ADI = 40;
 export const EN_COK_OLASILIK = 20;
 export const EN_COK_SEMA_BASLIK = 80;
 export const EN_COK_SEMA_AD = 40;
+/** Olasılık ağacı: en çok aşama (derinlik) ve uç (yaprak) sayısı. */
+export const EN_COK_AGAC_ASAMA = 3;
+export const EN_COK_YAPRAK = 36;
 
 // ── Venn ───────────────────────────────────────────────────────────────────
 
 /** Bölge adları: panelde değer kutularını etiketlemek için (veri dizisiyle aynı sıra). */
-export function vennBolgeAdlari(kume: number, adlar: string[]): string[] {
+export function vennBolgeAdlari(kume: number, adlar: string[], duzen: VennDuzeni = "kesisen"): string[] {
   const [a, b, c] = [adlar[0] || "A", adlar[1] || "B", adlar[2] || "C"];
+  if (kume === 2 && duzen === "altKume") return [`Yalnız ${a} (boş)`, `${a} (= ${a}∩${b})`, `${b}∖${a}`, "Hiçbiri (dışı)"];
+  if (kume === 2 && duzen === "ayrik") return [a, `${a}∩${b} (boş)`, b, "Hiçbiri (dışı)"];
   return kume === 3
     ? [`Yalnız ${a}`, `Yalnız ${b}`, `Yalnız ${c}`, `${a}∩${b} (C hariç)`, `${a}∩${c} (B hariç)`, `${b}∩${c} (A hariç)`, `${a}∩${b}∩${c}`, "Hiçbiri (dışı)"]
     : [`Yalnız ${a}`, `${a}∩${b}`, `Yalnız ${b}`, "Hiçbiri (dışı)"];
 }
 
+/** Düzende anlamlı (panelde gösterilen) bölge indeksleri. */
+export function vennGorunurBolgeler(kume: number, duzen: VennDuzeni = "kesisen"): number[] {
+  if (kume === 3) return [0, 1, 2, 3, 4, 5, 6, 7];
+  if (duzen === "altKume") return [1, 2, 3];
+  if (duzen === "ayrik") return [0, 2, 3];
+  return [0, 1, 2, 3];
+}
+
+const duzenOf = (v: { kume: number; duzen?: VennDuzeni }): VennDuzeni => (v.kume === 2 ? v.duzen ?? "kesisen" : "kesisen");
+
 type Daire = { x: number; y: number; r: number };
 
 /** Kümelerin daireleri: kutunun içine sığacak biçimde. */
-export function vennDaireleri(kume: number, k: { x: number; y: number; w: number; h: number }): Daire[] {
+export function vennDaireleri(kume: number, k: { x: number; y: number; w: number; h: number }, duzen: VennDuzeni = "kesisen"): Daire[] {
   const cx = k.x + k.w / 2;
+  if (kume === 2 && duzen === "altKume") {
+    // B büyük daire, A onun içinde (sola-aşağı kaydırılmış, B'ye değmez)
+    const R = Math.min(k.h * 0.4, k.w * 0.3);
+    const cy = k.y + k.h * 0.52;
+    return [{ x: cx - R * 0.3, y: cy + R * 0.08, r: R * 0.5 }, { x: cx, y: cy, r: R }];
+  }
+  if (kume === 2 && duzen === "ayrik") {
+    const r = Math.min(k.h * 0.3, k.w * 0.19);
+    const cy = k.y + k.h * 0.54;
+    return [{ x: cx - r * 1.3, y: cy, r }, { x: cx + r * 1.3, y: cy, r }];
+  }
   if (kume === 3) {
     const r = Math.min(k.w * 0.25, k.h * 0.27);
     const d = r * 0.95;
@@ -72,7 +108,16 @@ export function vennBolgesi(kume: number, daireler: Daire[], px: number, py: num
 }
 
 /** Bölge yazısının yeri (daire geometrisinden). */
-function bolgeYeri(kume: number, daireler: Daire[], i: number, k: { x: number; y: number; w: number; h: number }): { x: number; y: number } {
+function bolgeYeri(kume: number, daireler: Daire[], i: number, k: { x: number; y: number; w: number; h: number }, duzen: VennDuzeni = "kesisen"): { x: number; y: number } {
+  const kose = { x: k.x + k.w - 14, y: k.y + k.h - 14 };
+  if (kume === 2 && duzen === "altKume") {
+    const [A, B] = daireler;
+    return [{ x: A.x, y: A.y }, { x: A.x, y: A.y }, { x: B.x + B.r * 0.55, y: B.y - B.r * 0.1 }, kose][i];
+  }
+  if (kume === 2 && duzen === "ayrik") {
+    const [A, B] = daireler;
+    return [{ x: A.x, y: A.y }, { x: (A.x + B.x) / 2, y: A.y }, { x: B.x, y: B.y }, kose][i];
+  }
   if (kume === 2) {
     const [A, B] = daireler;
     const r = A.r;
@@ -94,9 +139,55 @@ function bolgeYeri(kume: number, daireler: Daire[], i: number, k: { x: number; y
 
 // ── Olasılık ağacı ─────────────────────────────────────────────────────────
 
-/** Yaprak sayısı (alt dalı olmayan dal = 1 yaprak). */
+/** Yaprak sayısı (alt dalı olmayan dal = 1 yaprak), tüm aşamalarda. */
 export function agacYaprakSayisi(dallar: AgacDali[]): number {
-  return dallar.reduce((t, d) => t + Math.max(1, d.alt?.length ?? 0), 0);
+  return dallar.reduce((t, d) => t + (d.alt?.length ? agacYaprakSayisi(d.alt) : 1), 0);
+}
+
+/** Ağacın aşama sayısı (kök dalları = 1). */
+export function agacDerinligi(dallar: AgacDali[]): number {
+  return dallar.reduce((m, d) => Math.max(m, 1 + (d.alt?.length ? agacDerinligi(d.alt) : 0)), 0);
+}
+
+/** Düz satır (aşama + ad + olasılık) — panel mini tablosu ve metin yazımı ortak biçimi. */
+export type AgacSatiri = { asama: number; ad: string; olasilik: string };
+
+export function agacSatirlari(dallar: AgacDali[], asama = 1): AgacSatiri[] {
+  return dallar.flatMap((d) => [{ asama, ad: d.ad, olasilik: d.olasilik }, ...(d.alt ? agacSatirlari(d.alt, asama + 1) : [])]);
+}
+
+/**
+ * Düz satırlardan ağaç. Her satır bir önceki satırların en son dalına bağlanır: 2. aşama son
+ * 1. aşama dalına, 3. aşama son 2. aşama dalına. Uzun ad/olasılık KESİLİR (uyari).
+ */
+export function agacKur(satirlar: AgacSatiri[]): { dallar: AgacDali[]; uyari?: string } | { hata: string } {
+  if (!satirlar.length) return { hata: "En az bir dal yazın: K: 1/2" };
+  const dallar: AgacDali[] = [];
+  const son: AgacDali[] = []; // her aşamanın son dalı
+  let uzunAd = false, uzunOlasilik = false;
+  for (const [i, sat] of satirlar.entries()) {
+    if (!Number.isInteger(sat.asama) || sat.asama < 1) return { hata: `${i + 1}. satır: aşama 1, 2 ya da 3 olmalı` };
+    if (sat.asama > EN_COK_AGAC_ASAMA) return { hata: `En çok ${EN_COK_AGAC_ASAMA} aşama (${i + 1}. satır)` };
+    let ad = sat.ad.trim();
+    let olasilik = sat.olasilik.trim();
+    if (ad.length > EN_COK_DAL_ADI) { ad = ad.slice(0, EN_COK_DAL_ADI); uzunAd = true; }
+    if (olasilik.length > EN_COK_OLASILIK) { olasilik = olasilik.slice(0, EN_COK_OLASILIK); uzunOlasilik = true; }
+    const dal: AgacDali = { ad, olasilik };
+    if (sat.asama === 1) dallar.push(dal);
+    else {
+      const ust = son[sat.asama - 2];
+      if (!ust || son.length < sat.asama - 1) return { hata: sat.asama === 2 ? "Alt dal (- ile başlayan) bir ana daldan sonra gelmeli" : `${i + 1}. satır: 3. aşama dalı bir 2. aşama dalından sonra gelmeli` };
+      ust.alt = [...(ust.alt ?? []), dal];
+    }
+    son[sat.asama - 1] = dal;
+    son.length = sat.asama;
+  }
+  if (dallar.length > 6) return { hata: "En çok 6 ana dal" };
+  const altFazla = (ds: AgacDali[]): boolean => ds.some((d) => (d.alt?.length ?? 0) > 6 || (d.alt ? altFazla(d.alt) : false));
+  if (altFazla(dallar)) return { hata: "Bir dalın en çok 6 alt dalı olabilir" };
+  if (agacYaprakSayisi(dallar) > EN_COK_YAPRAK) return { hata: `En çok ${EN_COK_YAPRAK} uç (sonuç) gösterilebilir` };
+  const uyarilar = [uzunAd ? `Dal adı en çok ${EN_COK_DAL_ADI} karakter` : "", uzunOlasilik ? `Olasılık en çok ${EN_COK_OLASILIK} karakter` : ""].filter(Boolean);
+  return { dallar, ...(uyarilar.length ? { uyari: `${uyarilar.join("; ")} (fazlası kesildi)` } : {}) };
 }
 
 // ── Yazımdan okuma ─────────────────────────────────────────────────────────
@@ -150,8 +241,8 @@ export function sayiNoktalariniYaz(n: { x: number; ad?: string; dolu?: boolean }
 }
 
 /**
- * Olasılık ağacı yazımı — her satır bir dal: "K: 1/3"; alt dal "- K: 1/2" (tire ya da girinti).
- * Okunamazsa null (alt dal ana daldan önce gelemez, en çok 2 düzey). Ad en çok 40, olasılık en çok
+ * Olasılık ağacı yazımı — her satır bir dal: "K: 1/3"; 2. aşama "- K: 1/2", 3. aşama "-- K: 1/2"
+ * (tire sayısı ya da 2/4 boşluk girinti). Okunamazsa null. Ad en çok 40, olasılık en çok
  * 20 karakter: uzun metin KESİLİR (şekil geçersiz sayılıp başka bir şekle dönüşmesin); bkz. agacUyarisi.
  */
 export function agacOku(metin: string): AgacDali[] | null {
@@ -163,31 +254,20 @@ export function agacOku(metin: string): AgacDali[] | null {
 export function agacOkuAyrinti(metin: string): { dallar: AgacDali[]; uyari?: string } | { hata: string } {
   const satirlar = metin.split(/\r?\n/).filter((s) => s.trim());
   if (!satirlar.length) return { hata: "En az bir dal yazın: K: 1/2" };
-  const dallar: AgacDali[] = [];
-  let uzunAd = false, uzunOlasilik = false;
+  const duz: AgacSatiri[] = [];
   for (const [i, sat] of satirlar.entries()) {
     const m = /^(\s*-*\s*)([^:]+?)\s*:\s*(.*?)\s*$/.exec(sat);
     if (!m) return { hata: `Dal okunamadı: ${i + 1}. satır ("ad: olasılık" yazın)` };
-    const alt = /-/.test(m[1]) || m[1].length >= 2;
-    let ad = m[2].trim();
-    let olasilik = m[3];
-    if (ad.length > EN_COK_DAL_ADI) { ad = ad.slice(0, EN_COK_DAL_ADI); uzunAd = true; }
-    if (olasilik.length > EN_COK_OLASILIK) { olasilik = olasilik.slice(0, EN_COK_OLASILIK); uzunOlasilik = true; }
-    const dal: AgacDali = { ad, olasilik };
-    if (alt) {
-      const ust = dallar[dallar.length - 1];
-      if (!ust) return { hata: "Alt dal (- ile başlayan) bir ana daldan sonra gelmeli" };
-      ust.alt = [...(ust.alt ?? []), dal];
-    } else dallar.push(dal);
+    const tire = (m[1].match(/-/g) ?? []).length;
+    const bosluk = m[1].replace(/\t/g, "  ").length;
+    const asama = tire > 0 ? 1 + tire : bosluk >= 4 ? 3 : bosluk >= 2 ? 2 : 1;
+    duz.push({ asama, ad: m[2], olasilik: m[3] });
   }
-  if (dallar.length > 6) return { hata: "En çok 6 ana dal" };
-  if (dallar.some((d) => (d.alt?.length ?? 0) > 6)) return { hata: "Bir dalın en çok 6 alt dalı olabilir" };
-  const uyarilar = [uzunAd ? `Dal adı en çok ${EN_COK_DAL_ADI} karakter` : "", uzunOlasilik ? `Olasılık en çok ${EN_COK_OLASILIK} karakter` : ""].filter(Boolean);
-  return { dallar, ...(uyarilar.length ? { uyari: `${uyarilar.join("; ")} (fazlası kesildi)` } : {}) };
+  return agacKur(duz);
 }
 
 export function agacYaz(dallar: AgacDali[]): string {
-  return dallar.flatMap((d) => [`${d.ad}: ${d.olasilik}`, ...(d.alt ?? []).map((a) => `- ${a.ad}: ${a.olasilik}`)]).join("\n");
+  return agacSatirlari(dallar).map((s) => `${s.asama > 1 ? `${"-".repeat(s.asama - 1)} ` : ""}${s.ad}: ${s.olasilik}`).join("\n");
 }
 
 // ── Doğrulama ──────────────────────────────────────────────────────────────
@@ -199,7 +279,7 @@ function dalGecerli(d: unknown, derinlik: number): boolean {
   const x = d as AgacDali;
   if (typeof x.ad !== "string" || typeof x.olasilik !== "string" || x.ad.length > 40 || x.olasilik.length > 20) return false;
   if (x.alt === undefined) return true;
-  return derinlik < 2 && Array.isArray(x.alt) && x.alt.length <= 6 && x.alt.every((a) => dalGecerli(a, derinlik + 1));
+  return derinlik < EN_COK_AGAC_ASAMA && Array.isArray(x.alt) && x.alt.length <= 6 && x.alt.every((a) => dalGecerli(a, derinlik + 1));
 }
 
 export function semaVerisiGecerliMi(v: unknown): v is SemaVerisi {
@@ -209,9 +289,14 @@ export function semaVerisiGecerliMi(v: unknown): v is SemaVerisi {
   if (g.tur === "venn") {
     return (g.kume === 2 || g.kume === 3) && Array.isArray(g.adlar) && g.adlar.length <= 3 && g.adlar.every((a) => typeof a === "string") &&
       Array.isArray(g.bolgeler) && g.bolgeler.length <= 8 && g.bolgeler.every((a) => typeof a === "string") && typeof g.evrensel === "boolean" &&
-      (g.boyali === undefined || (Array.isArray(g.boyali) && g.boyali.every((i) => Number.isInteger(i))));
+      (g.boyali === undefined || (Array.isArray(g.boyali) && g.boyali.every((i) => Number.isInteger(i)))) &&
+      (g.duzen === undefined || g.duzen === "kesisen" || g.duzen === "altKume" || g.duzen === "ayrik");
   }
-  if (g.tur === "agac") return Array.isArray(g.dallar) && g.dallar.length >= 1 && g.dallar.length <= 6 && g.dallar.every((d) => dalGecerli(d, 1));
+  if (g.tur === "agac") {
+    return Array.isArray(g.dallar) && g.dallar.length >= 1 && g.dallar.length <= 6 && g.dallar.every((d) => dalGecerli(d, 1)) &&
+      agacYaprakSayisi(g.dallar as AgacDali[]) <= EN_COK_YAPRAK;
+  }
+  if (g.tur === "birimCember" || g.tur === "isaretTablosu" || g.tur === "fonksiyonSema") return semaEkGecerliMi(g);
   if (g.tur === "sayiDogrusu") {
     return sayi(g.min) && sayi(g.max) && sayi(g.adim) && (g.max as number) > (g.min as number) && (g.adim as number) > 0 &&
       Array.isArray(g.araliklar) && g.araliklar.length <= 6 &&
@@ -223,14 +308,26 @@ export function semaVerisiGecerliMi(v: unknown): v is SemaVerisi {
 
 // ── Varsayılanlar / şablonlar ──────────────────────────────────────────────
 
-export type SemaSablonu = { id: string; ad: string; ipucu: string; olustur: () => SemaVerisi };
+export type SemaSablonu = {
+  id: string; ad: string; ipucu: string; olustur: () => SemaVerisi;
+  /** Sol kütüphane araması için Türkçe anahtar kelimeler. */
+  aramaKelimeleri?: string[];
+};
+
+const isaretSablonu = (ifade: string, esitsizlik: "<" | "<=" | ">" | ">=", ayrintili = false): SemaVerisi => {
+  const v = isaretTablosuVerisi(ifade, esitsizlik, ayrintili);
+  return "hata" in v ? { tur: "isaretTablosu", kokler: [], satirlar: [{ ad: "f(x)", isaretler: ["+"] }] } : v;
+};
 
 export const SEMA_SABLONLARI: SemaSablonu[] = [
-  { id: "venn2", ad: "Venn (2 küme)", ipucu: "İki küme; bölge değerleri yazılır, bölgeler boyanabilir", olustur: () => ({ tur: "venn", kume: 2, adlar: ["A", "B"], bolgeler: ["5", "3", "4", "2"], evrensel: true, evrenselAd: "E" }) },
-  { id: "venn3", ad: "Venn (3 küme)", ipucu: "Üç küme", olustur: () => ({ tur: "venn", kume: 3, adlar: ["A", "B", "C"], bolgeler: ["4", "5", "3", "2", "1", "2", "1", "3"], evrensel: true, evrenselAd: "E" }) },
-  { id: "venn-boyali", ad: "Venn (A\\B boyalı)", ipucu: "Fark kümesi boyalı örnek", olustur: () => ({ tur: "venn", kume: 2, adlar: ["A", "B"], bolgeler: ["", "", "", ""], evrensel: true, evrenselAd: "E", boyali: [0] }) },
+  { id: "venn2", ad: "Venn (2 küme)", ipucu: "İki küme; bölge değerleri yazılır, bölgeler boyanabilir", aramaKelimeleri: ["venn", "küme", "kesişim", "birleşim", "şema"], olustur: () => ({ tur: "venn", kume: 2, adlar: ["A", "B"], bolgeler: ["5", "3", "4", "2"], evrensel: true, evrenselAd: "E" }) },
+  { id: "venn3", ad: "Venn (3 küme)", ipucu: "Üç küme", aramaKelimeleri: ["venn", "küme", "üç küme", "kesişim"], olustur: () => ({ tur: "venn", kume: 3, adlar: ["A", "B", "C"], bolgeler: ["4", "5", "3", "2", "1", "2", "1", "3"], evrensel: true, evrenselAd: "E" }) },
+  { id: "venn-boyali", ad: "Venn (A\\B boyalı)", ipucu: "Fark kümesi boyalı örnek", aramaKelimeleri: ["venn", "fark kümesi", "boyalı", "tarama", "küme"], olustur: () => ({ tur: "venn", kume: 2, adlar: ["A", "B"], bolgeler: ["", "", "", ""], evrensel: true, evrenselAd: "E", boyali: [0] }) },
+  { id: "venn-alt", ad: "Alt küme (A ⊂ B)", ipucu: "İç içe iki küme: A, B'nin alt kümesi", aramaKelimeleri: ["alt küme", "venn", "iç içe", "kapsama", "küme"], olustur: () => ({ tur: "venn", kume: 2, duzen: "altKume", adlar: ["A", "B"], bolgeler: ["", "3", "5", ""], evrensel: true, evrenselAd: "E" }) },
+  { id: "venn-ayrik", ad: "Ayrık kümeler", ipucu: "A ∩ B = ∅: kesişmeyen iki küme", aramaKelimeleri: ["ayrık", "venn", "boş küme", "kesişmeyen", "küme"], olustur: () => ({ tur: "venn", kume: 2, duzen: "ayrik", adlar: ["A", "B"], bolgeler: ["4", "", "6", ""], evrensel: true, evrenselAd: "E" }) },
   {
     id: "agac", ad: "Olasılık ağacı", ipucu: "İki aşamalı ağaç; dal olasılıkları yazılır",
+    aramaKelimeleri: ["olasılık", "ağaç", "dal", "torba", "olasılık ağacı"],
     olustur: () => ({
       tur: "agac",
       dallar: [
@@ -240,22 +337,50 @@ export const SEMA_SABLONLARI: SemaSablonu[] = [
     }),
   },
   {
+    id: "agac3", ad: "3 aşamalı ağaç (zar-para-zar)", ipucu: "Zar (çift/tek) → para (Y/T) → zar (6 / 6 değil)",
+    aramaKelimeleri: ["olasılık", "ağaç", "üç aşama", "zar", "para", "yazı tura"],
+    olustur: () => {
+      const zar2 = () => [{ ad: "6", olasilik: "1/6" }, { ad: "6'", olasilik: "5/6" }];
+      const para = () => [{ ad: "Y", olasilik: "1/2", alt: zar2() }, { ad: "T", olasilik: "1/2", alt: zar2() }];
+      return { tur: "agac", dallar: [{ ad: "Çift", olasilik: "1/2", alt: para() }, { ad: "Tek", olasilik: "1/2", alt: para() }] };
+    },
+  },
+  {
     id: "sayi", ad: "Sayı doğrusu", ipucu: "Aralık: açık/kapalı uçlar; nokta işaretleme",
+    aramaKelimeleri: ["sayı doğrusu", "aralık", "eşitsizlik", "gerçek sayılar"],
     olustur: () => ({
       tur: "sayiDogrusu", min: -5, max: 6, adim: 1,
       araliklar: [{ bas: -2, son: 3, basDahil: false, sonDahil: true }],
       noktalar: [],
     }),
   },
+  { id: "birim30", ad: "Birim çember 30°", ipucu: "P(cos α, sin α), eksenlere izdüşüm; α = 30°", aramaKelimeleri: ["birim çember", "trigonometri", "sinüs", "kosinüs", "açı", "çember"], olustur: () => varsayilanBirimCember(30) },
+  { id: "birim-tan", ad: "Birim çember (tan, cot)", ipucu: "α = 135°: tan (x = 1) ve cot (y = 1) doğruları, bölge işaretleri", aramaKelimeleri: ["birim çember", "tanjant", "kotanjant", "tan", "cot", "trigonometri", "bölge"], olustur: () => ({ ...varsayilanBirimCember(135), tan: true, cot: true, bolgeler: true }) },
+  { id: "isaret-x2", ad: "x²−x−6 < 0 işaret tablosu", ipucu: "Kökler −2 ve 3; çözüm kümesi taralı", aramaKelimeleri: ["işaret tablosu", "eşitsizlik", "ikinci derece", "kök", "çözüm kümesi"], olustur: () => isaretSablonu("x^2-x-6", "<") },
+  { id: "isaret-rasyonel", ad: "(x+2)(x−1)²/(x−4) ≥ 0", ipucu: "Çift katlı kök (1) ve tanımsız nokta (4); çarpan satırlarıyla", aramaKelimeleri: ["işaret tablosu", "rasyonel", "çift katlı", "tanımsız", "eşitsizlik"], olustur: () => isaretSablonu("(x+2)(x-1)^2/(x-4)", ">=", true) },
+  { id: "fonksiyon-ok", ad: "f: A→B fonksiyon", ipucu: "Ok (Venn) diyagramıyla fonksiyon; bire bir / örten bilgisi panelde", aramaKelimeleri: ["fonksiyon", "ok diyagramı", "eşleme", "tanım kümesi", "değer kümesi", "bağıntı"], olustur: () => varsayilanFonksiyonSema() },
+  { id: "fonksiyon-degil", ad: "Fonksiyon olmayan eşleme", ipucu: "Bir elemanın iki görüntüsü var", aramaKelimeleri: ["fonksiyon değil", "bağıntı", "ok diyagramı", "eşleme"], olustur: () => ({ tur: "fonksiyonSema", adlar: ["A", "B"], fonkAd: "", a: ["1", "2", "3"], b: ["a", "b", "c"], oklar: [[0, 0], [0, 1], [1, 2], [2, 2]] }) },
 ];
 
 export const varsayilanSema = (): SemaVerisi => SEMA_SABLONLARI[0].olustur();
 
 // ── Çizim ──────────────────────────────────────────────────────────────────
 
-/** Şeklin kutu dışına taşan yazı payı. */
-export function semaPayi() {
+/**
+ * Şeklin kutu dışına taşan yazı payı (PNG kırpma sınırı). Tüm şema türleri yazılarını kutu
+ * + 16 px içinde tutar (başlık üstte 18 px yukarıda); `veri` ileride türe özel pay için.
+ */
+export function semaPayi(_veri?: SemaVerisi) {
   return { sol: 20, ust: 34, sag: 20, alt: 30 };
+}
+
+/** Şablon eklenirken önerilen kutu ölçüsü (U: fizikNesnesiEkle'de FIZIK_TANIMLARI.sema yerine). */
+export function semaBoyutu(v: SemaVerisi): { w: number; h: number } {
+  if (v.tur === "birimCember") return { w: 380, h: 300 };
+  if (v.tur === "isaretTablosu") return { w: Math.max(340, 120 + 70 * (v.kokler.length + 1)), h: 44 * (1 + v.satirlar.length + (v.cozumSatiri ? 1 : 0)) };
+  if (v.tur === "fonksiyonSema") return { w: 320, h: Math.max(200, 60 + 30 * Math.max(v.a.length, v.b.length)) };
+  if (v.tur === "agac") return agacDerinligi(v.dallar) >= 3 ? { w: 440, h: Math.max(220, 36 * agacYaprakSayisi(v.dallar)) } : { w: 300, h: Math.max(200, 26 * agacYaprakSayisi(v.dallar)) };
+  return { w: 300, h: 200 };
 }
 
 export function semaCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
@@ -269,6 +394,9 @@ export function semaCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
   ctx.setLineDash([]);
   if (v.tur === "venn") vennCiz(ctx, v, k);
   else if (v.tur === "agac") agacCiz(ctx, v, k);
+  else if (v.tur === "birimCember") birimCemberCiz(ctx, v, k);
+  else if (v.tur === "isaretTablosu") isaretTablosuCiz(ctx, v, k);
+  else if (v.tur === "fonksiyonSema") fonksiyonSemaCiz(ctx, v, k);
   else sayiDogrusuCiz(ctx, v, k);
   if (v.baslik?.trim()) fizikMetniCiz(ctx, v.baslik.trim(), k.x + k.w / 2, k.y - 18, 17, "orta", undefined, k.w + 40);
   ctx.restore();
@@ -277,7 +405,8 @@ export function semaCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
 type Kutu = { x: number; y: number; w: number; h: number };
 
 function vennCiz(ctx: CanvasRenderingContext2D, v: Extract<SemaVerisi, { tur: "venn" }>, k: Kutu) {
-  const daireler = vennDaireleri(v.kume, k);
+  const duzen = duzenOf(v);
+  const daireler = vennDaireleri(v.kume, k, duzen);
   const boyali = new Set(v.boyali ?? []);
   // Boyalı bölgeler: ızgaradan örnekle, tek yolda doldur (dikiş yok)
   if (boyali.size) {
@@ -311,55 +440,60 @@ function vennCiz(ctx: CanvasRenderingContext2D, v: Extract<SemaVerisi, { tur: "v
     const ad = (adlar[i] ?? "").trim();
     if (!ad) return;
     const ust = v.kume === 3 && i === 2 ? false : true;
-    const dx = i === 0 ? -d.r * 0.75 : i === 1 ? d.r * 0.75 : 0;
+    // Alt kümede A'nın adı kendi dairesinin hemen üstüne (B'nin içinde) yazılır.
+    const dx = (duzen === "altKume" && i === 0) || duzen === "ayrik" ? 0 : i === 0 ? -d.r * 0.75 : i === 1 ? d.r * 0.75 : 0;
     fizikMetniCiz(ctx, ad, d.x + dx, ust ? d.y - d.r - 12 : d.y + d.r + 14, 17, "orta", undefined, Math.max(40, d.r * 1.6));
   });
   // Bölge değerleri
+  const gorunur = new Set(vennGorunurBolgeler(v.kume, duzen));
   v.bolgeler.forEach((metin, i) => {
-    if (!metin?.trim()) return;
+    if (!metin?.trim() || !gorunur.has(i)) return;
     if (i === (v.kume === 2 ? 3 : 7) && !v.evrensel) return;
-    const p = bolgeYeri(v.kume, daireler, i, k);
+    const p = bolgeYeri(v.kume, daireler, i, k, duzen);
     fizikMetniCiz(ctx, metin.trim(), p.x, p.y, 16, "orta", undefined, Math.max(30, daireler[0].r * 0.9));
   });
 }
 
 function agacCiz(ctx: CanvasRenderingContext2D, v: Extract<SemaVerisi, { tur: "agac" }>, k: Kutu) {
-  const iki = v.dallar.some((d) => d.alt?.length);
+  const derinlik = Math.max(1, agacDerinligi(v.dallar));
   const yaprak = agacYaprakSayisi(v.dallar);
   const satirH = k.h / Math.max(1, yaprak);
-  const x0 = k.x + 8;
-  const x1 = k.x + k.w * (iki ? 0.42 : 0.72);
-  const x2 = k.x + k.w * 0.82;
+  // Aşama sütunları: 1–2 aşamada eski yerleşim aynen korunur.
+  const oranlar = derinlik === 1 ? [0.72] : derinlik === 2 ? [0.42, 0.82] : [0.26, 0.5, 0.74];
+  const xs = [k.x + 8, ...oranlar.map((o) => k.x + k.w * o)];
   const y0 = k.y + k.h / 2;
   ctx.lineWidth = 1.8;
   ctx.fillStyle = MUREKKEP;
-  ctx.beginPath(); ctx.arc(x0, y0, 3.4, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = MUREKKEP;
+  ctx.beginPath(); ctx.arc(xs[0], y0, 3.4, 0, Math.PI * 2); ctx.fill();
   let sira = 0;
-  for (const d of v.dallar) {
-    const n = Math.max(1, d.alt?.length ?? 0);
+  const dalCiz = (d: AgacDali, asama: number, px: number, py: number, yol: string[]) => {
+    const n = d.alt?.length ? agacYaprakSayisi(d.alt) : 1;
+    const x1 = xs[asama];
     const y1 = k.y + satirH * (sira + n / 2);
-    ctx.strokeStyle = MUREKKEP;
-    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
-    // Olasılık: çizginin ortasında, çizginin üst/alt tarafına
-    const yukari = y1 < y0 - 1;
-    fizikMetniCiz(ctx, d.olasilik, (x0 + x1) / 2 + (yukari ? -6 : 6), (y0 + y1) / 2 + (yukari ? -11 : 11), 15, "orta", undefined, Math.max(30, x1 - x0));
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(x1, y1); ctx.stroke();
+    if (asama === 1) {
+      // Olasılık: çizginin ortasında, çizginin üst/alt tarafına
+      const yukari = y1 < py - 1;
+      fizikMetniCiz(ctx, d.olasilik, (px + x1) / 2 + (yukari ? -6 : 6), (py + y1) / 2 + (yukari ? -11 : 11), 15, "orta", undefined, Math.max(30, x1 - px));
+    } else {
+      const yu = y1 < py - 1;
+      const dikey = Math.abs(y1 - py) < 1;
+      fizikMetniCiz(ctx, d.olasilik, (px + x1) / 2, (py + y1) / 2 + (dikey ? -12 : yu ? -11 : 11), 15, "orta", undefined, Math.max(30, x1 - px));
+    }
     ctx.beginPath(); ctx.arc(x1, y1, 3, 0, Math.PI * 2); ctx.fill();
     if (d.alt?.length) {
-      fizikMetniCiz(ctx, d.ad, x1 - 2, y1 - 14, 16, "sag", undefined, Math.max(30, x1 - x0));
-      d.alt.forEach((a, j) => {
-        const y2 = k.y + satirH * (sira + j + 0.5);
-        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-        const yu = y2 < y1 - 1;
-        const dikey = Math.abs(y2 - y1) < 1;
-        fizikMetniCiz(ctx, a.olasilik, (x1 + x2) / 2, (y1 + y2) / 2 + (dikey ? -12 : yu ? -11 : 11), 15, "orta", undefined, Math.max(30, x2 - x1));
-        ctx.beginPath(); ctx.arc(x2, y2, 3, 0, Math.PI * 2); ctx.fill();
-        fizikMetniCiz(ctx, `${d.ad}${a.ad}`.replace(/\s+/g, ""), x2 + 10, y2, 16, "sol", undefined, Math.max(40, k.x + k.w - x2 + 20));
-      });
+      fizikMetniCiz(ctx, d.ad, x1 - 2, y1 - 14, 16, "sag", undefined, Math.max(30, x1 - px));
+      for (const a of d.alt) dalCiz(a, asama + 1, x1, y1, [...yol, d.ad]);
     } else {
-      fizikMetniCiz(ctx, d.ad, x1 + 10, y1, 16, "sol", undefined, Math.max(40, k.x + k.w - x1 + 20));
+      // Uç: 1. aşamada yalnız kendi adı, daha derinde yolun tamamı (KM, ÇY6…)
+      // 3 aşamada sonuç sıralı üçlü olarak yazılır: (Ç, Y, 6)
+      const uc = asama === 1 ? d.ad : derinlik >= 3 ? `(${[...yol, d.ad].join(", ")})` : [...yol, d.ad].join("").replace(/\s+/g, "");
+      fizikMetniCiz(ctx, uc, x1 + 10, y1, 16, "sol", undefined, Math.max(40, k.x + k.w + 8 - x1));
+      sira += 1;
     }
-    sira += n;
-  }
+  };
+  for (const d of v.dallar) dalCiz(d, 1, xs[0], y0, []);
 }
 
 /** Verilen alt sınırdan küçük olmayan en küçük 1-2-5 adımı. */

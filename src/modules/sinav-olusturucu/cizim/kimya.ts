@@ -6,7 +6,7 @@
 
 import { MUREKKEP } from "./sabitler";
 import { fizikMetniCiz } from "./fizik";
-import type { GrafikEgrisi, GrafikVerisi, KimyaVerisi, Sekil } from "./tipler";
+import type { GrafikEgrisi, GrafikVerisi, KimyaVerisi, OrganikYanGrup, Sekil } from "./tipler";
 
 type FizikSekli = Extract<Sekil, { tur: "fizik" }>;
 type Kutu = { x: number; y: number; w: number; h: number };
@@ -603,6 +603,322 @@ export function zincirMolekulu(n: number, tur: "alkan" | "alken" | "alkin", konu
   return { id: "zincir", ad: zincirAdi(sayi, tur, bagNo + 1), formul: `C_${sayi}H_{${h}}`, atomlar, baglar, geo: `${zincirAdi(sayi, tur, bagNo + 1)} (C_${sayi}H_{${h}})`, grup: "organik" };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// v1.2 — Sikloalkanlar ve yan gruplu (dallanmış / sübstitüe) organik yapılar
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ADLANDIRMA (IUPAC, Türkçe yazım — MEB: "2-metilbütan", "2-kloropropan", "2-bütanol"):
+// Öğretmenin ÇİZDİĞİ ana zincir, IUPAC'ın seçtiği ana zincir olmayabilir (sınav
+// sorusunun ta kendisi: "bu yapının adı nedir?"). Bu yüzden ad, çizimden kurulan
+// karbon iskeleti GRAFI üzerinden baştan hesaplanır:
+//  1. Ana zincir: (a) en çok temel grubu (−OH, yoksa −NH₂) taşıyan, (b) en uzun,
+//     (c) en çok sübstitüent taşıyan zincir; eşitlikte (d) numaralandırma ölçütleri.
+//  2. Numaralandırma: temel gruba en küçük numara, sonra tüm ön eklere birlikte en
+//     küçük numara takımı (ilk farkta), sonra alfabetik sırada ilk yazılana küçük numara.
+//  3. Ön ekler alfabetik (çoğaltma ekleri di/tri sayılmaz): bromo, etil, kloro, metil…
+// Halka: halka her zaman ana yapıdır (yan gruplar en çok 2 karbon); halkada tek
+// sübstitüentin (ya da temel grubun) numarası yazılmaz: "metilsiklohekzan", "siklohekzanol".
+// Kapalı formül Hill düzeninde: C, H, sonra Br, Cl, N, O.
+
+export const ORGANIK_YAN_GRUPLAR: { g: OrganikYanGrup; ad: string; yazi: string }[] = [
+  { g: "CH3", ad: "metil", yazi: "−CH₃" },
+  { g: "C2H5", ad: "etil", yazi: "−C₂H₅" },
+  { g: "Cl", ad: "kloro", yazi: "−Cl" },
+  { g: "Br", ad: "bromo", yazi: "−Br" },
+  { g: "OH", ad: "hidroksi (−ol)", yazi: "−OH" },
+  { g: "NH2", ad: "amino (−amin)", yazi: "−NH₂" },
+];
+
+const ORG_KOK = ["met", "et", "prop", "büt", "pent", "hekz", "hept", "okt", "non", "dek", "undek", "dodek", "tridek", "tetradek", "pentadek", "hekzadek"];
+const CARPAN = ["", "", "di", "tri", "tetra", "penta", "hekza", "hepta", "okta"];
+const CARPAN_KARMASIK = ["", "", "bis", "tris", "tetrakis", "pentakis", "hekzakis"];
+
+type Hetero = "Cl" | "Br" | "OH" | "NH2";
+type OrgGraf = { n: number; komsu: number[][]; hetero: Hetero[][]; anaZincir: number[]; halka: boolean };
+
+/** Çizimdeki zincirden karbon iskeleti grafı. Değerlik aşılırsa hata. */
+export function organikGraf(z: { n: number; halka?: boolean; yanGruplar?: { k: number; g: OrganikYanGrup }[] }): { graf: OrgGraf } | { hata: string } {
+  const halka = !!z.halka;
+  const n = Math.round(z.n);
+  if (halka ? n < 3 || n > 8 : n < 1 || n > 12) return { hata: halka ? "Halka 3–8 karbonlu olmalı" : "Zincir 1–12 karbonlu olmalı" };
+  const komsu: number[][] = Array.from({ length: n }, () => []);
+  const hetero: Hetero[][] = Array.from({ length: n }, () => []);
+  const bagla = (a: number, b: number) => { komsu[a].push(b); komsu[b].push(a); };
+  for (let i = 0; i + 1 < n; i += 1) bagla(i, i + 1);
+  if (halka) bagla(n - 1, 0);
+  let toplam = n;
+  for (const y of z.yanGruplar ?? []) {
+    const c = Math.round(y.k) - 1;
+    if (c < 0 || c >= n) return { hata: `${y.k}. karbon zincirde yok` };
+    if (y.g === "CH3" || y.g === "C2H5") {
+      const yeni = toplam;
+      komsu.push([]); hetero.push([]); toplam += 1; bagla(c, yeni);
+      if (y.g === "C2H5") { komsu.push([]); hetero.push([]); toplam += 1; bagla(yeni, yeni + 1); }
+    } else hetero[c].push(y.g);
+  }
+  for (let i = 0; i < toplam; i += 1) {
+    if (komsu[i].length + hetero[i].length > 4) return { hata: `${i < n ? `${i + 1}. karbon` : "Bir karbon"} 4'ten fazla bağ yapamaz` };
+  }
+  return { graf: { n: toplam, komsu, hetero, anaZincir: Array.from({ length: n }, (_, i) => i), halka } };
+}
+
+/** Kapalı formül: { yazim: "C_{5}H_{12}", duz: "C5H12" } (Hill düzeni). */
+export function organikFormul(g: OrgGraf): { yazim: string; duz: string } {
+  let h = 0;
+  const say: Record<string, number> = { Br: 0, Cl: 0, N: 0, O: 0 };
+  for (let i = 0; i < g.n; i += 1) {
+    h += 4 - g.komsu[i].length - g.hetero[i].length;
+    for (const x of g.hetero[i]) {
+      if (x === "OH") { say.O += 1; h += 1; } else if (x === "NH2") { say.N += 1; h += 2; } else say[x] += 1;
+    }
+  }
+  const parca: [string, number][] = [["C", g.n], ["H", h], ["Br", say.Br], ["Cl", say.Cl], ["N", say.N], ["O", say.O]];
+  const kalan = parca.filter(([, k]) => k > 0);
+  return {
+    yazim: kalan.map(([s, k]) => (k === 1 ? s : `${s}_{${k}}`)).join(""),
+    duz: kalan.map(([s, k]) => (k === 1 ? s : `${s}${k}`)).join(""),
+  };
+}
+
+const alfabetikAnahtar = (ad: string) => ad.replace(/[()\d,\-]/g, "").replace(/^(di|tri|tetra|bis|tris)(?=[a-zçğıöşü])/, "");
+const trKarsilastir = (a: string, b: string) => alfabetikAnahtar(a).localeCompare(alfabetikAnahtar(b), "tr");
+
+/** Liste karşılaştırması (ilk farkta küçük olan önce). */
+function listeKiyas(a: number[], b: number[]) {
+  for (let i = 0; i < Math.min(a.length, b.length); i += 1) if (a[i] !== b[i]) return a[i] - b[i];
+  return a.length - b.length;
+}
+
+type Onek = { ad: string; konum: number; karmasik: boolean };
+
+/** Bir dalın (kök `kok`, ana zincire `ebeveyn` üzerinden bağlı) alkil adı: metil, etil, izopropil, (2-kloroetil)… */
+function dalAdi(g: OrgGraf, kok: number, ebeveyn: number, temel: Hetero | null): { ad: string; karmasik: boolean } {
+  // Kökten başlayan en uzun zincir (eşitlikte en çok sübstitüentli).
+  const yollar: number[][] = [];
+  const gez = (dugum: number, onceki: number, yol: number[]) => {
+    const ileri = g.komsu[dugum].filter((k) => k !== onceki);
+    if (!ileri.length) { yollar.push(yol); return; }
+    for (const k of ileri) gez(k, dugum, [...yol, k]);
+  };
+  gez(kok, ebeveyn, [kok]);
+  const subSayisi = (yol: number[]) => yol.reduce((t, c, i) => t + g.hetero[c].length + g.komsu[c].filter((k) => k !== (i === 0 ? ebeveyn : yol[i - 1]) && k !== yol[i + 1]).length, 0);
+  yollar.sort((a, b) => b.length - a.length || subSayisi(b) - subSayisi(a));
+  const zincir = yollar[0];
+  const onekler: Onek[] = [];
+  zincir.forEach((c, i) => {
+    for (const h of g.hetero[c]) onekler.push({ ad: heteroOnek(h, temel, true), konum: i + 1, karmasik: false });
+    for (const k of g.komsu[c]) {
+      if (k === (i === 0 ? ebeveyn : zincir[i - 1]) || k === zincir[i + 1]) continue;
+      const alt = dalAdi(g, k, c, temel);
+      onekler.push({ ad: alt.ad, konum: i + 1, karmasik: alt.karmasik });
+    }
+  });
+  const kok2 = `${ORG_KOK[zincir.length - 1]}il`;
+  if (!onekler.length) return { ad: kok2, karmasik: false };
+  if (zincir.length === 2 && onekler.length === 1 && onekler[0].ad === "metil" && onekler[0].konum === 1) return { ad: "izopropil", karmasik: false };
+  // Tek karbonlu dalda numara yazılmaz: (klorometil), (hidroksimetil).
+  return { ad: `(${onekMetni(onekler, zincir.length === 1)}${kok2})`, karmasik: true };
+}
+
+function heteroOnek(h: Hetero, temel: Hetero | null, dalda = false): string {
+  if (h === "Cl") return "kloro";
+  if (h === "Br") return "bromo";
+  if (h === "OH") return "hidroksi";
+  void temel; void dalda;
+  return "amino";
+}
+
+/** Ön ekleri alfabetik sırada yazar: "2-kloro-3,3-dimetil". Sonu tire ile bitmez. */
+function onekMetni(onekler: Onek[], konumsuz = false): string {
+  const gruplar = new Map<string, { konumlar: number[]; karmasik: boolean }>();
+  for (const o of onekler) {
+    const g = gruplar.get(o.ad) ?? { konumlar: [], karmasik: o.karmasik };
+    g.konumlar.push(o.konum);
+    gruplar.set(o.ad, g);
+  }
+  const adlar = [...gruplar.keys()].sort(trKarsilastir);
+  return adlar.map((ad) => {
+    const g = gruplar.get(ad)!;
+    const sayi = g.konumlar.length;
+    const carpan = (g.karmasik ? CARPAN_KARMASIK : CARPAN)[sayi] ?? "";
+    const konum = konumsuz ? "" : `${[...g.konumlar].sort((a, b) => a - b).join(",")}-`;
+    return `${konum}${carpan}${ad}`;
+  }).join("-");
+}
+
+type Adlandirma = { ad: string; temelKonum: number[]; onekKonum: number[]; alfaKonum: number[] };
+
+/** Verilen sıralı ana zincir (ya da halka sırası) için ad ve karşılaştırma anahtarları. */
+function zinciriAdlandir(g: OrgGraf, zincir: number[], temel: Hetero | null, halka: boolean): Adlandirma {
+  const icinde = new Set(zincir);
+  const onekler: Onek[] = [];
+  const temelKonum: number[] = [];
+  zincir.forEach((c, i) => {
+    for (const h of g.hetero[c]) {
+      if (h === temel) temelKonum.push(i + 1);
+      else onekler.push({ ad: heteroOnek(h, temel), konum: i + 1, karmasik: false });
+    }
+    for (const k of g.komsu[c]) {
+      if (icinde.has(k)) continue;
+      const d = dalAdi(g, k, c, temel);
+      onekler.push({ ad: d.ad, konum: i + 1, karmasik: d.karmasik });
+    }
+  });
+  const onekKonum = onekler.map((o) => o.konum).sort((a, b) => a - b);
+  // Alfabetik ölçüt: alfabetik sıraya dizilmiş ön eklerin konumları.
+  const alfaKonum = [...onekler].sort((a, b) => trKarsilastir(a.ad, b.ad) || a.konum - b.konum).map((o) => o.konum);
+  const n = zincir.length;
+  const kok = `${halka ? "siklo" : ""}${ORG_KOK[n - 1]}an`;
+  const toplamSub = onekler.length + temelKonum.length;
+  // Numarası yazılmayanlar: halkada tek sübstitüent / tek temel grup; 1–2 karbonlu zincirde tek sübstitüent.
+  const onekKonumsuz = (halka && toplamSub === 1) || (!halka && n <= 2 && toplamSub === 1);
+  const temelKonumsuz = (halka && temelKonum.length === 1) || (!halka && n <= 2 && temelKonum.length === 1);
+  let ad: string;
+  const on = onekler.length ? onekMetni(onekler, onekKonumsuz) : "";
+  if (temel && temelKonum.length) {
+    const ek = temel === "OH" ? "ol" : "amin";
+    const carpan = CARPAN[temelKonum.length] ?? "";
+    const temelYazi = `${kok}${carpan}${ek}`;
+    const konum = temelKonumsuz ? "" : `${[...temelKonum].sort((a, b) => a - b).join(",")}-`;
+    // MEB yazımı: "3-metil-2-bütanol" (temel grubun numarası kökün önünde).
+    ad = on ? `${on}${konum ? `-${konum}` : ""}${temelYazi}` : `${konum}${temelYazi}`;
+  } else ad = on ? `${on}${kok}` : kok;
+  return { ad, temelKonum: temelKonum.sort((a, b) => a - b), onekKonum, alfaKonum };
+}
+
+function adlandirmaKiyas(a: Adlandirma, b: Adlandirma) {
+  return listeKiyas(a.temelKonum, b.temelKonum) || listeKiyas(a.onekKonum, b.onekKonum) || listeKiyas(a.alfaKonum, b.alfaKonum);
+}
+
+/** Yapının IUPAC adı. */
+export function organikAdi(g: OrgGraf): string {
+  const temelVar = (h: Hetero) => g.hetero.some((l) => l.includes(h));
+  const temel: Hetero | null = temelVar("OH") ? "OH" : temelVar("NH2") ? "NH2" : null;
+  if (g.halka) {
+    const halka = g.anaZincir;
+    const n = halka.length;
+    let enIyi: Adlandirma | null = null;
+    for (let bas = 0; bas < n; bas += 1) {
+      for (const yon of [1, -1]) {
+        const sira = Array.from({ length: n }, (_, i) => halka[(((bas + yon * i) % n) + n) % n]);
+        const a = zinciriAdlandir(g, sira, temel, true);
+        if (!enIyi || adlandirmaKiyas(a, enIyi) < 0) enIyi = a;
+      }
+    }
+    return enIyi!.ad;
+  }
+  // Ağaç: tüm basit yollar (her yol iki yönde numaralanır).
+  const yollar: number[][] = [];
+  for (let s = 0; s < g.n; s += 1) {
+    const gez = (d: number, onceki: number, yol: number[]) => {
+      yollar.push(yol);
+      for (const k of g.komsu[d]) if (k !== onceki) gez(k, d, [...yol, k]);
+    };
+    gez(s, -1, [s]);
+  }
+  const temelSay = (yol: number[]) => yol.reduce((t, c) => t + g.hetero[c].filter((h) => h === temel).length, 0);
+  const subSay = (yol: number[]) => {
+    const ic = new Set(yol);
+    return yol.reduce((t, c) => t + g.hetero[c].filter((h) => h !== temel).length + g.komsu[c].filter((k) => !ic.has(k)).length, 0);
+  };
+  let enIyi: { a: Adlandirma; anahtar: number[] } | null = null;
+  for (const yol of yollar) {
+    const anahtar = [-temelSay(yol), -yol.length, -subSay(yol)];
+    if (enIyi && listeKiyas(anahtar, enIyi.anahtar) > 0) continue;
+    const a = zinciriAdlandir(g, yol, temel, false);
+    if (!enIyi || listeKiyas(anahtar, enIyi.anahtar) < 0 || adlandirmaKiyas(a, enIyi.a) < 0) enIyi = { a, anahtar };
+  }
+  return enIyi!.a.ad;
+}
+
+type ZincirVerisiTam = NonNullable<Extract<KimyaVerisi, { tur: "molekul" }>["zincir"]>;
+
+/** Sikloalkan ya da yan gruplu zincir için çizim (iskelet formülü), ad ve kapalı formül. */
+export function organikYapiMolekulu(z: ZincirVerisiTam): Molekul | null {
+  const r = organikGraf(z);
+  if ("hata" in r) return null;
+  const g = r.graf;
+  const n = Math.round(z.n);
+  const atomlar: MolAtom[] = [];
+  const baglar: MolBag[] = [];
+  // Ana iskelet konumları ve her karbonun "dışarı" yönü
+  const disYon: { x: number; y: number }[] = [];
+  if (z.halka) {
+    const R = 1 / (2 * Math.sin(Math.PI / n));
+    for (let i = 0; i < n; i += 1) {
+      const a = -Math.PI / 2 + (2 * Math.PI * i) / n;
+      atomlar.push(A("", R * Math.cos(a), R * Math.sin(a)));
+      disYon.push({ x: Math.cos(a), y: Math.sin(a) });
+    }
+    for (let i = 0; i < n; i += 1) baglar.push({ a: i, b: (i + 1) % n, kat: 1 });
+  } else {
+    const k = 0.866;
+    for (let i = 0; i < n; i += 1) atomlar.push(A("", (i - (n - 1) / 2) * k, (i % 2) * 0.5));
+    for (let i = 0; i + 1 < n; i += 1) baglar.push({ a: i, b: i + 1, kat: 1 });
+    for (let i = 0; i < n; i += 1) {
+      if (n === 1) disYon.push({ x: 1, y: 0 });
+      // Uçlarda zikzak sürüyormuş gibi: bir sonraki (hayali) karbonun yönü.
+      else if (i === 0) disYon.push({ x: -0.866, y: 0.5 });
+      else if (i === n - 1) disYon.push({ x: 0.866, y: ((n % 2) - ((n - 1) % 2)) * 0.5 });
+      else disYon.push({ x: 0, y: i % 2 ? 1 : -1 });
+    }
+  }
+  // Yan gruplar (aynı karbondaki 2.–3. grup yelpaze gibi açılır)
+  const sayac = new Array(n).fill(0);
+  const yanlar = z.yanGruplar ?? [];
+  const toplamYan = new Array(n).fill(0);
+  for (const y of yanlar) toplamYan[Math.round(y.k) - 1] += 1;
+  const dondur = (v: { x: number; y: number }, aci: number) => ({ x: v.x * Math.cos(aci) - v.y * Math.sin(aci), y: v.x * Math.sin(aci) + v.y * Math.cos(aci) });
+  for (const y of yanlar) {
+    const c = Math.round(y.k) - 1;
+    const kac = toplamYan[c];
+    const sira = sayac[c]++;
+    const ac = kac === 1 ? 0 : kac === 2 ? (sira === 0 ? -0.55 : 0.55) : (sira - 1) * 0.75;
+    const d = dondur(disYon[c], ac);
+    const p = atomlar[c];
+    const simge = y.g === "CH3" || y.g === "C2H5" ? "" : y.g === "NH2" ? "NH_2" : y.g;
+    const uz = simge ? 1.05 : 1;
+    const i1 = atomlar.length;
+    atomlar.push(A(simge, p.x + d.x * uz, p.y + d.y * uz));
+    baglar.push({ a: c, b: i1, kat: 1 });
+    if (y.g === "C2H5") {
+      const d2 = dondur(d, sira % 2 ? -1.05 : 1.05);
+      atomlar.push(A("", atomlar[i1].x + d2.x, atomlar[i1].y + d2.y));
+      baglar.push({ a: i1, b: i1 + 1, kat: 1 });
+    }
+  }
+  const ad = organikAdi(g);
+  const f = organikFormul(g);
+  return { id: "zincir", ad, formul: f.yazim, atomlar, baglar, geo: `${ad} (${f.yazim})`, grup: "organik" };
+}
+
+/** Test/arayüz için: zincir verisinin adı ve kapalı formülü (düz yazı). */
+export function organikAdVeFormul(z: ZincirVerisiTam): { ad: string; formul: string } | { hata: string } {
+  if (!z.halka && !(z.yanGruplar?.length)) {
+    const m = zincirMolekulu(z.n, z.tur, z.konum);
+    return { ad: m.ad, formul: m.formul.replace(/[_{}]/g, "") };
+  }
+  const r = organikGraf(z);
+  if ("hata" in r) return r;
+  return { ad: organikAdi(r.graf), formul: organikFormul(r.graf).duz };
+}
+
+/** Sikloalkan / yan gruplu zincir verisi. */
+export const organikZincirVerisi = (n: number, ek: { halka?: boolean; yanGruplar?: { k: number; g: OrganikYanGrup }[] } = {}): KimyaVerisi =>
+  molekulVerisi("zincir", { zincir: { n, tur: "alkan", konum: 1, ...ek }, geometri: true });
+
+export const KIMYA_SIKLO_SABLONLARI: (KimyaSablonu & { aramaKelimeleri: string[] })[] = [
+  { id: "siklo-3", ad: "Siklopropan", ipucu: "C₃H₆: üçgen halka", olustur: () => organikZincirVerisi(3, { halka: true }), aramaKelimeleri: ["sikloalkan", "halka", "siklopropan"] },
+  { id: "siklo-4", ad: "Siklobütan", ipucu: "C₄H₈: kare halka", olustur: () => organikZincirVerisi(4, { halka: true }), aramaKelimeleri: ["sikloalkan", "halka", "siklobütan"] },
+  { id: "siklo-5", ad: "Siklopentan", ipucu: "C₅H₁₀: beşgen halka", olustur: () => organikZincirVerisi(5, { halka: true }), aramaKelimeleri: ["sikloalkan", "halka", "siklopentan"] },
+  { id: "siklo-6", ad: "Siklohekzan", ipucu: "C₆H₁₂: altıgen halka (çift bağsız; benzenle karıştırmayın)", olustur: () => organikZincirVerisi(6, { halka: true }), aramaKelimeleri: ["sikloalkan", "halka", "siklohekzan", "sikloheksan"] },
+  { id: "dal-2metilbutan", ad: "2-Metilbütan", ipucu: "C₅H₁₂: bütan zincirinin 2. karbonuna −CH₃ (izopentan)", olustur: () => organikZincirVerisi(4, { yanGruplar: [{ k: 2, g: "CH3" }] }), aramaKelimeleri: ["dallanmış", "izomer", "metil", "yan grup", "izopentan"] },
+  { id: "dal-22dimetilpropan", ad: "2,2-Dimetilpropan", ipucu: "C₅H₁₂: neopentan", olustur: () => organikZincirVerisi(3, { yanGruplar: [{ k: 2, g: "CH3" }, { k: 2, g: "CH3" }] }), aramaKelimeleri: ["dallanmış", "izomer", "neopentan", "metil"] },
+  { id: "dal-2kloropropan", ad: "2-Kloropropan", ipucu: "C₃H₇Cl: propanın 2. karbonuna −Cl", olustur: () => organikZincirVerisi(3, { yanGruplar: [{ k: 2, g: "Cl" }] }), aramaKelimeleri: ["halojen", "alkil halojenür", "kloro", "yan grup"] },
+  { id: "dal-2butanol", ad: "2-Bütanol", ipucu: "C₄H₁₀O: ikincil alkol", olustur: () => organikZincirVerisi(4, { yanGruplar: [{ k: 2, g: "OH" }] }), aramaKelimeleri: ["alkol", "hidroksi", "OH", "bütanol"] },
+  { id: "dal-metilsiklohekzan", ad: "Metilsiklohekzan", ipucu: "C₇H₁₄: halkaya −CH₃", olustur: () => organikZincirVerisi(6, { halka: true, yanGruplar: [{ k: 1, g: "CH3" }] }), aramaKelimeleri: ["sikloalkan", "halka", "metil", "yan grup"] },
+];
+
 const SAYI_RE = "[-+−]?\\d+(?:[.,]\\d+)?";
 const sayiOku2 = (t: string) => Number(t.replace(",", ".").replace("−", "-"));
 
@@ -683,7 +999,13 @@ export function molekulCoz(v: MolekulVerisi): Molekul {
     const r = ozelMolekulOku(v.ozel.ad, v.ozel.atomlar, v.ozel.baglar);
     if ("molekul" in r) return r.molekul;
   }
-  if (v.id === "zincir" && v.zincir) return zincirMolekulu(v.zincir.n, v.zincir.tur, v.zincir.konum);
+  if (v.id === "zincir" && v.zincir) {
+    if (v.zincir.halka || v.zincir.yanGruplar?.length) {
+      const m = organikYapiMolekulu(v.zincir);
+      if (m) return m;
+    }
+    return zincirMolekulu(v.zincir.n, v.zincir.tur, v.zincir.konum);
+  }
   return molekulBul(v.id) ?? MOLEKULLER[0];
 }
 
@@ -1124,7 +1446,15 @@ export function kimyaVerisiGecerliMi(v: unknown): v is KimyaVerisi {
     }
     if (g.id === "zincir") {
       const z = g.zincir as Record<string, unknown> | undefined;
-      return !!z && tamSayi(z.n, 2, 12) && ["alkan", "alken", "alkin"].includes(String(z.tur)) && tamSayi(z.konum, 1, 11);
+      if (!z || !tamSayi(z.n, 2, 12) || !["alkan", "alken", "alkin"].includes(String(z.tur)) || !tamSayi(z.konum, 1, 11)) return false;
+      // v1.2: halka (sikloalkan, 3–8) ve yan gruplar yalnız alkanda; değerlik aşılmamalı.
+      if (z.halka !== undefined && typeof z.halka !== "boolean") return false;
+      if (z.yanGruplar !== undefined) {
+        if (!Array.isArray(z.yanGruplar) || z.yanGruplar.length > 8) return false;
+        if (!z.yanGruplar.every((y) => !!y && typeof y === "object" && tamSayi((y as Record<string, unknown>).k, 1, 12) && ORGANIK_YAN_GRUPLAR.some((t) => t.g === (y as Record<string, unknown>).g))) return false;
+      }
+      if ((z.halka || (z.yanGruplar as unknown[] | undefined)?.length) && (z.tur !== "alkan" || "hata" in organikGraf(z as { n: number; halka?: boolean; yanGruplar?: { k: number; g: OrganikYanGrup }[] }))) return false;
+      return true;
     }
     return !!molekulBul(g.id);
   }

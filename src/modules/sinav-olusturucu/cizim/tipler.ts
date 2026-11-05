@@ -77,10 +77,86 @@ export type FizikNesnesi =
   // v1.2 geometri (bkz. `geometriEk.ts`): doğruda açılar, özel dörtgenler, 3B katı cisimler, kağıt katlama.
   | "dogrudaAcilar" | "dortgenGeo" | "katiCisim" | "kagitKatlama"
   // Fizik ek şekilleri (bkz. `fizikEk.ts`): ışın ok, halka akım, solenoid, düz tel alanı, ⊗/⊙ alanı, girişim, enerji düzeyi, devre düğümü.
-  | "isinOk" | "halkaAkim" | "solenoid" | "telAlan" | "alanNokta" | "dalgaGirisim" | "enerjiDuzeyi" | "dugum";
+  | "isinOk" | "halkaAkim" | "solenoid" | "telAlan" | "alanNokta" | "dalgaGirisim" | "enerjiDuzeyi" | "dugum"
+  // v1.2 hesaplı hazır sahneler (bkz. `fizikSahneler.ts`, `optik.ts`, `sivi.ts`): eğik düzlemde kuvvetler, asal eksenli optik düzenek, sıvı kapları.
+  | "egikKuvvet" | "optikDuzenek" | "siviKabi";
 
 /** Fizik ek şekillerinin (ışın ok, halka akım, ⊗ alanı…) küçük ayarları; anlamı şekle göre `fizikEk.ts`'te. */
 export type FizikEk = { ters?: boolean; sayi?: number; sayi2?: number; metin?: string; metin2?: string };
+
+/**
+ * Eğik düzlemde kütle + kuvvet bileşenleri (bkz. `fizikSahneler.ts`). Oklar kuvvetin
+ * BÜYÜKLÜĞÜYLE orantılı (g = 10 m/s², `olcek` px/N): kütle artınca mg, N, bileşenler uzar.
+ */
+export type EgikKuvvetVerisi = {
+  /** Eğim açısı (derece, 5–70). */
+  aci: number;
+  /** Kütle (kg, 0,1–100). */
+  kutle: number;
+  /** Sürtünme katsayısı (0–1,5); 0 → sürtünmesiz. */
+  mu: number;
+  /** Ok ölçeği: piksel / newton (0,2–20). */
+  olcek: number;
+  goster: { mg: boolean; bilesen: boolean; normal: boolean; surtunme: boolean };
+  /** Okların yanına sayısal değer (mg = 50 N). */
+  degerler: boolean;
+  /** Kütlenin eğik yüzeydeki yeri (0 = alt uç, 1 = üst uç). */
+  konum: number;
+  aciEtiketi: string;
+  kutleEtiketi: string;
+};
+
+/** Asal eksenli optik düzenek (bkz. `optik.ts`). Uzunluklar birim (cm) cinsinden; 1/f = 1/do + 1/di. */
+export type OptikVerisi = {
+  tur: "cukurAyna" | "tumsekAyna" | "inceMercek" | "kalinMercek";
+  /** Odak uzaklığının BÜYÜKLÜĞÜ (işaret türden gelir: tümsek ayna / kalın kenarlı mercekte f < 0). */
+  f: number;
+  /** Cisim uzaklığı do (> 0). */
+  uzaklik: number;
+  /** Cisim boyu. */
+  boy: number;
+  isinlar: { paralel: boolean; odak: boolean; merkez: boolean; egrilik?: boolean };
+  goruntu: boolean;
+  isaretler: boolean;
+  /** di, büyütme ve görüntü niteliği yazısı. */
+  bilgi: boolean;
+};
+
+/** Sıvı kapları (bkz. `sivi.ts`). */
+export type SiviVerisi =
+  | {
+      tur: "bolmeli";
+      satir: number;
+      sutun: number;
+      /** Dolu bölmeler (satır·sütun + sütun, üstten 0). */
+      dolu: number[];
+      /** Taralı engel bölmeleri. */
+      engel: number[];
+      musluk?: { taraf: "sol" | "sag" | "alt"; konum: number };
+      /** Noktalar (K, L, M…) — bölme indeksi + ad. */
+      noktalar?: { hucre: number; ad: string }[];
+    }
+  | {
+      tur: "kaldirma";
+      /** Sıvı seviyesi (0,3–0,95, kap yüksekliğine oran). */
+      seviye: number;
+      /** Yüzen X'in batan oranı = dX/dsıvı (0,1–0,9). */
+      xBatma: number;
+      /** dZ/dsıvı (> 1). */
+      zOran: number;
+      adlar: string[];
+      kuvvet: boolean;
+    }
+  | {
+      tur: "uBorusu";
+      /** Sol kolda üstteki sıvının (ağır, alttaki sıvı) özkütlesi d1; sağ kola eklenen hafif sıvı d2. */
+      d1: number;
+      d2: number;
+      h1: number;
+      h2: number;
+      /** Açıksa h2 = d1·h1/d2 (denge koşulu) otomatik. */
+      otomatik: boolean;
+    };
 
 export type GeoAciIsareti = "yok" | "yay" | "dik";
 
@@ -140,6 +216,87 @@ export type GeometriVerisi =
       teget: boolean;
       merkezAciEtiket: string;
       cevreAciEtiket: string;
+      // ── v1.2 (isteğe bağlı). `konum[4]` = D (iç açı kirişi CD'nin ucu, adı `adlar[5]`). ──
+      /** İki kiriş (AB, CD) çember içinde E'de kesişir; AEC iç açısı işaretlenir. */
+      icAci?: boolean;
+      icAciEtiket?: string;
+      /** Çember dışındaki P'den iki kesen (PA, PB) ya da iki teğet. */
+      disAci?: "yok" | "kesen" | "teget";
+      disAciEtiket?: string;
+      /** P'nin konumu: merkezden açı (derece) ve uzaklık (yarıçap katı, 1,25–3). */
+      disNokta?: { aci: number; uzaklik: number };
+      /** Dış açı adları: [P, 1. yakın/teğet noktası, 2. yakın/teğet noktası]. */
+      disAdlar?: string[];
+      /** T'deki teğet ile TA kirişi arasındaki teğet-kiriş açısı. */
+      tegetKiris?: boolean;
+      tegetKirisEtiket?: string;
+      /** AOB merkez açısının daire dilimini tarar. */
+      dilimTarama?: boolean;
+    }
+  | {
+      tur: "dogruAci";
+      /** kesen: d₁ ∥ d₂ + kesen (8 açı) · z: iç ters · u: karşı durumlu · m: M (zikzak, tek kırık) · kalemUcu · zikzak (iki kırık). */
+      duzen: "kesen" | "z" | "u" | "m" | "kalemUcu" | "zikzak";
+      /** kesende kesenin eğimi; diğerlerinde A'daki açı (derece). */
+      aci: number;
+      /** B'deki açı (m, kalemUcu, zikzak). */
+      aci2: number;
+      /** Açı bölgesi etiketleri (kesende 8 bölge: üst kesişim sağ-üst, sol-üst, sol-alt, sağ-alt, alt kesişim aynı sıra). */
+      etiketler: string[];
+      /** Nokta adları [A, B, C, D] ve doğru adları [d₁, d₂]. */
+      adlar: string[];
+      dogruAdlari: string[];
+      paralelOk: boolean;
+      /** Etiketi boş açılara ölçülen dereceyi yaz. */
+      olcuYaz: boolean;
+    }
+  | {
+      tur: "dortgen";
+      tip: "paralelkenar" | "eskenar" | "yamuk" | "ikizkenarYamuk" | "dikYamuk" | "deltoid" | "dikdortgen" | "kare" | "serbest";
+      /** Türe göre ölçüler (bkz. `dortgenKoseleri`). */
+      olcu: number[];
+      /** Yalnız `serbest`: birim kutuda köşeler (y aşağı). */
+      kose?: Nokta[];
+      adlar: string[];
+      /** [AB, BC, CD, DA] kenar etiketleri; açı etiketleri [A, B, C, D]. */
+      kenarlar: string[];
+      acilar: string[];
+      aciIsareti: GeoAciIsareti[];
+      esKenar: number[];
+      esAci: number[];
+      kosegen: boolean;
+      kesisimAdi: string;
+      /** Köşegenler dikse kesişimde ∟ işareti. */
+      dikIsaret: boolean;
+      yukseklik: boolean;
+      yukseklikAdi: string;
+      yukseklikEtiket: string;
+    }
+  | {
+      tur: "kati";
+      cisim: "kup" | "prizma" | "ucgenPrizma" | "silindir" | "koni" | "piramit" | "kure";
+      /** kup [a] · prizma [a, b, c] · ucgenPrizma [a, h] · silindir/koni [r, h] · piramit [a, h] · kure [r]. */
+      olcu: number[];
+      /** Ölçü etiketleri (olcu ile aynı sıra; koni/piramitte 3. = ana doğru / yan ayrıt). */
+      etiketler: string[];
+      adlar: string[];
+      koseAdlari: boolean;
+      /** Arka (görünmeyen) ayrıtlar kesikli [5,4]; kapalıysa hiç çizilmez. */
+      gizliKesik: boolean;
+      kosegen: "yok" | "cisim" | "yuzey";
+    }
+  | {
+      tur: "katlama";
+      kagit: KatlamaKagidi;
+      /** En çok iki katlama. */
+      katlar: KatlamaAdimi[];
+      /** Şekil I (katlamadan önce) yanında gösterilsin. */
+      sekil1: boolean;
+      ok: boolean;
+      olcu: boolean;
+      eski: boolean;
+      baslik: boolean;
+      dolgu: "mavi" | "gri" | "tarali";
     }
   | {
       tur: "benzer";
@@ -153,7 +310,15 @@ export type GeometriVerisi =
     }
   | { tur: "cokgen"; n: number; adlar: string[]; merkez: boolean; kosegen: boolean; esKenar: boolean };
 
-export type IstatistikTuru = "sutun" | "cubuk" | "daire" | "cizgi" | "histogram" | "kutu" | "govde";
+/** Kağıt katlama: kağıt (dikdörtgen w×h, kare a, B'de dik üçgen |BC| = p, |AB| = q). Koordinat y yukarı. */
+export type KatlamaKagidi = { tur: "dikdortgen" | "kare" | "dikucgen"; w: number; h: number; a: number; p: number; q: number };
+/**
+ * Bir katlama. iki: k1–k2 köşelerinden geçen çizgi · nokta: `kose` köşesi ile `kenar` kenarında, kenarın
+ * ilk köşesinden `uz` birim uzaktaki nokta · getir: `hareketli` köşe `hedef`e (köşe ya da "O" merkez) gelir.
+ */
+export type KatlamaAdimi = { mod: "iki" | "nokta" | "getir"; k1: string; k2: string; hareketli: string; kose: string; kenar: string; uz: number; hedef: string };
+
+export type IstatistikTuru ="sutun" | "cubuk" | "daire" | "cizgi" | "histogram" | "kutu" | "govde";
 
 /**
  * İstatistik grafiği verisi: bir TABLO. Satır = kategori (ya da kutu/gövde grafiğinde
@@ -346,6 +511,12 @@ export type CizimSekliGovdesi =
       ek?: FizikEk;
       /** Laboratuvar kaplarında sıvı seviyesi (0–1); sıvı `dolgu` rengiyle çizilir. */
       seviye?: number;
+      /** Yalnız `egikKuvvet`. */
+      kuvvet?: EgikKuvvetVerisi;
+      /** Yalnız `optikDuzenek`. */
+      optik?: OptikVerisi;
+      /** Yalnız `siviKabi`. */
+      sivi?: SiviVerisi;
     }
   /**
    * Akış şeması kutusu. Metin KUTUNUN İÇİNDE: ayrı bir "metin" şekli olsaydı
@@ -492,7 +663,15 @@ export type KimyaVerisi =
       baslik?: string;
       /** Özel molekül: atomlar "O(0,-0.35,2); H(-0.85,0.45)" (simge, x, y, serbest çift), bağlar "1-2; 1-3; 2=3; 2#3". */
       ozel?: { ad: string; atomlar: string; baglar: string };
-      zincir?: { n: number; tur: "alkan" | "alken" | "alkin"; konum: number };
+      zincir?: {
+        n: number;
+        tur: "alkan" | "alken" | "alkin";
+        konum: number;
+        /** v1.2: halkalı (sikloalkan, n = 3–8; yalnız alkan). */
+        halka?: boolean;
+        /** v1.2: ana zincirdeki karbonlara bağlı yan gruplar (k: 1'den karbon numarası). */
+        yanGruplar?: { k: number; g: OrganikYanGrup }[];
+      };
     }
   /** Orbital kutu-ok diyagramı: elektron sayısı (z − yük) Aufbau + Hund kuralıyla otomatik dolar. */
   | { tur: "orbital"; z: number; yuk: number; baslik?: string; dizilim: boolean }
@@ -596,6 +775,9 @@ export type SemaVerisi =
       noktalar: { x: number; ad?: string; dolu?: boolean }[];
       baslik?: string;
     };
+
+/** Organik zincire bağlanabilen yan gruplar (bkz. `kimya.ts` organikAdlandir). */
+export type OrganikYanGrup = "CH3" | "C2H5" | "Cl" | "Br" | "OH" | "NH2";
 
 export type AgacDali = { ad: string; olasilik: string; alt?: AgacDali[] };
 
