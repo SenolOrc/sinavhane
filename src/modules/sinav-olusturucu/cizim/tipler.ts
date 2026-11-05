@@ -74,6 +74,8 @@ export type FizikNesnesi =
   | "kimya"
   // Geometri (bkz. `geometriSekilleri.ts`): köşe adlı üçgen, çember, benzer üçgenler, çokgen, açı yayı, dik açı, eş kenar işareti.
   | "ucgenABC" | "dikUcgen" | "benzerUcgen" | "cemberGeo" | "cokgenAd" | "aciYayi" | "dikAci" | "esIsaret"
+  // v1.2 geometri (bkz. `geometriEk.ts`): doğruda açılar, özel dörtgenler, 3B katı cisimler, kağıt katlama.
+  | "dogrudaAcilar" | "dortgenGeo" | "katiCisim" | "kagitKatlama"
   // Fizik ek şekilleri (bkz. `fizikEk.ts`): ışın ok, halka akım, solenoid, düz tel alanı, ⊗/⊙ alanı, girişim, enerji düzeyi, devre düğümü.
   | "isinOk" | "halkaAkim" | "solenoid" | "telAlan" | "alanNokta" | "dalgaGirisim" | "enerjiDuzeyi" | "dugum";
 
@@ -102,6 +104,26 @@ export type GeometriVerisi =
       yukseklik: "yok" | "A" | "B" | "C";
       yukseklikEtiket: string;
       ayakAdi: string;
+      // ── v1.2 yardımcı elemanlar (hepsi isteğe bağlı; eski belgeler değişmeden açılır) ──
+      /** Köşeden karşı kenara açıortay (ayak adı `aciortayAdi`, varsayılan "N") + iki eş açı yayı. */
+      aciortay?: "yok" | "A" | "B" | "C";
+      aciortayAdi?: string;
+      /** Karşı kenarın orta noktasına kenarortay (ayak `kenarortayAdi`, varsayılan "V"); "hepsi": üçü + ağırlık merkezi. */
+      kenarortay?: "yok" | "A" | "B" | "C" | "hepsi";
+      kenarortayAdi?: string;
+      /** Ağırlık merkezi adı (varsayılan "G"). */
+      agirlikAdi?: string;
+      /** Dış açılar: A'da CA uzantısı, B'de AB uzantısı, C'de BC uzantısı; etiketler [A, B, C]. */
+      disAci?: ("A" | "B" | "C")[];
+      disAciEtiket?: string[];
+      /** İç teğet çember ve merkezi (`icMerkezAdi`, varsayılan "I"). */
+      icTegetCember?: boolean;
+      icMerkezAdi?: string;
+      /** Çevrel çember ve merkezi (`cevrelMerkezAdi`, varsayılan "O"). */
+      cevrelCember?: boolean;
+      cevrelMerkezAdi?: string;
+      /** serbest modda `kose` kutuya DOĞRUDAN eşlenir (sığdırma yok): köşe sürükleme fareyi izlesin. */
+      sabitKutu?: boolean;
     }
   | {
       tur: "cember";
@@ -502,11 +524,66 @@ export type SemaVerisi =
       /** Boyanacak bölge indeksleri (bölgeler ile aynı sıra). */
       boyali?: number[];
       baslik?: string;
+      /**
+       * Yalnız 2 kümede: kesisen (varsayılan) · altKume (A ⊂ B, iç içe) · ayrik (A ∩ B = ∅).
+       * Bölge dizisinin anlamı değişmez: altKume'de "yalnız A" (0), ayrik'te "A∩B" (1) boş kümedir.
+       */
+      duzen?: VennDuzeni;
     }
   | {
       tur: "agac";
-      /** Kökten dallar; her dalın alt dalları olabilir (en çok 2 düzey). */
+      /** Kökten dallar; her dalın alt dalları olabilir (en çok 3 aşama). */
       dallar: AgacDali[];
+      baslik?: string;
+    }
+  /** Trigonometrik birim çember (bkz. `semaEk.ts`). */
+  | {
+      tur: "birimCember";
+      /** α (derece, −720…720). */
+      aci: number;
+      /** P noktasının adı (varsayılan "P"). */
+      noktaAdi?: string;
+      /** Açı yayının yazısı (varsayılan "α"; "30°" da yazılabilir). */
+      aciEtiketi?: string;
+      /** tan doğrusu (x = 1) ve T(1, tan α). */
+      tan?: boolean;
+      /** cot doğrusu (y = 1) ve K(cot α, 1). */
+      cot?: boolean;
+      /** P'den eksenlere kesikli izdüşüm dikmeleri ve cos α / sin α yazıları (varsayılan açık). */
+      izdusum?: boolean;
+      /** Bölge numaraları (I–IV) ve pozitif olan oranlar. */
+      bolgeler?: boolean;
+      baslik?: string;
+    }
+  /** Eşitsizlik işaret tablosu (bkz. `semaEk.ts`). */
+  | {
+      tur: "isaretTablosu";
+      /** Soldan sağa kökler / tanımsız noktalar (en çok 8). */
+      kokler: IsaretKoku[];
+      /** Satırlar (en çok 6): her biri kökler+1 aralığın işareti ("+", "-" ya da ""). */
+      satirlar: IsaretSatiri[];
+      /** Çözüm kümesindeki aralıkların indeksleri (taranır). */
+      cozum?: number[];
+      /** Altta çözüm kümesi sayı doğrusu satırı. */
+      cozumSatiri?: boolean;
+      /** Kök değerinin altında katlılık/dahil işareti: ○ tek, ○○ çift, ● dahil, || tanımsız. */
+      katGoster?: boolean;
+      /** Otomatik hesap kaynağı: "(x+2)(x-1)^2/(x-4)". */
+      ifade?: string;
+      esitsizlik?: "<" | "<=" | ">" | ">=" | "";
+      baslik?: string;
+    }
+  /** Fonksiyon / küme eşleme ok diyagramı (bkz. `semaEk.ts`). */
+  | {
+      tur: "fonksiyonSema";
+      /** [tanım kümesi adı, değer kümesi adı]. */
+      adlar: string[];
+      /** Fonksiyon adı (f); boşsa üst yazı çizilmez. */
+      fonkAd: string;
+      a: string[];
+      b: string[];
+      /** Eşleme okları: [A'daki indeks, B'deki indeks]. */
+      oklar: [number, number][];
       baslik?: string;
     }
   | {
@@ -521,3 +598,11 @@ export type SemaVerisi =
     };
 
 export type AgacDali = { ad: string; olasilik: string; alt?: AgacDali[] };
+
+export type VennDuzeni = "kesisen" | "altKume" | "ayrik";
+
+/** İşaret tablosunda bir kök: değer yazısı ("-2", "1/2", "√3"), katlılık, tanımsızlık, çözüme dahil olma. */
+export type IsaretKoku = { deger: string; kat: "tek" | "cift"; tanimsiz?: boolean; dahil?: boolean };
+
+/** İşaret tablosu satırı; `noktalar` kök başına "0" / "||" / "" (yoksa son satırda kök türünden). */
+export type IsaretSatiri = { ad: string; isaretler: string[]; noktalar?: string[] };
