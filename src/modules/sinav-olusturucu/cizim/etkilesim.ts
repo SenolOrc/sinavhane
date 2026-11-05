@@ -182,3 +182,50 @@ export function sekilDondur90(s: Sekil): Sekil {
 export function cevrilebilirMi(s: Sekil): boolean {
   return s.tur !== "baglayici" && s.tur !== "metin";
 }
+
+// ── Yerinde düzenleme balonunun yeri ───────────────────────────────────────
+
+export type EkranKutusu = { x: number; y: number; w: number; h: number };
+
+/**
+ * Çift tıklama balonunun konumu (kaydırma kabı koordinatı). Balon düzenlenen
+ * şeklin kutusuna (`kacin`: adlar/etiketler dahil) DEĞMEZ ve görünür alana
+ * (`gorunur`) sığar: önce tıklanan yarıya göre sağ/sol yan, sonra alt, sonra
+ * üst denenir. Hiçbiri tam sığmazsa en geniş boşluk seçilir; balon o boşluğa
+ * `maxH` ile kısaltılır (içerik kaydırılır). Sığacak boşluk hiç yoksa (şekil
+ * görünür alanı kaplıyor) balon görünür alanın içinde tutulur.
+ */
+export function balonYerlesimi(o: { nokta: Nokta; kacin: EkranKutusu | null; gorunur: EkranKutusu; w: number; h: number; bosluk?: number }): { left: number; top: number; maxH: number } {
+  const { nokta, gorunur: g } = o;
+  const pay = 8, b = o.bosluk ?? 12;
+  const w = Math.min(o.w, g.w - 2 * pay);
+  const enCokH = Math.max(120, g.h - 2 * pay);
+  const h = Math.min(o.h, enCokH);
+  const sinirX = (x: number) => Math.max(g.x + pay, Math.min(x, g.x + g.w - pay - w));
+  const sinirY = (y: number, hh: number) => Math.max(g.y + pay, Math.min(y, g.y + g.h - pay - hh));
+  const k = o.kacin;
+  if (!k) return { left: sinirX(nokta.x + 14), top: sinirY(nokta.y + 14, h), maxH: enCokH };
+  type Aday = { left: number; top: number; oda: number; tamSigar: boolean; dikey: boolean };
+  const sagOda = g.x + g.w - pay - (k.x + k.w + b);
+  const solOda = k.x - b - (g.x + pay);
+  const altOda = g.y + g.h - pay - (k.y + k.h + b);
+  const ustOda = k.y - b - (g.y + pay);
+  const yanTop = sinirY(nokta.y - h / 3, h);
+  const sag: Aday = { left: k.x + k.w + b, top: yanTop, oda: sagOda, tamSigar: sagOda >= w, dikey: false };
+  const sol: Aday = { left: k.x - b - w, top: yanTop, oda: solOda, tamSigar: solOda >= w, dikey: false };
+  const alt: Aday = { left: sinirX(nokta.x - w / 2), top: k.y + k.h + b, oda: altOda, tamSigar: altOda >= h, dikey: true };
+  const ust: Aday = { left: sinirX(nokta.x - w / 2), top: k.y - b - Math.min(h, Math.max(0, ustOda)), oda: ustOda, tamSigar: ustOda >= h, dikey: true };
+  const yanlar = nokta.x >= k.x + k.w / 2 ? [sag, sol] : [sol, sag];
+  const sira = [...yanlar, alt, ust];
+  const tam = sira.find((a) => a.tamSigar);
+  if (tam) return { left: tam.left, top: tam.top, maxH: enCokH };
+  // Dikey boşluklarda balon kısaltılabilir (en az ~140 px kalsın); yanlarda genişlik kısaltılamaz.
+  const dikeyAday = [alt, ust].filter((a) => a.oda >= 140).sort((p, q) => q.oda - p.oda)[0];
+  if (dikeyAday) {
+    const maxH = Math.min(enCokH, dikeyAday.oda);
+    const top = dikeyAday === ust ? k.y - b - Math.min(h, maxH) : dikeyAday.top;
+    return { left: dikeyAday.left, top, maxH };
+  }
+  // Yer yok: şekil görünür alanı kaplıyor. Tıklanan noktanın karşı köşesine yasla.
+  return { left: sinirX(nokta.x >= g.x + g.w / 2 ? g.x : g.x + g.w), top: sinirY(nokta.y >= g.y + g.h / 2 ? g.y : g.y + g.h, h), maxH: enCokH };
+}

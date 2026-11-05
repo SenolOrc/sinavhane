@@ -180,7 +180,7 @@ function UcgenPaneli({ geo, yaz, tarihce }: { geo: Extract<GeometriVerisi, { tur
           ))}
         </div>
       ) : (
-        <span className={IPUCU}>Köşeleri tuvalde fareyle sürükleyin (ya da konumları aşağıdan yazın).</span>
+        <span className={IPUCU}>Köşeleri tuvalde fareyle sürükleyebilir, kenar ya da açı üzerine çift tıklayarak etiket yazabilirsiniz (konumları aşağıdan da yazabilirsiniz).</span>
       )}
       {!koseler && <span className="text-[10px] text-red-600" role="alert">Bu ölçülerle üçgen kurulamaz (üçgen eşitsizliği ya da açı 0–180° dışında).</span>}
       {olcu && (
@@ -271,7 +271,7 @@ function CemberPaneli({ geo, yaz, tarihce }: { geo: Extract<GeometriVerisi, { tu
       </div>
       <Secenekler baslik="Dış nokta P" deger={geo.disAci ?? "yok"} secenekler={[["yok", "Yok"], ["kesen", "İki kesen"], ["teget", "İki teğet"]] as const}
         onSec={(d) => { tarihce(); gunc({ disAci: d, ...(d !== "yok" && !geo.disNokta ? { disNokta: { aci: 0, uzaklik: 2.1 } } : {}), ...(d === "teget" && !geo.disAdlar ? { disAdlar: ["P", "A", "B"] } : {}) }); }} />
-      <span className={IPUCU}>A, B, C, T (ve P) noktalarını tuvalde çember üstünde sürükleyebilirsiniz.</span>
+      <span className={IPUCU}>A, B, C, T (ve P) noktalarını tuvalde çember üstünde sürükleyebilir, noktaya çift tıklayarak adını değiştirebilirsiniz.</span>
       <DigerAyarlar>
         <div className="flex flex-wrap items-center gap-2">
           {["Merkez", "A", "B", "C", "T", "D", "E (kesişim)"].map((ad, i) => (
@@ -431,7 +431,7 @@ function DortgenPaneli({ geo, yaz, tarihce }: { geo: Extract<GeometriVerisi, { t
             <OndalikGirdisi key={`${tip.id}${i}`} etiket={ad} deger={geo.olcu[i]} onOdak={tarihce} onDegis={(v) => v !== undefined && gunc({ olcu: dizi(geo.olcu, i, v, 0) })} />
           ))}
         </div>
-      ) : <span className={IPUCU}>Köşeler serbest: tuvalde sürükleyin ya da yukarıdan bir tür seçin.</span>}
+      ) : <span className={IPUCU}>Köşeler serbest: tuvalde sürükleyin, kenar/açıya çift tıklayıp etiket yazın ya da yukarıdan bir tür seçin.</span>}
       {!gecerli && <span className="text-[10px] text-red-600" role="alert">Bu ölçülerle dörtgen kurulamaz (uzunluklar pozitif, açı 0–180°, oran 0–1 olmalı).</span>}
       <div className="flex flex-wrap items-center gap-1.5">
         <TogglePill aktif={geo.kosegen} onClick={() => { tarihce(); gunc({ kosegen: !geo.kosegen }); }}>Köşegenler + kesişim {geo.kesisimAdi || "E"}</TogglePill>

@@ -5,7 +5,7 @@
 // - akış kutusu / fizik nesnesi / bağlayıcı: metin ya da etiket (_ ^ ve Yunan harfleri)
 // Değişiklik anında uygulanır; Enter/Esc/dışarı tıklama kapatır.
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
 
@@ -14,6 +14,8 @@ import type { Sekil } from "../../cizim/tipler";
 import type { GeometriVerisi } from "../../cizim/tipler";
 import { geometriEtiketiAyarla, geometriEtiketiOku, type GeoEtiketYamasi, type GeoHedef } from "../../cizim/geometriEtkilesim";
 import { geometriVerisiGecerliMi, varsayilanGeometri } from "../../cizim/geometriSekilleri";
+import { balonYerlesimi, type EkranKutusu } from "../../cizim/etkilesim";
+import type { Nokta } from "../../cizim/tipler";
 
 type FizikSekli = Extract<Sekil, { tur: "fizik" }>;
 
@@ -81,13 +83,23 @@ function SembolluGirdi({ deger, onDegis, etiket, yerTutucu, cokSatir, onBitir, o
 export function YerindeDuzenleBalonu({ hedef, sekil, konum, guncelle, kapat }: {
   hedef: BalonHedefi;
   sekil: Sekil;
-  konum: { left: number; top: number };
+  /** Tıklanan nokta, kaçınılacak şekil kutusu ve görünür alan (kaydırma kabı koordinatı). */
+  konum: { nokta: Nokta; kacin: EkranKutusu | null; gorunur: EkranKutusu };
   /** Şekli verilen yeni hâliyle değiştirir (geçmiş kaydını çağıran yönetir). */
   guncelle: (yeni: Sekil) => void;
   kapat: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useDisariTiklama(true, kapat, ref);
+  // Balonun gerçek yüksekliği ölçülür; yer, şekle değmeyecek ve görünür alana
+  // sığacak biçimde ona göre seçilir (ilk çizimde tahmini 320 px).
+  const [yukseklik, setYukseklik] = useState(320);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const olcu = el ? Math.ceil(el.scrollHeight) : 0;
+    if (olcu > 0 && Math.abs(olcu - yukseklik) > 1) setYukseklik(olcu);
+  });
+  const yer = balonYerlesimi({ ...konum, w: 300, h: yukseklik });
   useEffect(() => {
     const tus = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); kapat(); } };
     window.addEventListener("keydown", tus, true);
@@ -157,14 +169,14 @@ export function YerindeDuzenleBalonu({ hedef, sekil, konum, guncelle, kapat }: {
             </div>
           </>
         )}
-        {kose && deger.ad === undefined && <p className="text-xs text-slate-500">Bu noktanın adı sağ panelden değiştirilir.</p>}
+        {kose && deger.ad === undefined && <p className="text-xs text-slate-500">Bu noktanın adı “Ayrıntılar” panelinden değiştirilir.</p>}
       </>
     );
   } else if (hedef.tur === "metin") {
     if (sekil.tur === "akis") {
       baslik = "Kutu metni";
       icerik = sekil.denklem
-        ? <p className="text-xs text-slate-500">Bu kutu denklem gösteriyor. Değiştirmek için sağ paneldeki “Denklemi düzenle”yi kullanın.</p>
+        ? <p className="text-xs text-slate-500">Bu kutu denklem gösteriyor. Değiştirmek için “Ayrıntılar” panelindeki “Denklemi düzenle”yi kullanın.</p>
         : <SembolluGirdi odakla cokSatir etiket="Kutu metni" deger={sekil.metin} yerTutucu="Kutunun metni (Shift+Enter: yeni satır)" onDegis={(t) => guncelle({ ...sekil, metin: t })} onBitir={kapat} />;
     } else if (sekil.tur === "fizik") {
       baslik = "Etiket";
@@ -188,8 +200,8 @@ export function YerindeDuzenleBalonu({ hedef, sekil, konum, guncelle, kapat }: {
       role="dialog"
       aria-label={baslik}
       data-testid="yerinde-duzenle"
-      className="absolute z-30 flex w-[300px] max-w-[calc(100%-16px)] flex-col gap-1.5 rounded-xl border border-slate-200 bg-white p-3 shadow-xl"
-      style={{ left: konum.left, top: konum.top }}
+      className="absolute z-30 flex w-[300px] max-w-[calc(100%-16px)] flex-col gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white p-3 shadow-xl"
+      style={{ left: yer.left, top: yer.top, maxHeight: yer.maxH }}
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="flex items-center justify-between">

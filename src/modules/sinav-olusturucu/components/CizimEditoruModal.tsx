@@ -59,7 +59,7 @@ import {
   sekilYatayCevir,
   type BaglantiPortu,
 } from "../cizim/etkilesim";
-import { geometriEnYakinKenarVeyaKose, geometriKoseTasi, geometriKoseleri } from "../cizim/geometriEtkilesim";
+import { geometriEnYakinKenarVeyaKose, geometriKoseTasi, geometriKoseTasiSekil, geometriKoseleri } from "../cizim/geometriEtkilesim";
 import { geometriMi } from "../cizim/geometriSekilleri";
 import type { GrafikDuzeni } from "../cizim/grafik";
 import { SolKutuphane } from "./cizim/SolKutuphane";
@@ -1315,8 +1315,9 @@ export function CizimEditoruModal({
       if (!s0 || s0.tur !== "fizik") return;
       let yeni: Sekil = s0;
       if (ns.tur === "geo") {
-        const geo = geometriKoseTasi(s0, ns.i, nokta);
-        if (geo) yeni = { ...s0, geo };
+        // Köşe kutu dışına çıkarsa kutu da büyür (seçim çerçevesi köşeyi kapsasın).
+        const tasinan = geometriKoseTasiSekil(s0, ns.i, nokta);
+        if (tasinan) yeni = tasinan;
       } else if (ns.tur === "grafik" && ns.pencere && ns.egri !== undefined) {
         const p = ns.pencere;
         // Pencere sürükleme boyunca dondurulur: yoksa nokta değiştikçe eksenler
@@ -2179,10 +2180,10 @@ export function CizimEditoruModal({
   const kutuphaneListesi = useMemo(() => kutuphaneGirdileri(kullaniciSablonlari), [kullaniciSablonlari]);
 
   /** Seçimin dünya kutusu (bağlayıcı için uç noktalarından). */
-  function secimKutusuHesapla(): { x: number; y: number; w: number; h: number } | null {
+  function secimKutusuHesapla(liste: Sekil[] = seciliSekiller): { x: number; y: number; w: number; h: number } | null {
     const ctx = canvasRef.current?.getContext("2d");
-    if (!ctx || !seciliSekiller.length) return null;
-    const kutular = seciliSekiller.map((s) => {
+    if (!ctx || !liste.length) return null;
+    const kutular = liste.map((s) => {
       if (s.tur === "fizik" && geometriNesnesiMi(s)) {
         // Köşesi kutunun dışına sürüklenmiş geometri şekli: köşeler de kapsansın.
         const k = sekilSinirlari(ctx, s);
@@ -2340,15 +2341,18 @@ export function CizimEditoruModal({
   const balonSekli = balon ? sekiller.find((s) => s.id === balon.hedef.sekilId) : undefined;
   const balonKonum = (() => {
     if (!balon) return null;
-    const p = ekranKonumu(balon.nokta);
     const kap = containerRef.current;
-    const genislik = kap?.clientWidth || 800;
-    const left = Math.max((kap?.scrollLeft ?? 0) + 8, Math.min(p.x + 14, (kap?.scrollLeft ?? 0) + genislik - 310));
-    // Aşağıda yer yoksa tıklanan yerin üstüne açılır (baloncuk ~320 px).
-    const gorunurAlt = (kap?.scrollTop ?? 0) + (kap?.clientHeight || 600);
-    let top = p.y + 14;
-    if (top + 320 > gorunurAlt) top = Math.max((kap?.scrollTop ?? 0) + 8, p.y - 334, gorunurAlt - 330 > p.y + 14 ? p.y + 14 : (kap?.scrollTop ?? 0) + 8);
-    return { left, top };
+    // Balon şeklin kendisine (köşe adları dahil) değmesin: şeklin ekran kutusu
+    // verilir; yer seçimi (yan / alt / üst, gerekirse kısaltıp kaydırma) saf
+    // `balonYerlesimi`'nde.
+    const sk = balonSekli && balonSekli.tur !== "baglayici" ? secimKutusuHesapla([balonSekli]) : null;
+    const a = sk ? ekranKonumu({ x: sk.x, y: sk.y }) : null;
+    const b = sk ? ekranKonumu({ x: sk.x + sk.w, y: sk.y + sk.h }) : null;
+    return {
+      nokta: ekranKonumu(balon.nokta),
+      kacin: a && b ? { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y } : null,
+      gorunur: { x: kap?.scrollLeft ?? 0, y: kap?.scrollTop ?? 0, w: kap?.clientWidth || 800, h: kap?.clientHeight || 600 },
+    };
   })();
 
   const aracDugmesi = (a: CizimAraci) => {

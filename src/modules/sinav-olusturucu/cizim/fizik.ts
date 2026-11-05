@@ -68,7 +68,7 @@ export const FIZIK_TANIMLARI: Record<FizikNesnesi, FizikTanimi> = {
   makara: { ad: "Makara", grup: "mekanik", w: 70, h: 70, etiketYeri: "ust", etiket: "", elips: true, ipucu: "Sabit makara — ipi sol/sağ yönden bağlayın" },
   araba: { ad: "Araba", grup: "mekanik", w: 120, h: 60, etiketYeri: "ic", etiket: "M", ipucu: "Tekerlekli araba/vagon" },
   nokta: { ad: "Nokta cisim", grup: "mekanik", w: 14, h: 14, etiketYeri: "ust", etiket: "A", elips: true, ipucu: "Noktasal kütle / konum işareti" },
-  yay: { ad: "Yay", grup: "mekanik", w: 140, h: 40, etiketYeri: "ust", etiket: "k", ipucu: "Tek başına yay. İki şekli yayla bağlamak için Bağlantı > Yay" },
+  yay: { ad: "Yay", grup: "mekanik", w: 140, h: 40, etiketYeri: "ust", etiket: "k", ipucu: "Tek başına yay. İki şekli yayla bağlamak için Ok / Bağlayıcı aracında Yay türünü seçin" },
   kap: { ad: "Kap", grup: "mekanik", w: 110, h: 130, etiketYeri: "alt", etiket: "", ipucu: "Üstü açık kap; Dolgu seçilirse sıvı gösterilir" },
   duvar: { ad: "Duvar", grup: "mekanik", w: 22, h: 170, etiketYeri: "alt", etiket: "", ipucu: "Taralı sabit duvar (yüzü sağda; Çevir ile solda)" },
   zemin: { ad: "Zemin", grup: "mekanik", w: 300, h: 22, etiketYeri: "alt", etiket: "", ipucu: "Taralı zemin çizgisi" },

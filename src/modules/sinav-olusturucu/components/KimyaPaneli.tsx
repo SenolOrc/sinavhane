@@ -1,5 +1,6 @@
-// Kimya sekmesi: laboratuvar malzemeleri, atom/molekül, periyodik tablo, kimya grafikleri.
-// Çizim kodu `cizim/kimya.ts`'te; burada yalnız arayüz. Fizik/matematik sekmeleriyle aynı ilke:
+// Kimya araçları: sol kütüphanedeki "Kimya" kategorisinin ayrıntılı şeridi
+// (KimyaSeridi: zincir çizici, özel molekül) ve seçili kimya nesnesinin paneli.
+// Çizim kodu `cizim/kimya.ts`'te; burada yalnız arayüz. İlke:
 // önce tek tıkla hazır şekil, sonra sayıları değiştirmek.
 
 import { useEffect, useRef, useState } from "react";

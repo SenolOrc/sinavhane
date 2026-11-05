@@ -1,4 +1,6 @@
-// Matematik sekmesi: fonksiyon grafiği, istatistik grafiği, Venn / ağaç / sayı doğrusu.
+// Matematik araçları: sol kütüphanedeki "Matematik & Grafik" kategorisinin
+// "yazarak çiz" şeridi (MatematikSeridi) ve seçili istatistik/şema nesnesinin
+// ayrıntılı paneli (IstatistikPaneli, SemaPaneli).
 // Çizim kodu `cizim/` altında; burada yalnız arayüz.
 //
 // İLKE (fizik grafiğindekiyle aynı): boş ekrandan başlanmaz. Şablon tek tıkla gelir,

@@ -3,7 +3,7 @@
   "private": true,
   "license": "MIT",
   "description": "Öğretmenler için ücretsiz, açık kaynaklı sınav hazırlama uygulaması",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

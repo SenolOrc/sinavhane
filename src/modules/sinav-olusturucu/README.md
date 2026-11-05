@@ -1,47 +1,74 @@
 # Sınav Oluşturucu
 
-v0.11.7 — Yazılı Kağıdı hazırlama akışı uçtan uca aktif.
+Sınavhane'nin tek modülü: yazılı kâğıdı hazırlama akışı (A4 önizleme, çizim editörü, denklem editörü,
+OCR, Sınavlarım kütüphanesi, parolalı sınav dosyası, yazdır / PDF).
 
-## 2026-10 Fizik kipi ve "yazarak denklem"
+## Çizim editörü (v1.2): öğretmen dostu arayüz
 
-Fizik sınavı hazırlayan öğretmen için çizim editörüne FİZİK kipi, denklem editörüne
-"Yazarak ekle" satırı eklendi. Yeni bir AI oturumu bu iki yere dokunmadan önce:
+v1.2'de eski kip sekmeleri (`Çizim | Fizik | Matematik | Kimya`) ve `Şekiller | Ayarlar` sekme atlaması
+kaldırıldı. Pencere üç parçadır:
 
-**Fizik kipi (çizim editörü, `Çizim | Fizik | Akış şeması` anahtarı)**
+- **Sol kütüphane** (`components/cizim/SolKutuphane.tsx`): anlık arama + katlanır kategoriler (Hazır Soru
+  Sahneleri, Geometri, Matematik & Grafik, İstatistik & Şema, Fizik, Kimya, Akış Şeması, Şablonlarım).
+  Karta tıklamak çekmeceyi kapatmaz. Veri `cizim/kutuphane.ts`'ten gelir (`kutuphaneGirdileri`,
+  `kutuphaneAra`, `aramaOnerileri`); her girdi `{ id, ad, kategori, altBaslik, aramaKelimeleri, onizleme, ekle }`.
+  Kart önizlemesi `KutuphaneOnizleme`: fizik nesnesi `fizikSimgeCiz`, şablonlar gerçek `sekilleriCiz` ile;
+  önce taslak tuvalde mürekkep sınırı bulunur, sonra o sınır karta sığdırılır (molekül, gövde–yaprak gibi
+  kutusundan küçük çizimler de okunur büyüklükte çıkar). Arama kutusu `y = x^2 - 4` ya da `0,5; 5,15`
+  gibi yazıları "Çiz:" önerisine çevirir.
+- **Üst araç çubuğu** (sabit): Seç/Taşı, Çizgi, Ok/Bağlayıcı, Dikdörtgen, Daire/Elips, Üçgen, Çokgen,
+  Dalga, Serbest çizgi, Metin, Silgi, Geri/İleri al, yakınlaştırma, "Daha fazla". Çizim bitince araç Seç'e
+  döner; Esc önce aracı bırakır, modalı kapatmaz.
+- **Yüzen araç çubuğu** (`components/cizim/YuzenAracCubugu.tsx`) seçimin üstünde; ayrıntılı veri
+  (grafik, istatistik, şema, kimya, geometri, hesaplı sahneler) sağdaki **Ayrıntılar** panelinde.
 
-- Şekil türü `fizik` (`cizim/tipler.ts`): `nesne` (30 çeşit: kütle, küre, eğik düzlem,
-  makara, araba, yay, kap, duvar/zemin/tavan, direnç, pil, ampul, anahtar, sığaç, bobin,
-  ampermetre/voltmetre, iki mercek, üç ayna, prizma, mıknatıs, ± yük, eksen takımı) +
-  kutu (`x,y,w,h`) + `etiket` + `etiketYeri` + `ayna` (yatay çevir) + `dolgu`.
-  Çizimler `cizim/fizik.ts`'te, katalog (ad, varsayılan ölçü, ipucu) `FIZIK_TANIMLARI`'nda.
-  Palet önizlemeleri AYNI çizim rutininden gelir (`fizikSimgeCiz`) — ayrı SVG tutulmaz.
-- **Yeni fizik nesnesi eklemek**: `FizikNesnesi` birleşimi (tipler.ts) + `FIZIK_TANIMLARI` +
-  `govdeCiz` içine bir `case` — TypeScript üçünden eksik olanı derlemede yakalar
-  (`Record<FizikNesnesi, …>` ve `switch` kapsamı). Başka yere dokunmak gerekmez.
-- Kutu tabanlı şekil olduğu için taşıma/boyutlandırma/döndürme/kesin ölçü/hizalama mevcut
-  yoldan çalışır (`sinirlar.ts`, `geometri.ts`, `vurus.ts`'e `fizik` eklendi; vuruşta kutunun
-  İÇİ tıklanabilir, tıpkı akış kutusu gibi).
-- **Etiket yazımı** (`fizikMetniParcala`): `m_1`, `v^2`, `v_{0x}`, `\theta`, `\Delta t`.
-  Bağlayıcı etiketleri de aynı yazıyı kullanır (`T_1`, `F_{sür}`). Bilinmeyen `\kelime`
-  olduğu gibi kalır. Yunan tablosu `yunanHarfleri.ts`'te ve denklem "yazarak ekle" ile ORTAK.
-- **Bağlayıcı biçimi** (`baglayici.stil`): `dik` (varsayılan; alan yazılmaz, eski belgeler
-  değişmedi) · `duz` (ip/çubuk) · `yay` (zikzak) · `vektor` (kalın, dolu uçlu, etiket yanına).
-  Düz biçimlerde yol iki tutunma noktası arasında tek doğru (`baglayiciYolu`); yay zikzağı
-  yalnız ÇİZİMDE üretilir (`ciz.ts`), vuruş/sınır hesabı düz yola bakar.
-- **Fizik kipinde bağlantının uçları şekil YA DA boş nokta olabilir** (kuvvet oku boşlukta
-  başlayıp biter). Akış kipi eskisi gibi yalnız kutulara bağlanır.
-- **Yön seçimi EKRANDAKİ yöndür** ("Sol" = gördüğün sol). Döndürülmüş şekilde tutunma
-  noktası şekille döner (`tutunmaNoktasi` dönüşü uygular, `yonDondur`). Bu davranış akış
-  kutuları için de geçerli: eskiden döndürülmüş akış kutusunda ok kutudan kopuktu.
-- Fizik etiketi kutunun DIŞINA yazılabildiği için `cizimIcerikSiniri` etiketi de sayar
-  (soruya eklenen görselde kırpılmasın). Harfler (A, V, N, S) gövdeyle dönmez, düz kalır.
-- Fizik kipi TÜM çizim araçlarını korur (ok, çizgi, elips, dalga…): fizik şemasında lazım.
-  Paletin küçük önizleme tuvalleri de `<canvas>`; testlerde asıl tuvali `canvas[role="img"]`
-  ile seç, `querySelector("canvas")` yanlış tuvali verir.
-- Arayüz `components/FizikPaneli.tsx` (şerit, seçili nesne paneli, bağlayıcı biçim paneli);
-  `CizimEditoruModal.tsx` yalnız durumu (`kip`, `baglayiciAyari`, `baglayiciKaynakUcu`) tutar.
+Doğrudan etkileşim (saf yardımcılar, test edilir):
 
-**Denklem editörü: "Yazarak ekle" (`denklem/yazim.ts`)**
+- `cizim/geometriEtkilesim.ts`: köşe/nokta tutamaçları (`geometriKoseleri`), `geometriKoseTasi` (yeni geo
+  verisi) ve `geometriKoseTasiSekil` (köşe kutu dışına çıkarsa şeklin `x, y, w, h` kutusu da büyür,
+  köşeler yeniden birimlenir; seçim çerçevesi, vuruş ve PNG kırpma aynı kutuyu görür, dünya konumu
+  döndürülmüş/aynalı şekilde de korunur), çift tıklanan köşe/kenar ve etiket yazma.
+- `cizim/etkilesim.ts`: bağlantı portları (mavi halkalar; akış kutusu ve fizik nesnesi), grafik noktası
+  sürükleme, yatay çevir / 90° döndür, `balonYerlesimi` (çift tıklama balonu şekle değmez, önce yanlara,
+  sonra alta/üste açılır; sığmazsa `maxH` ile kısalır ve içi kaydırılır).
+- `components/cizim/YerindeDuzenleBalonu.tsx`: köşe adı, açı etiketi/işareti, eş açı/kenar işareti,
+  kenar etiketi; akış kutusu metni, fizik ve bağlayıcı etiketi. Değişiklik tek geri alma adımıdır.
+
+Şekil aileleri:
+
+- **Hazır sahneler** `cizim/sahneler.ts` (`HAZIR_SAHNELER`) ← `cizim/fizikSahneSablonlari.ts`. Birleşik
+  sahneler (eğik düzlem + makara, Atwood, palanga, tam devre) mevcut nesne + bağlayıcılardan kurulur;
+  hesaplı tek nesneler `cizim/fizikSahneler.ts` (`egikKuvvet`), `cizim/optik.ts` (`optikDuzenek`),
+  `cizim/sivi.ts` (`siviKabi`); paneli `components/FizikSahnePaneli.tsx`.
+- **Geometri** `cizim/geometriSekilleri.ts` (üçgen yardımcı elemanları, çember açıları, benzerlik, çokgen),
+  `cizim/geometriEk.ts` (doğruda açılar, özel dörtgenler, katı cisimler, kağıt katlama),
+  `cizim/geometriYardimci.ts`; paneli `components/GeometriPaneli.tsx`.
+- **Matematik** `cizim/grafik.ts` + `cizim/ifade.ts`, `cizim/istatistik.ts`, `cizim/sema.ts`,
+  `cizim/semaEk.ts` (birim çember, işaret tablosu, fonksiyon ok diyagramı); paneller
+  `components/GrafikPaneli.tsx`, `components/MatematikPaneli.tsx`; veri tabloları `components/MiniTablo.tsx`.
+- **Kimya** `cizim/kimya.ts` (laboratuvar, Bohr, Lewis, organik iskelet: zincir, sikloalkan, yan gruplar,
+  IUPAC adı; orbital, pil, periyodik tablo); paneli `components/KimyaPaneli.tsx`.
+
+Çekirdek kurallar (v1.1'den beri geçerli):
+
+- Şekil türü `fizik` (`cizim/tipler.ts`): `nesne` + kutu (`x,y,w,h`) + `etiket` + `etiketYeri` + `ayna` +
+  `dolgu` + nesneye özel veri (`grafik`, `istatistik`, `sema`, `kimya`, `geo`, `kuvvet`, `optik`, `sivi`).
+  Katalog `FIZIK_TANIMLARI` (`cizim/fizik.ts`).
+- **Yeni nesne eklemek**: `FizikNesnesi` birleşimi + `FIZIK_TANIMLARI` + `govdeCiz` içine bir `case`;
+  TypeScript eksik olanı derlemede yakalar. Kütüphaneye grubuna göre kendiliğinden gelir; arama için
+  `aramaKelimeleri` verin.
+- **Etiket yazımı** (`fizikMetniParcala`): `m_1`, `v^2`, `v_{0x}`, `\theta`, `\Delta t`; bağlayıcı
+  etiketleri de aynı yazıyı kullanır. Yunan tablosu `yunanHarfleri.ts`'te, denklem "yazarak ekle" ile ORTAK.
+- **Bağlayıcı biçimi** (`baglayici.stil`): `dik` (varsayılan) · `duz` (ip/çubuk) · `yay` (zikzak) ·
+  `vektor`. Uçlar şekil ya da boş nokta olabilir; yön seçimi EKRANDAKİ yöndür (döndürülmüş şekilde
+  tutunma noktası şekille döner). Bağlayıcının `sekilSinirlari` nöbetçi değerdir (-1e6);
+  `birlesikSinir` karışık seçimde bağlayıcıları saymaz.
+- Etiket ve eksen yazıları kutunun DIŞINA taşabildiği için `cizimIcerikSiniri` / `fizikDisPayi` /
+  `geometriDisPayi` bunları sayar (soruya eklenen PNG'de kırpılmasın).
+- Testlerde asıl tuvali `canvas[role="img"]` ile seçin; kütüphane kartlarının önizlemeleri de `<canvas>`.
+
+## Denklem editörü: "Yazarak ekle" (`denklem/yazim.ts`)
+
 
 - README'deki "kalan asıl iş"in KARAR VERİLEN çözümü: imleç modeli ya da MathLive yerine,
   yazıdan mevcut `DenklemParcasi[]`'yi üreten bir ayrıştırıcı. Belge biçimi (`surum: "v1"`)
@@ -56,10 +83,12 @@ Fizik sınavı hazırlayan öğretmen için çizim editörüne FİZİK kipi, den
   gösterir ama yine de ekler. Giriş kutusunda Enter ekler ve odağı KORUR (arka arkaya yazılır).
 - Denklem iç içe parçalarda önizleme vurgusu hâlâ yok (eski açık madde).
 
-**Testler**: `tests/fizik-senaryolari.ts` (`npm run test:fizik`), `tests/fizik-kullanici-akisi.tsx`
-(`test:fizik:ui`), `tests/denklem-yazim-senaryolari.ts` (`test:denklem-yazim`). Üçü `test:all`'da.
-Görsel doğrulama için 30 nesne gerçek Chromium tuvalinde çizilip gözle kontrol edildi;
-otomatik testler geometriyi doğrular, estetiği değil — yeni nesne eklerken yine gözle bak.
+
+**Testler**: `tests/fizik-senaryolari.ts` (`test:fizik`), `tests/fizik-kullanici-akisi.tsx` (`test:fizik:ui`),
+`tests/denklem-yazim-senaryolari.ts` (`test:denklem-yazim`), v1.2: `tests/v12-g-senaryolari.ts`,
+`tests/v12-m-senaryolari.ts`, `tests/v12-f-senaryolari.ts` (+ `-kullanici-akisi.tsx` eşleri) ve
+`tests/v12-u-kullanici-akisi.tsx`. Hepsi `npm test`'te. Otomatik testler geometriyi ve PNG kırpmasını
+doğrular, estetiği değil: yeni şekil eklerken kütüphane kartını ve tuvali gözle de kontrol edin.
 
 ## 2026-08 test turu — bulunan ve düzeltilen sorunlar
 
@@ -71,9 +100,7 @@ dokunmadan önce bilmesi gerekenler:
   + `src/components/GeriAlToast.tsx` (app/Layout.tsx'te bir kez render edilir).
   Eskiden `SinavlarimScreen.tsx`'in kendi `useState`'indeydi: öğretmen 10 sn
   dolmadan başka ekrana geçince (çok normal bir davranış) bildirim ANINDA
-  kayboluyordu, "geri al" hakkı süresi dolmadan buharlaşıyordu. Bu KIRPMA silme
-  için de aynıydı (bkz. `modules/ders-kitabi/README.md`) — ikisi de aynı ortak
-  kuyruğa taşındı. **Yeni bir silme akışı eklerken bu kuyruğu kullan, ekran
+  kayboluyordu, "geri al" hakkı süresi dolmadan buharlaşıyordu. **Yeni bir silme akışı eklerken bu kuyruğu kullan, ekran
   içi `useState` + `setTimeout` kalıbına dönme.**
 - **Zengin metin araç çubuğu (Kalın/İtalik/Altı çizili) fare tıklamasında
   bazen etkisizdi.** Kök neden: araç çubuğu düğmesine `mousedown` (preventDefault'a
@@ -119,8 +146,7 @@ dokunmadan önce bilmesi gerekenler:
 
 Temel kararlar:
 
-- Bu modül geçici çalışma alanıdır.
-- Sınav taslağı, soru görselleri ve soru bankası kırpıntıları SQLite'a kaydedilmez;
+- Sınav taslağı ve soru görselleri SQLite'a kaydedilmez;
   içerik yalnızca tarayıcı IndexedDB'sinde (`sinav:<id>` anahtarlı, otomatik) ve
   isteğe bağlı `.json` dosyasında (elle dışa/içe aktarım) tutulur.
 - **Çok sınavlı kütüphane:** tek taslak slotu yerine `db.sinavlar` metadata tablosu
@@ -239,10 +265,10 @@ Bilinen teknik borç:
 
 - Zengin metin düzenleme `document.execCommand` üzerinden yapılıyor (deprecated Web
   API); şu an çalışıyor ama tarayıcı/webview güncellemelerinde risk taşıyor.
-- İki dosya hâlâ tek parça olarak büyük: `SinavOlusturucuScreen.tsx` 3.619 ve
-  `DenklemEditoruModal.tsx` 2.731 satır. Bölme planı Faz D
-  (`SINAV-OLUSTURUCU-DEGERLENDIRME.md` §13). `CizimEditoruModal.tsx` 2.593 →
-  1.613 satır (geometri `cizim/` altına çıktı).
+- Üç dosya hâlâ tek parça olarak büyük (2026-11): `SinavOlusturucuScreen.tsx` ~4.500,
+  `CizimEditoruModal.tsx` ~3.400 ve `DenklemEditoruModal.tsx` ~2.000 satır. Çizim
+  editöründe geometri/etkileşim hesapları `cizim/` altında saf; kütüphane, yüzen çubuk ve
+  balon `components/cizim/` altına ayrıldı. Bölme planı: Faz D.
   `SinavComponents.tsx` (3.651) **bölündü** — altı dosya, kabaca eşit ölçekte:
   `SinavKagit.tsx` (kâğıda basılan her şey) · `SinavZenginMetin.tsx`
   (`RichTextEditor` + salt-okunur ikizi) · `SinavSoruListesi.tsx` ·
@@ -266,44 +292,34 @@ Faz D'ye dokunmadan önce bilinmesi gereken iki bilinçli tercih:
 - Testlerin bir kısmı kaynak **metni** arar (`ekran.includes(...)`). Dosya bölerken
   kırılırlar; kırılınca iddiayı yeni yerine **taşı**, silme.
 
-### Fizik kipi güncellemesi (vektör, yerleşim, bağlantı)
-- **Vektör sekmesi**: Kuvvet (F), Hız (v), İvme (a, çift çizgi), Bileşen (kesikli) tek tıkla eklenir; kutu tutamaçlarıyla boyu, döndürmeyle yönü ayarlanır. Bir şekil seçiliyken eklenirse o şeklin sağ kenarından dışarı doğru başlar.
-- Varsayılan dolgu artık yok (beyaz dolgu komşu şekil/çizgileri gizliyordu); Dolgu isteğe bağlı.
-- Yeni şekil `cizim/yerlesim.ts` ile mevcut şekillerle kesişmeyen en yakın boş yere gelir.
-- Düz bağlantılar (ip/yay/vektör) karşılıklı şekillerde yatay/dikey hizalanır; makaraya giden ip çemberin teğetine oturur.
+### Çizim editörü özellik notları
 
-### Kareli alan (vektör zemini)
-- Fizik şeridi > "Vektör / Izgara" > **Kareli alan**. Satır, sütun, hücre genişliği/yüksekliği ("Kare kalsın" ile birlikte), çizgi rengi, kalınlığı, kesikli ve dış çerçeve seçilebilir (varsayılan 3×4, açık gri, ince).
-- Alan her zaman diğer şekillerin ALTINDA çizilir; yalnız çizgilerine tıklayınca seçilir (içindeki cisimlere/vektörlere tıklamayı çalmaz).
-- Vektör köşelere yapışır: Bağlantı > Kuvvet/Vektör ile alanın içine tıklayınca en yakın köşe alınır; ya da alan seçiliyken "Vektör ekle" kutusuna başlangıç köşesi ve bileşenler (yatay, dikey; yukarı +) yazılır. Uçlar `BaglayiciUcu.dugum {c, r}` olarak saklanır; alan taşınınca/boyutlanınca/döndürülünce vektörler birlikte gelir.
-- Kod: `cizim/geometri.ts` (`izgaraBoyutu`, `izgaraDugumu`, `enYakinDugum`), `cizim/fizik.ts` (`kareliAlan` gövdesi), `components/FizikPaneli.tsx` (`KareliAlanPaneli`).
-
-### Fizik grafikleri (konum–zaman, hız–zaman, ivme–zaman, sinüs)
-- Fizik şeridi > **Grafik**: hazır şablonlar (x–t sabit hız, x–t ivmeli, v–t, a–t, sinüs, kosinüs, sin θ π eksenli, noktalarla). Tek tıkla eklenir; kutuyu taşıyıp boyutlandırabilirsiniz.
-- **x · v · a Üçlü grafik**: aynı hareketin konum, hız ve ivme grafiğini alt alta, zaman eksenleri hizalı ekler.
-- **Hızlı çiz**: Grafik sekmesindeki kutuya `0,5; 5,15; 9,15; 11,9` gibi (zaman, değer) noktalarını yazıp Enter → kılavuzlu, sayılı grafik hazır. Noktalar panelindeki **"Bunu v–t say"** düğmesi aynı hareketin x–t ve a–t grafiklerini de üretir.
-- Eğri üç şekilde tanımlanır (panelden değişir):
-  - **Hareket evreleri**: başlangıç konumu/hızı + evreler (süre, ivme). Konum, hız ve ivme grafiği aynı evrelerden hesaplandığı için birbiriyle tutarlıdır; panelde toplam süre, son hız ve yer değiştirme görünür.
-  - **Noktalar**: `0,0; 4,20; 8,20; 10,0` gibi yazılır (ondalık için `2.5` ya da `2,5 10`).
-  - **Sinüs / Kosinüs**: genlik, periyot, faz (derece), düşey kayma, başlangıç–bitiş.
-- Eğri başına renk, kesikli, **altını boya** (yer değiştirme = v–t alanı), köşe noktaları + eksene kesikli kılavuz, eğri adı (I, x_1). En çok 4 eğri aynı grafikte.
-- Eksenler: ad (`m/s^2` üst simge), aralık ve adım (boşsa otomatik), ızgara, sayılar (düzenli / yalnız köşe değerleri / yok), yatay eksen π (radyan: π/2, π, 3π/2…), başlık.
-- Kod: `cizim/grafik.ts` (saf: örnekleme, aralık, sayı yazımı, çizim), `components/GrafikPaneli.tsx`. Testler: `tests/fizik-senaryolari.ts`, `tests/fizik-kullanici-akisi.tsx`.
-
-### Matematik: fonksiyon, istatistik, şemalar
-Fizik kipi > **Matematik / İstatistik** sekmesi. Her şey tek tıkla hazır şablonla gelir, sayılar sonra değiştirilir; çıktı siyah-beyaz baskıya uygundur (renk isteğe bağlı).
-- **Hızlı çiz:** `y = x^2 - 4 ; y > x + 1 ; x = 3` yazıp Enter. Eşitsizlik yazılırsa bölge boyanır (`<` `>` kesikli, `<=` `>=` düz sınır). `eval` yok: `cizim/ifade.ts` kendi çözücüsü (örtük çarpma `2x`, `3(x+1)`, `x^2`, `sqrt`, `|x|`, `sin/cos/tan`, `ln/log`, `pi`).
-- **Fonksiyon grafiği** (`grafik.ts`, eğri türleri fonksiyon / bölge / isaret): asimptot kesilir, parçalı fonksiyonda açık-kapalı uç dairesi, adlı noktalar `A(2,3)`, serpme diyagramı + regresyon doğrusu.
-- **Denklem, alan, kesişim, teğet:** `x^2+y^2=25`, `x^2/9+y^2/4=1`, `x^2/9-y^2/4=1`, `(x-1)^2+(y+2)^2=4`, `x=y^2` kapalı denklem olarak çizilir (`denklem` eğrisi, marching squares; çember/elipste eksen birimleri eşitlenir). `alan(x, x^2, 0, 1)` iki eğri arası, `alan(x^2-4x+5, 1, 3)` eğri altı alan; `teget(x^2, 1)` x₀ noktasında teğet (sayısal türev, denklemi panelde yazar); `kesisim` ya da panelde “Kesişim ve kökleri işaretle” y=f(x) eğrilerinin kesişim ve eksen kökleri `(x; y)` etiketiyle işaretlenir (asimptot kök sayılmaz; denklem eğrileri bu hesaba girmez).
-- **İstatistik** (`istatistik.ts`, `MatematikPaneli.tsx`): sütun, gruplu sütun, çubuk, daire, çizgi, histogram (+ sıklık çokgeni, ham veriden sınıf), kutu (MEB çeyrek yöntemi, aykırı değer), gövde–yaprak (iki grup sırt sırta). Tablo Excel'den yapıştırılabilir. Ortalama/ortanca/tepe değer/standart sapma paneldedir.
-- **Şemalar** (`sema.ts`): Venn (2–3 küme, bölge değerleri, bölge boyama), olasılık ağacı (`K: 1/3` / `- K: 1/2` yazımı), sayı doğrusu (aralık `(-2, 3]; [5, ∞)`, açık/kapalı nokta).
-- Testler: `npm run test:fizik` (ifade, hesaplar, çizim, doğrulama) ve `npm run test:fizik:ui` (hızlı fonksiyon, tablo yapıştır, Venn boyama).
-
-### Kimya: laboratuvar, atom/molekül, periyodik tablo, grafikler
-Fizik kipi > **Kimya** sekmesi (Laboratuvar · Atom / Molekül · Periyodik tablo · Grafik). Kod: `cizim/kimya.ts`, arayüz `components/KimyaPaneli.tsx`.
-- **Laboratuvar:** beher, erlenmayer, balon joje, mezür, deney tüpü, büret, ayırma hunisi, Bunsen beki, huni, damıtma düzeneği. Sıvı = `dolgu` rengi + `seviye` (panelde kaydırıcı).
-- **Bohr atomu / iyon:** atom numarası ve yük yazılır; kabuklar otomatik dolar (kation dış kabuktan eksilir, Cr/Cu istisnası dâhil). Elle dizilim de yazılabilir.
-- **Molekül:** 17 hazır yapı (H₂ … NH₄⁺, NaCl); bağ çizgisi ya da Lewis noktaları, δ+/δ−, formül ve geometri yazısı. Ortaklanmamış çiftler boşluğa otomatik dağılır; testte her molekülün oktet sayımı doğrulanır.
-- **Periyodik tablo:** 118 element, lantanit/aktinit satırları; tüm tablo, ilk 20, ilk 3 periyot, ana gruplar. Element boyama (`O, S, 11-13`), simgeyi `?` yapma, kütle ve numara gösterme.
-- **Grafikler:** ısınma/soğuma, çözünürlük, derişim–zaman, ekzotermik/endotermik/katalizörlü enerji profili, titrasyon (`grafik.ts` verisi).
-- Kapsam dışı: organik yapı çizimi (halkalar, fonksiyonel gruplar) henüz yok.
+- **Vektörler** (Fizik > Vektör): Kuvvet (F), Hız (v), İvme (a, çift çizgi), Bileşen (kesikli). Bir şekil
+  seçiliyken eklenirse o şeklin sağ kenarından dışarı doğru başlar. Varsayılan dolgu yok (beyaz dolgu
+  komşu çizgileri gizliyordu). Yeni şekil `cizim/yerlesim.ts` ile boş bir yere gelir; boş yer
+  kalmamışsa ortaya kaydırılarak konur.
+- **Bağlama**: üst çubuktaki Ok / Bağlayıcı aracı sürekli kiptedir (Esc'e kadar); tür Otomatik (iki devre
+  elemanı → devre teli, akış kutusu → dik ok) ya da Ok / Dik açılı ok / Devre teli / İp-Çubuk / Yay /
+  Kuvvet-Vektör. Fizik nesnesinin ve akış kutusunun mavi port halkalarından sürükleyerek de bağlanır.
+  Düz bağlantılar karşılıklı şekillerde hizalanır; makaraya giden ip çemberin teğetine oturur.
+- **Kareli alan** (Fizik > Vektör / Izgara): satır, sütun, hücre ölçüsü, çizgi biçimi. Her zaman diğer
+  şekillerin ALTINDA çizilir, yalnız çizgilerine tıklayınca seçilir. Vektör köşelere yapışır: Ok /
+  Bağlayıcı aracında Kuvvet / Vektör türüyle alanın içine tıklayın ya da alan seçiliyken Ayrıntılar'daki
+  "Vektör ekle"yi kullanın. Uçlar `BaglayiciUcu.dugum {c, r}`; alan taşınınca vektörler birlikte gelir.
+  Kod: `cizim/geometri.ts` (`izgaraBoyutu`, `izgaraDugumu`, `enYakinDugum`), `FizikPaneli.tsx` (`KareliAlanPaneli`).
+- **Hareket grafikleri** (Fizik > Hareket grafikleri): x–t, v–t, a–t, sinüs/kosinüs, noktalarla ve
+  "x–t, v–t, a–t üçlü" (aynı hareketin üç grafiği alt alta, zaman eksenleri hizalı). Eğri hareket
+  evreleriyle (süre, ivme), noktalarla ya da genlik/periyotla tanımlanır; köşe noktaları tuvalde
+  sürüklenir (eksen adımına yakalanır). "Bunu v–t say" x–t ve a–t'yi de üretir. Kod: `cizim/grafik.ts`,
+  `components/GrafikPaneli.tsx`.
+- **Matematik**: ifade çözücü `cizim/ifade.ts` (`eval` yok; örtük çarpma `2x`, `x^2`, `sqrt`, `|x|`,
+  `sin/cos/tan`, `ln/log`, `pi`). Eşitsizlik bölge olarak boyanır; `x^2+y^2=25` gibi kapalı denklemler
+  marching squares ile çizilir; `alan(...)`, `teget(...)`, `kesisim`. İstatistik: MEB çeyrek yöntemiyle
+  kutu grafiği, ham veriden histogram; tablo Excel'den yapıştırılır. Şemalar: Venn (kesişen / alt küme /
+  ayrık), en çok 3 aşamalı olasılık ağacı, sayı doğrusu, birim çember, işaret tablosu
+  (`isaretTablosuHesapla`), fonksiyon ok diyagramı.
+- **Kimya**: laboratuvar malzemeleri (sıvı = dolgu + seviye), Bohr atomu/iyon (kabuklar otomatik, Cr/Cu
+  istisnası), Lewis yapıları (oktet testte doğrulanır), organik iskelet (zincir, sikloalkan 3–8, yan
+  gruplar −CH₃ −C₂H₅ −Cl −Br −OH −NH₂; IUPAC adı ve Hill formülü grafikten hesaplanır), fonksiyonel
+  gruplar, orbital diyagramları, Daniell / Cu–Ag pili, 118 elementli periyodik tablo, kimya grafikleri.
+  Kapsam dışı: alken/alkine yan grup ve sikloalken (doğrulayıcı reddeder).

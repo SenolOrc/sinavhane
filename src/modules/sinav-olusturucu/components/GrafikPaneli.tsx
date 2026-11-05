@@ -637,7 +637,7 @@ export function GrafikSeridi({ onSablon, onUclu, onHizli }: {
           <OrnekCipleri ornekler={HIZLI_NOKTA_ORNEKLERI.map((o) => ({ ad: o.ad, deger: o.metin }))} onSec={setMetin} />
           {nedeni && <span className="w-full text-[10px] text-red-600" data-testid="grafik-hizli-hata">{nedeni}</span>}
           {ayniX && <span className="w-full text-[10px] text-amber-700" data-testid="grafik-hizli-uyari">{ayniX}</span>}
-          <span className="w-full text-[10px] text-slate-500">(zaman, değer) çiftleri ; ile ayrılır (en çok 80 nokta). Köşelere kesikli kılavuz ve sayılar otomatik gelir.</span>
+          <span className="w-full text-[10px] text-slate-500">(zaman, değer) çiftleri ; ile ayrılır (en çok 80 nokta). Köşelere kesikli kılavuz ve sayılar otomatik gelir; eklenen grafikte köşe noktalarını tuvalde sürükleyerek de değiştirebilirsiniz.</span>
         </div>
       )}
       {GRAFIK_SABLONLARI.map((sb) => (

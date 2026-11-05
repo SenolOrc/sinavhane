@@ -18,6 +18,7 @@ import { izgaraBoyutu } from "../cizim/geometri";
 import type { BaglayiciUcu, BaglayiciStili, BaglayiciYonu, FizikEtiketYeri, FizikNesnesi, Sekil } from "../cizim/tipler";
 import { TogglePill } from "./ModalParcalari";
 import { GeoEkPaneli } from "./GeometriPaneli";
+import { portluMu } from "../cizim/etkilesim";
 import { FizikSahnePaneli, fizikSahnePaneliVarMi } from "./FizikSahnePaneli";
 
 export type BaglayiciAyari = {
@@ -72,8 +73,9 @@ export function FizikSeridi({
   grup: disGrup,
   onGrupDegisti,
 }: {
-  /** Seçili şekil grubu DIŞARIDAN yönetilebilir (üstteki Matematik/Kimya
-   *  sekmeleri aynı paneli ilgili grupta açar). Verilmezse kendi durumunu tutar. */
+  /** Seçili şekil grubu DIŞARIDAN yönetilebilir. Verilmezse kendi durumunu tutar.
+   *  (v1.2'den beri çizim penceresi bu şeridi kullanmıyor; şekiller sol
+   *  kütüphaneden eklenir. Şerit bağımsız kullanım için korunuyor.) */
   grup?: FizikGrubu;
   onGrupDegisti?: (grup: FizikGrubu) => void;
   /** "Kimya" grubunda gösterilir (laboratuvar, atom/molekül, periyodik tablo, grafik). */
@@ -286,6 +288,11 @@ export function FizikSecimPaneli({
           yerTutucu={sekil.nesne === "koordinat" ? "dikey|yatay  ör. v|t" : undefined}
         />
       </div>
+      {portluMu(sekil) && (
+        <span className="mt-1 block text-[10px] text-slate-500">
+          Etikete tuvalde çift tıklayarak da yazabilirsiniz. Şeklin üstüne gelince çıkan mavi noktalardan sürükleyerek tel/ok bağlayabilirsiniz.
+        </span>
+      )}
       <GeoEkPaneli sekil={sekil} guncelle={guncelle} tarihceyeKaydet={tarihceyeKaydet} />
       {kimyaSiviliMi(sekil.nesne) && (
         <div className="mt-2 flex flex-wrap items-center gap-2" data-testid="kimya-sivi">
@@ -521,7 +528,7 @@ function KareliAlanPaneli({ sekil, guncelle, tarihceyeKaydet, onVektorEkle }: {
           >
             Vektörü ekle
           </button>
-          <span className="text-[10px] text-slate-500">Sütun/satır köşe numarasıdır (sol-üst = 0,0); dikey bileşen yukarı pozitif. Ayrıca Bağlantı &gt; Kuvvet/Vektör ile köşelere tıklayabilirsiniz.</span>
+          <span className="text-[10px] text-slate-500">Sütun/satır köşe numarasıdır (sol-üst = 0,0); dikey bileşen yukarı pozitif. Üst çubuktaki Ok / Bağlayıcı aracında “Kuvvet / Vektör” türünü seçip köşelere tıklayarak da çizebilirsiniz.</span>
         </div>
       )}
     </div>

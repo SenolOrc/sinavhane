@@ -14,6 +14,8 @@ import { FIZIK_GRUPLARI, FIZIK_TANIMLARI } from "./fizik";
 import {
   GRAFIK_SABLONLARI,
   MAT_GRAFIK_SABLONLARI,
+  ORNEK_EVRELER,
+  hareketUcluGrafik,
   hizliMatematik,
   noktalardanGrafik,
   noktalariOku,
@@ -391,7 +393,14 @@ export function kutuphaneGirdileri(kullaniciSablonlari: KullaniciSablonu[] = [])
     id: "grafik:uclu", ad: "x–t, v–t, a–t üçlü", kategori: "fizik", altBaslik: "Hareket grafikleri",
     ipucu: "Aynı hareketin konum, hız ve ivme grafiği alt alta, zaman eksenleri hizalı",
     aramaKelimeleri: ["grafik", "konum", "hız", "ivme", "üçlü"],
-    onizleme: { tur: "yazi", metin: "x · v · a" }, ekle: () => ({ tur: "uclu" }),
+    // Üç grafik yan yana (kart yatay); tuvale eklenince alt alta dizilir.
+    onizleme: {
+      tur: "sekiller",
+      sekiller: () => hareketUcluGrafik(0, 0, ORNEK_EVRELER).map((g, i) => ({
+        ...fizikOnizlemeSekli("grafik", { grafik: { ...g, sade: true } }, 200, 190), id: `onizleme-${i}`, x: i * 230,
+      })),
+    },
+    ekle: () => ({ tur: "uclu" }),
   });
 
   // 6) Kimya

@@ -29,6 +29,21 @@ export function bosYerBul(mevcut: Kutu[], w: number, h: number, tuval: { w: numb
     const kutu = { x: a.x, y: a.y, w, h };
     if (!mevcut.some((m) => kesisir(kutu, m, BOSLUK))) return { x: Math.round(a.x), y: Math.round(a.y) };
   }
-  const kayma = (mevcut.length % 6) * 26;
-  return { x: Math.round(Math.min(enX, ortaX + kayma)), y: Math.round(Math.min(enY, ortaY + kayma)) };
+  // Tam boş yer yoksa: mevcut şekillerle EN AZ örtüşen konumu seç (eşitlikte
+  // ortaya yakın olan). Eskiden ortaya kademeli kayma yapılıyordu ve büyük
+  // şekiller (grafik, sahne) çoğunlukla öncekinin tam üstüne geliyordu.
+  const ortusme = (k: Kutu) =>
+    mevcut.reduce((t, m) => {
+      const ox = Math.min(k.x + k.w, m.x + m.w + BOSLUK) - Math.max(k.x, m.x - BOSLUK);
+      const oy = Math.min(k.y + k.h, m.y + m.h + BOSLUK) - Math.max(k.y, m.y - BOSLUK);
+      return t + (ox > 0 && oy > 0 ? ox * oy : 0);
+    }, 0);
+  let enIyi: { x: number; y: number } | null = null;
+  let enAz = Infinity;
+  for (const a of adaylar) {
+    const o = ortusme({ x: a.x, y: a.y, w, h });
+    if (o < enAz - 1e-6) { enAz = o; enIyi = { x: a.x, y: a.y }; }
+  }
+  if (enIyi) return { x: Math.round(enIyi.x), y: Math.round(enIyi.y) };
+  return { x: Math.round(ortaX), y: Math.round(ortaY) };
 }

@@ -255,7 +255,11 @@ export function cizimIcerikSiniri(
 }
 
 export function birlesikSinir(ctx: CanvasRenderingContext2D, sekiller: Sekil[]) {
-  const sinirlar = sekiller.map((s) => sekilSinirlari(ctx, s));
+  // Bağlayıcının kutusu anlamsız bir nöbetçi değerdir (-1e6): karışık seçimde
+  // (ör. ipleriyle eklenen hazır sahne) birleşik çerçeveyi tuvalin köşesine
+  // çekmesin. Yalnız bağlayıcı seçiliyse eski davranış korunur.
+  const govde = sekiller.filter((s) => s.tur !== "baglayici");
+  const sinirlar = (govde.length ? govde : sekiller).map((s) => sekilSinirlari(ctx, s));
   const x = Math.min(...sinirlar.map((s) => s.x));
   const y = Math.min(...sinirlar.map((s) => s.y));
   const sag = Math.max(...sinirlar.map((s) => s.x + s.w));

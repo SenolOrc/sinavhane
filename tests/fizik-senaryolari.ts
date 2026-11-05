@@ -303,6 +303,12 @@ test("Yerleşim: yeni şekil mevcutlarla kesişmez; vektör grubu var", () => {
   for (const v of ["vektorKuvvet", "vektorHiz", "vektorIvme", "vektorBilesen"] as const) {
     dogrula(FIZIK_TANIMLARI[v].grup === "vektor", `${v} vektör grubunda değil`);
   }
+  // Tam boş yer yoksa yeni büyük şekil öncekinin tam üstüne değil, en az örtüşen yere gelir.
+  const buyuk = { x: 230, y: 125, w: 500, h: 350 };
+  const k2 = bosYerBul([buyuk], 500, 350, { w: 960, h: 600 });
+  const ox = Math.max(0, Math.min(k2.x + 500, buyuk.x + buyuk.w) - Math.max(k2.x, buyuk.x));
+  const oy = Math.max(0, Math.min(k2.y + 350, buyuk.y + buyuk.h) - Math.max(k2.y, buyuk.y));
+  dogrula(ox * oy < 500 * 350 * 0.5, `büyük şekil öncekinin üstüne bindi: ${JSON.stringify(k2)}`);
 });
 
 test("Düz bağlantı: karşılıklı iki kütle arasında çizgi yatay", () => {

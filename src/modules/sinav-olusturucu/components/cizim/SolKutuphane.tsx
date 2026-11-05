@@ -18,10 +18,47 @@ import {
 import { fizikDisPayi, fizikSimgeCiz } from "../../cizim/fizik";
 import { sekilleriCiz } from "../../cizim/ciz";
 import { sekilTamKutusu } from "../../cizim/sinirlar";
+import type { Sekil } from "../../cizim/tipler";
 
 const ONIZLEME_W = 112;
 const ONIZLEME_H = 64;
 const ACIK_KATEGORI_ANAHTARI = "sinavhane:cizim-kutuphane-acik:v1";
+
+/**
+ * Şekilleri, kutuları kartın iki katı büyüklükte bir taslak tuvalin ortasına
+ * sığdırarak çizer ve saydam olmayan piksellerin sınırını dünya koordinatında
+ * döndürür. Tarayıcı dışı ortamda (jsdom) ya da boş çizimde null.
+ */
+function murekkepSiniri(
+  sekiller: Sekil[], x0: number, y0: number, x1: number, y1: number, olcek: number, w: number, h: number,
+): { x0: number; y0: number; x1: number; y1: number } | null {
+  if (typeof document === "undefined") return null;
+  const k = 2; // taslak çözünürlük katsayısı
+  const tw = w * 2 * k, th = h * 2 * k;
+  const c = document.createElement("canvas");
+  c.width = tw; c.height = th;
+  const t = c.getContext("2d");
+  if (!t || typeof t.getImageData !== "function") return null;
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  t.setTransform(olcek * k, 0, 0, olcek * k, tw / 2 - cx * olcek * k, th / 2 - cy * olcek * k);
+  sekilleriCiz(t, sekiller);
+  const d = t.getImageData(0, 0, tw, th).data;
+  let px0 = tw, py0 = th, px1 = -1, py1 = -1;
+  for (let y = 0; y < th; y++) {
+    for (let x = 0; x < tw; x++) {
+      if (d[(y * tw + x) * 4 + 3] > 24) {
+        if (x < px0) px0 = x;
+        if (x > px1) px1 = x;
+        if (y < py0) py0 = y;
+        if (y > py1) py1 = y;
+      }
+    }
+  }
+  if (px1 < 0) return null;
+  const dunya = (px: number, py: number) => ({ x: cx + (px - tw / 2) / (olcek * k), y: cy + (py - th / 2) / (olcek * k) });
+  const a = dunya(px0, py0), b = dunya(px1 + 1, py1 + 1);
+  return { x0: a.x, y0: a.y, x1: b.x, y1: b.y };
+}
 
 /** Kart önizlemesi: gerçek çizim rutinleriyle, kutuya sığdırılmış. */
 export function KutuphaneOnizleme({ onizleme, w = ONIZLEME_W, h = ONIZLEME_H }: { onizleme: KutuphaneOnizlemesi; w?: number; h?: number }) {
@@ -48,10 +85,24 @@ export function KutuphaneOnizleme({ onizleme, w = ONIZLEME_W, h = ONIZLEME_H }: 
         return { x: k.x - p.sol, y: k.y - p.ust, w: k.w + p.sol + p.sag, h: k.h + p.ust + p.alt };
       });
       if (!kutular.length) return;
-      const x0 = Math.min(...kutular.map((k) => k.x)), y0 = Math.min(...kutular.map((k) => k.y));
-      const x1 = Math.max(...kutular.map((k) => k.x + k.w)), y1 = Math.max(...kutular.map((k) => k.y + k.h));
+      let x0 = Math.min(...kutular.map((k) => k.x)), y0 = Math.min(...kutular.map((k) => k.y));
+      let x1 = Math.max(...kutular.map((k) => k.x + k.w)), y1 = Math.max(...kutular.map((k) => k.y + k.h));
       const pay = 4;
-      const olcek = Math.min((w - 2 * pay) / Math.max(1, x1 - x0), (h - 2 * pay) / Math.max(1, y1 - y0));
+      const sigdir = (a: number, b: number, c: number, d: number) =>
+        Math.min((w - 2 * pay) / Math.max(1, c - a), (h - 2 * pay) / Math.max(1, d - b));
+      let olcek = sigdir(x0, y0, x1, y1);
+      // Kutu çoğu zaman mürekkepten büyüktür (molekül, gövde–yaprak, birim
+      // çember): önce geniş bir taslak tuvale çiz, gerçek mürekkep sınırını bul,
+      // sonra yalnız o sınırı karta sığdır. Böylece küçük kalan önizlemeler
+      // büyür, kutudan taşan yazılar da kesilmez.
+      const sinir = murekkepSiniri(sekiller, x0, y0, x1, y1, olcek, w, h);
+      if (sinir) {
+        const yeni = Math.min(sigdir(sinir.x0, sinir.y0, sinir.x1, sinir.y1), olcek * 4);
+        if (yeni > olcek * 1.08 || sinir.x0 < x0 || sinir.y0 < y0 || sinir.x1 > x1 || sinir.y1 > y1) {
+          ({ x0, y0, x1, y1 } = sinir);
+          olcek = yeni;
+        }
+      }
       ctx.save();
       ctx.translate(w / 2, h / 2);
       ctx.scale(olcek, olcek);
@@ -168,7 +219,7 @@ export function SolKutuphane({
             onChange={(e) => setArama(e.target.value)}
             placeholder="Ara: makara, parabol, beher…"
             title="Şekil veya şablon ara... ör. makara, parabol, dik üçgen, beher, venn"
-            className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-9 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-brand-400 focus:bg-white"
+            className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-9 text-sm [&::-webkit-search-cancel-button]:hidden text-slate-700 outline-none placeholder:text-slate-400 focus:border-brand-400 focus:bg-white"
           />
           {arama && (
             <button type="button" aria-label="Aramayı temizle" onClick={() => setArama("")}

@@ -13,7 +13,7 @@ import {
   aciOlc, dogruAciDuzeni, dortgenKoseleri, katDuzelt, katiCokyuzlu, kagitKoseleri, katlamaHesapla, varsayilanDogruAci, varsayilanDortgen, varsayilanKati, varsayilanKatlama,
 } from "../src/modules/sinav-olusturucu/cizim/geometriEk";
 import {
-  geometriEnYakinKenarVeyaKose, geometriEtiketiAyarla, geometriEtiketiOku, geometriKenarlari, geometriKoseTasi, geometriKoseleri,
+  geometriEnYakinKenarVeyaKose, geometriEtiketiAyarla, geometriEtiketiOku, geometriKenarlari, geometriKoseTasi, geometriKoseTasiSekil, geometriKoseleri,
 } from "../src/modules/sinav-olusturucu/cizim/geometriEtkilesim";
 import { sekilGecerliMi } from "../src/modules/sinav-olusturucu/cizim/sablon";
 import { cizimIcerikSiniri } from "../src/modules/sinav-olusturucu/cizim/sinirlar";
@@ -399,6 +399,42 @@ test("etkileşim: köşeler, köşe taşıma (üçgen fareyi izler), çember nok
   dogrula(geometriKoseTasi(sekil("cokgenAd"), 0, { x: 0, y: 0 }) === null, "düzgün çokgen köşesi taşınmaz");
 });
 
+test("etkileşim: köşe kutu dışına sürüklenince şeklin kutusu yeni köşeleri kapsar (dönük/aynalı dahil)", () => {
+  const icinde = (s: FizikSekli, p: Nokta, tol = 1e-6) => {
+    // Kutu yerel çerçevede: noktayı şeklin yerel çerçevesine çevirip kutuyla karşılaştır.
+    const r = (-(s.donus ?? 0) * Math.PI) / 180, cx = s.x + s.w / 2, cy = s.y + s.h / 2;
+    let x = (p.x - cx) * Math.cos(r) - (p.y - cy) * Math.sin(r);
+    const y = (p.x - cx) * Math.sin(r) + (p.y - cy) * Math.cos(r);
+    if (s.ayna) x = -x;
+    return Math.abs(x) <= s.w / 2 + tol && Math.abs(y) <= s.h / 2 + tol;
+  };
+  for (const ek of [{}, { donus: 37, ayna: true }, { donus: 90 }] as Partial<FizikSekli>[]) {
+    for (const nesne of ["ucgenABC", "dortgenGeo"] as const) {
+      let s = sekil(nesne, { geo: nesne === "ucgenABC" ? varsayilanUcgen() : varsayilanDortgen(), ...ek });
+      const K0 = geometriKoseleri(s);
+      // C (üçgen) / C (dörtgen) köşesini iki adımda kutudan çok uzağa çek (sürükleme gibi).
+      const i = 2;
+      const hedef = { x: K0[i].x + 140, y: K0[i].y - 120 };
+      for (const t of [0.5, 1]) {
+        const ara = { x: K0[i].x + (hedef.x - K0[i].x) * t, y: K0[i].y + (hedef.y - K0[i].y) * t };
+        s = geometriKoseTasiSekil(s, i, ara)!;
+        dogrula(!!s && !!s.geo && geometriVerisiGecerliMi(s.geo), `${nesne}: geçerli veri`);
+      }
+      const K = geometriKoseleri(s);
+      yakinN(K[i], hedef, `${nesne} ${JSON.stringify(ek)}: köşe fareyi izler`, 1e-6);
+      K0.forEach((k, j) => { if (j !== i) yakinN(K[j], k, `${nesne}: ${k.ad} yerinde kalır`, 1e-6); });
+      K.forEach((k) => dogrula(icinde(s, k), `${nesne} ${JSON.stringify(ek)}: ${k.ad} kutu içinde (kutu ${s.x},${s.y} ${s.w}×${s.h})`));
+      dogrula(s.w > FIZIK_TANIMLARI[nesne].w || s.h > FIZIK_TANIMLARI[nesne].h, `${nesne}: kutu büyüdü`);
+    }
+  }
+  // Kutu içinde kalan taşıma kutuyu değiştirmez.
+  const s = sekil("ucgenABC", { geo: varsayilanUcgen() });
+  const K = geometriKoseleri(s);
+  const t = geometriKoseTasiSekil(s, 0, { x: K[0].x + 2, y: K[0].y + 3 })!;
+  dogrula(t.x === s.x && t.y === s.y && t.w === s.w && t.h === s.h, "içeride kutu aynı");
+  dogrula(geometriKoseTasiSekil(sekil("cokgenAd"), 0, { x: 0, y: 0 }) === null, "düzgün çokgen: null");
+});
+
 test("etkileşim: çift tıklamada en yakın köşe/kenar; etiket yazma", () => {
   const s = sekil("ucgenABC", { geo: varsayilanUcgen() });
   const K = geometriKoseleri(s);
@@ -437,6 +473,9 @@ test("PNG dışa aktarım: yeni geometri şekillerinin yazıları kırpılmaz (g
   // Köşesi kutu kenarına sürüklenmiş üçgen, uzun adlar
   const s0 = sekil("ucgenABC", { geo: varsayilanUcgen() });
   durumlar.push(["surukle", { ...s0, x: 560, y: 420, geo: { ...varsayilanUcgen({ adlar: ["A(−12,15)", "B", "C(40,70)"] }), mod: "serbest", sabitKutu: true, kose: [{ x: 1.4, y: -0.4 }, { x: -0.4, y: 1.4 }, { x: 1, y: 1 }] } }]);
+  // Kutu dışına sürüklenip kutusu normalleştirilmiş üçgen (seçim çerçevesi = PNG kutusu)
+  { const u = { ...s0, x: 560, y: 420, donus: 20 }; const Ku = geometriKoseleri(u);
+    durumlar.push(["surukle-kutu", geometriKoseTasiSekil(u, 2, { x: Ku[2].x + 160, y: Ku[2].y - 140 })!]); }
   durumlar.push(["dogru-uzun", { ...sekil("dogrudaAcilar", { geo: varsayilanDogruAci({ dogruAdlari: ["d_1 doğrusu", "d_2 doğrusu"] }) }), x: 560, y: 420 }]);
   for (const [ad, s] of durumlar) {
     const tuval = tuvalUret(W, H);

@@ -44,9 +44,29 @@ async function main() {
   const { CizimEditoruModal } = await import("../src/modules/sinav-olusturucu/components/CizimEditoruModal");
   const { kutuphaneGirdileri, kutuphaneAra, aramaOnerileri, kutuphaneAramaAnahtari } = await import("../src/modules/sinav-olusturucu/cizim/kutuphane");
   const { geometriKoseleri } = await import("../src/modules/sinav-olusturucu/cizim/geometriEtkilesim");
-  const { grafikNoktaTutamaclari, sekilYatayCevir, baglantiPortlari } = await import("../src/modules/sinav-olusturucu/cizim/etkilesim");
+  const { grafikNoktaTutamaclari, sekilYatayCevir, baglantiPortlari, balonYerlesimi } = await import("../src/modules/sinav-olusturucu/cizim/etkilesim");
   const { sekilGecerliMi } = await import("../src/modules/sinav-olusturucu/cizim/sablon");
   const { varsayilanUcgen } = await import("../src/modules/sinav-olusturucu/cizim/geometriSekilleri");
+
+  // ——— Saf: çift tıklama balonu şekle değmez, görünür alana sığar ———
+  {
+    const kesisir = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) =>
+      a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    const gorunur = { x: 0, y: 0, w: 1000, h: 600 };
+    const kacin = { x: 400, y: 200, w: 340, h: 260 };
+    for (const [nokta, h] of [[{ x: 730, y: 450 }, 560], [{ x: 410, y: 210 }, 300], [{ x: 560, y: 455 }, 200]] as const) {
+      const y = balonYerlesimi({ nokta, kacin, gorunur, w: 300, h });
+      const kutu = { x: y.left, y: y.top, w: 300, h: Math.min(h, y.maxH) };
+      dogrula(!kesisir(kutu, kacin), `balon şekli örtüyor: ${JSON.stringify(kutu)}`);
+      dogrula(kutu.x >= 0 && kutu.y >= 0 && kutu.x + kutu.w <= 1000 && kutu.y + kutu.h <= 600, `balon görünür alan dışında: ${JSON.stringify(kutu)}`);
+    }
+    // Sağda yer yoksa sola açılır; yanlarda yer yoksa alta/üste kısaltılarak (maxH) açılır.
+    const sol = balonYerlesimi({ nokta: { x: 900, y: 300 }, kacin: { x: 700, y: 100, w: 250, h: 300 }, gorunur, w: 300, h: 400 });
+    dogrula(sol.left + 300 <= 700, `sağda yer yokken sola açılmadı: ${sol.left}`);
+    const dar = balonYerlesimi({ nokta: { x: 500, y: 300 }, kacin: { x: 200, y: 60, w: 600, h: 300 }, gorunur, w: 300, h: 560 });
+    dogrula(dar.top >= 360 && dar.top + dar.maxH <= 600 && dar.maxH < 560, `dar alanda balon alta kısaltılarak açılmadı: ${JSON.stringify(dar)}`);
+    console.log("✓ v12-U: yerinde düzenleme balonu şekle değmez, görünür alana sığar (gerekirse kaydırmalı)");
+  }
 
   // ——— Saf: kütüphane toplayıcısı ve arama ———
   {

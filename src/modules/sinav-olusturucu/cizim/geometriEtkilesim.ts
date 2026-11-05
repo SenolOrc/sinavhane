@@ -6,6 +6,7 @@
 //
 //   geometriKoseleri(sekil)                  → sürüklenebilir noktalar (köşe / çember noktası / dış nokta P)
 //   geometriKoseTasi(sekil, i, nokta)        → i. nokta oraya taşınmış YENİ geo verisi (ya da null)
+//   geometriKoseTasiSekil(sekil, i, nokta)   → aynısı + kutu yeni köşeleri kapsayacak şekilde güncellenmiş şekil
 //   geometriKenarlari(sekil)                 → kenar parçaları (etiket indeksiyle)
 //   geometriEnYakinKenarVeyaKose(sekil, p)   → çift tıklanan köşe/kenar
 //   geometriEtiketiAyarla(geo, hedef, yama)  → köşe adı / açı etiketi-işareti / kenar etiketi-tırtığı yaz
@@ -132,6 +133,34 @@ export function geometriKoseTasi(s: FizikSekli, index: number, nokta: Nokta): Ge
     return { ...v, konum: index === 4 || v.konum.length >= 5 ? konum : konum.slice(0, 4) };
   }
   return null;
+}
+
+/**
+ * `geometriKoseTasi` + kutu normalleştirme: sürüklenen köşe şeklin kutusunun
+ * (x, y, w, h) dışına çıktıysa kutu yeni köşeleri de kapsayacak kadar büyütülür
+ * ve köşeler yeni kutuya göre yeniden birimlenir. Böylece seçim çerçevesi,
+ * tutamaçlar, vuruş testi ve PNG kırpma aynı kutuyu kullanır. Dünyadaki köşe
+ * konumları değişmez (döndürülmüş/aynalı şekilde de). Taşınamıyorsa null.
+ */
+export function geometriKoseTasiSekil(s: FizikSekli, index: number, nokta: Nokta): FizikSekli | null {
+  const geo = geometriKoseTasi(s, index, nokta);
+  if (!geo) return null;
+  const kose = geo.tur === "ucgen" && geo.sabitKutu ? geo.kose : geo.tur === "dortgen" && geo.tip === "serbest" ? geo.kose ?? [] : [];
+  if (!kose.length) return { ...s, geo };
+  const k = kutu(s);
+  // Eski yerel çerçevede köşeler (piksel).
+  const L = kose.map((p) => ({ x: k.x + p.x * k.w, y: k.y + p.y * k.h }));
+  const x0 = Math.min(k.x, ...L.map((p) => p.x)), y0 = Math.min(k.y, ...L.map((p) => p.y));
+  const x1 = Math.max(k.x + k.w, ...L.map((p) => p.x)), y1 = Math.max(k.y + k.h, ...L.map((p) => p.y));
+  const EPS = 1e-6;
+  if (x0 >= k.x - EPS && y0 >= k.y - EPS && x1 <= k.x + k.w + EPS && y1 <= k.y + k.h + EPS) return { ...s, geo };
+  const w = x1 - x0, h = y1 - y0;
+  // Yeni kutunun merkezi dünyada nereye düşüyorsa kutu oraya oturur: dönüş merkezi
+  // değişse de köşelerin dünya konumu korunur.
+  const W = geoYereldenDunyaya(s, { x: (x0 + x1) / 2, y: (y0 + y1) / 2 });
+  const birimli = L.map((p) => ({ x: (p.x - x0) / w, y: (p.y - y0) / h }));
+  const yeniGeo = geo.tur === "ucgen" ? { ...geo, kose: birimli } : geo.tur === "dortgen" ? { ...geo, kose: birimli } : geo;
+  return { ...s, x: W.x - w / 2, y: W.y - h / 2, w, h, geo: yeniGeo };
 }
 
 /** Kenar parçaları (dünya). Üçgende `index` veri sırasıdır: 0 = a (BC), 1 = b (CA), 2 = c (AB). Dörtgende 0 AB, 1 BC, 2 CD, 3 DA. */
