@@ -24,6 +24,7 @@ import {
   Minus,
   Columns3,
   Rows3,
+  Scissors,
 } from "lucide-react";
 
 import { useDisariTiklama } from "@/lib/disariTiklama";
@@ -51,6 +52,9 @@ export type YuzenAracAyarlari = {
   punto?: { deger: number; onDegis: (p: number) => void };
   onCevir?: () => void;
   onDondur?: () => void;
+  /** Üçgen / dörtgen / çokgen / katlama şekli seçiliyken: tuvalde çizgi çekerek katla. */
+  onKatla?: () => void;
+  katlaAktif?: boolean;
   onCogalt: () => void;
   onSil: () => void;
   onAyrintilar: () => void;
@@ -265,6 +269,19 @@ export function YuzenAracCubugu({ konum, ayar }: { konum: { left: number; top: n
       )}
       {ayar.onCevir && (
         <button type="button" className={DUGME} title="Yatay çevir" aria-label="Yatay çevir" onClick={ayar.onCevir}><FlipHorizontal2 size={18} /></button>
+      )}
+      {ayar.onKatla && (
+        <button
+          type="button"
+          className={`${DUGME} font-semibold text-brand-700`}
+          title="Katla: şeklin üzerinde bir kenardan öbürüne noktalı çizgi çekin"
+          aria-label="Katla"
+          aria-pressed={!!ayar.katlaAktif}
+          data-testid="arac-katla"
+          onClick={ayar.onKatla}
+        >
+          <Scissors size={18} /><span className="text-xs">Katla</span>
+        </button>
       )}
       {ayar.onDondur && (
         <button type="button" className={DUGME} title="90° döndür" aria-label="90° döndür" onClick={ayar.onDondur}><RotateCw size={18} /></button>

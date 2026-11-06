@@ -529,8 +529,10 @@ export type KatlamaDogrusu = { p: Nokta; d: Nokta; hareketli: KagitKosesi | unde
 
 /** Kağıdın köşeleri (y yukarı). Dikdörtgen/kare: A sol-alt, B sağ-alt, C sağ-üst, D sol-üst. Dik üçgen: B'de dik, A üstte. */
 export function kagitKoseleri(k: KatlamaKagidi): KagitKosesi[] {
+  if (k.tur === "serbest" && k.serbestKoseler && k.serbestKoseler.length >= 3) return k.serbestKoseler.map((n) => ({ ad: n.ad, x: n.x, y: n.y }));
   if (k.tur === "dikucgen") return [{ ad: "A", x: 0, y: k.q }, { ad: "B", x: 0, y: 0 }, { ad: "C", x: k.p, y: 0 }];
   const w = k.tur === "kare" ? k.a : k.w, h = k.tur === "kare" ? k.a : k.h;
+  if (k.tur === "serbest") return [{ ad: "A", x: 0, y: 0 }, { ad: "B", x: w, y: 0 }, { ad: "C", x: w, y: h }, { ad: "D", x: 0, y: h }];
   return [{ ad: "A", x: 0, y: 0 }, { ad: "B", x: w, y: 0 }, { ad: "C", x: w, y: h }, { ad: "D", x: 0, y: h }];
 }
 
@@ -539,6 +541,56 @@ export function kagitKenarlari(koseler: KagitKosesi[]) {
     const q = koseler[(i + 1) % koseler.length];
     return { ad: p.ad + q.ad, p, q, uz: Math.hypot(q.x - p.x, q.y - p.y) };
   });
+}
+
+/** Doğrunun (p→q) iki yanından DAHA KÜÇÜK olanın doğrudan en uzak köşesi (katlanacak köşe). */
+export function kucukTarafKosesi(koseler: KagitKosesi[], p: Nokta, q: Nokta): KagitKosesi | undefined {
+  const dx = q.x - p.x, dy = q.y - p.y, l = Math.hypot(dx, dy) || 1;
+  const d = (a: Nokta) => (dx * (a.y - p.y) - dy * (a.x - p.x)) / l;
+  let poz = 0, neg = 0;
+  koseler.forEach((n) => { const v = d(n); if (v > 1e-9) poz += v; else if (v < -1e-9) neg -= v; });
+  const isaret = poz <= neg ? 1 : -1;
+  let enIyi: KagitKosesi | undefined, enD = 1e-9;
+  koseler.forEach((n) => { const v = isaret * d(n); if (v > enD) { enD = v; enIyi = n; } });
+  return enIyi ?? koseler[0];
+}
+
+/** Sonsuz doğrunun (a–b) çokgenin sınırını kestiği en uzak iki nokta; kesmiyorsa null. */
+export function dogruyuKagidaKirp(koseler: KagitKosesi[], a: Nokta, b: Nokta): [Nokta, Nokta] | null {
+  const dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy);
+  if (l < 1e-9) return null;
+  const noktalar: { t: number; p: Nokta }[] = [];
+  koseler.forEach((P, i) => {
+    const Q = koseler[(i + 1) % koseler.length];
+    const ex = Q.x - P.x, ey = Q.y - P.y;
+    const den = dx * ey - dy * ex;
+    if (Math.abs(den) < 1e-12) return;
+    const t = ((P.x - a.x) * ey - (P.y - a.y) * ex) / den;
+    const u = ((P.x - a.x) * dy - (P.y - a.y) * dx) / den;
+    if (u < -1e-9 || u > 1 + 1e-9) return;
+    const uc = Math.max(0, Math.min(1, u));
+    const nk = { x: P.x + ex * uc, y: P.y + ey * uc };
+    noktalar.push({ t, p: nk });
+  });
+  if (noktalar.length < 2) return null;
+  noktalar.sort((m, n) => m.t - n.t);
+  const ilk = noktalar[0], son = noktalar[noktalar.length - 1];
+  if (Math.hypot(ilk.p.x - son.p.x, ilk.p.y - son.p.y) < 1e-6) return null;
+  return [ilk.p, son.p];
+}
+
+/** Noktanın çokgen sınırındaki en yakın izdüşümü: nokta, kenar adı ve kenar üzerindeki oran. */
+export function sinirdaEnYakin(koseler: KagitKosesi[], n: Nokta): { nokta: Nokta; kenar: string; oran: number; uzaklik: number } {
+  let en = { nokta: { x: koseler[0].x, y: koseler[0].y }, kenar: koseler[0].ad + koseler[1 % koseler.length].ad, oran: 0, uzaklik: Infinity };
+  koseler.forEach((P, i) => {
+    const Q = koseler[(i + 1) % koseler.length];
+    const ex = Q.x - P.x, ey = Q.y - P.y;
+    const t = Math.max(0, Math.min(1, ((n.x - P.x) * ex + (n.y - P.y) * ey) / (ex * ex + ey * ey || 1)));
+    const m = { x: P.x + ex * t, y: P.y + ey * t };
+    const u = Math.hypot(n.x - m.x, n.y - m.y);
+    if (u < en.uzaklik) en = { nokta: m, kenar: P.ad + Q.ad, oran: t, uzaklik: u };
+  });
+  return en;
 }
 
 /** Katlama doğrusu: p noktası, d birim yönü; `getir`de hedef noktası. */
@@ -555,10 +607,23 @@ export function katlamaDogrusu(kt: KatlamaAdimi, koseler: KagitKosesi[]): Katlam
     const e = kagitKenarlari(koseler).find((x) => x.ad === kt.kenar) ?? kagitKenarlari(koseler)[1];
     const t = Math.max(0.02, Math.min(0.98, kt.uz / e.uz));
     q = { x: e.p.x + (e.q.x - e.p.x) * t, y: e.p.y + (e.q.y - e.p.y) * t };
+  } else if (kt.mod === "ikiKenar") {
+    const ke = kagitKenarlari(koseler);
+    const e1 = ke.find((x) => x.ad === kt.kenar1) ?? ke[0];
+    const e2 = ke.find((x) => x.ad === kt.kenar2 && x.ad !== e1.ad) ?? ke[(ke.indexOf(e1) + 1) % ke.length];
+    const nk = (e: (typeof ke)[number], o: number | undefined): Nokta => {
+      const t = Math.max(0.02, Math.min(0.98, o ?? 0.5));
+      return { x: e.p.x + (e.q.x - e.p.x) * t, y: e.p.y + (e.q.y - e.p.y) * t };
+    };
+    p = nk(e1, kt.oran1); q = nk(e2, kt.oran2);
+  } else if (kt.mod === "serbestCizgi") {
+    p = kt.uc1 ?? { x: (koseler[0].x + koseler[1].x) / 2, y: (koseler[0].y + koseler[1].y) / 2 };
+    q = kt.uc2 ?? { x: (koseler[1].x + koseler[2 % koseler.length].x) / 2, y: (koseler[1].y + koseler[2 % koseler.length].y) / 2 };
+    if (!hareketli) hareketli = kucukTarafKosesi(koseler, p, q);
   } else {
     const V = bul(kt.hareketli) ?? koseler[0];
-    hedefAd = kt.hedef;
-    hedefNokta = kt.hedef === "O" ? merkez : bul(kt.hedef) ?? merkez;
+    hedefAd = kt.hedefXY ? null : kt.hedef;
+    hedefNokta = kt.hedefXY ? { x: kt.hedefXY.x, y: kt.hedefXY.y } : kt.hedef === "O" ? merkez : bul(kt.hedef) ?? merkez;
     const m = { x: (V.x + hedefNokta.x) / 2, y: (V.y + hedefNokta.y) / 2 };
     const n = { x: hedefNokta.x - V.x, y: hedefNokta.y - V.y };
     p = m; q = { x: m.x - n.y, y: m.y + n.x };
@@ -581,10 +646,29 @@ export function katDuzelt(kt: KatlamaAdimi, koseler: KagitKosesi[]): KatlamaAdim
   const e = kenarlar.find((x) => x.ad === k.kenar)!;
   const enCok = Math.max(1, Math.round(e.uz) - 1);
   k.uz = Math.max(1, Math.min(enCok, k.uz || Math.round(e.uz / 2)));
+  const sinirla = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
   if (k.mod === "iki") k.hareketli = ilk(ad.filter((a) => a !== k.k1 && a !== k.k2), k.hareketli);
   else if (k.mod === "nokta") k.hareketli = ilk(ad.filter((a) => a !== k.kose), k.hareketli);
-  else k.hareketli = ilk(ad, k.hareketli);
+  else if (k.mod === "ikiKenar") {
+    const tum = kagitKenarlari(koseler).map((e) => e.ad);
+    k.kenar1 = ilk(tum, k.kenar1 ?? "");
+    const i1 = tum.indexOf(k.kenar1);
+    k.kenar2 = k.kenar2 && k.kenar2 !== k.kenar1 && tum.includes(k.kenar2) ? k.kenar2 : tum[(i1 + 1) % tum.length];
+    k.oran1 = sinirla(k.oran1 ?? 0.5, 0.05, 0.95);
+    k.oran2 = sinirla(k.oran2 ?? 0.5, 0.05, 0.95);
+    const ortak = ad.find((a) => k.kenar1!.includes(a) && k.kenar2!.includes(a));
+    k.hareketli = ad.includes(k.hareketli) ? k.hareketli : ortak ?? ad[0];
+  } else if (k.mod === "serbestCizgi") {
+    const fin = (n?: Nokta) => !!n && Number.isFinite(n.x) && Number.isFinite(n.y);
+    if (!fin(k.uc1) || !fin(k.uc2) || Math.hypot(k.uc1!.x - k.uc2!.x, k.uc1!.y - k.uc2!.y) < 1e-6) {
+      const b = (i: number) => koseler[i % koseler.length];
+      k.uc1 = { x: (b(0).x + b(1).x) / 2, y: (b(0).y + b(1).y) / 2 };
+      k.uc2 = { x: (b(1).x + b(2).x) / 2, y: (b(1).y + b(2).y) / 2 };
+    }
+    k.hareketli = ad.includes(k.hareketli) ? k.hareketli : "";
+  } else k.hareketli = ilk(ad, k.hareketli);
   k.hedef = ilk(["O", ...ad.filter((a) => a !== k.hareketli)], k.hedef);
+  if (k.mod !== "getir") delete k.hedefXY;
   return k;
 }
 
@@ -645,8 +729,8 @@ export function katlamaHesapla(v: { kagit: KatlamaKagidi; katlar: KatlamaAdimi[]
     return parca.map((n) => {
       if (Math.abs(yan(L, n)) < 1e-6) return { x: n.x, y: n.y, ad: adVer(n) };
       const r = yansit(L, n);
-      if (L.hedefNokta && Math.hypot(r.x - L.hedefNokta.x, r.y - L.hedefNokta.y) < 1e-6) return { x: r.x, y: r.y, ad: L.hedefAd };
       const kaynak = adBul(n);
+      if (L.hedefNokta && L.hedefAd && Math.hypot(r.x - L.hedefNokta.x, r.y - L.hedefNokta.y) < 1e-6) return { x: r.x, y: r.y, ad: L.hedefAd };
       const var_ = adBul(r);
       return { x: r.x, y: r.y, ad: var_ || (kaynak ? `${kaynak}′` : "") };
     });
@@ -689,8 +773,8 @@ function taraliDoldur(ctx: CanvasRenderingContext2D, poly: Nokta[]) {
 const yaklasik = (a: Nokta, b: Nokta) => Math.hypot(a.x - b.x, a.y - b.y) < 1e-6;
 const sayiYaz = (n: number) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100).replace(".", ","));
 
-/** Kağıt katlama çizimi: (isteğe bağlı) Şekil I → Şekil II yan yana. */
-function katlamaCiz(ctx: CanvasRenderingContext2D, v: KatlamaVerisi, k: Kutu) {
+/** Katlama çiziminin yerleşimi: kutular, ölçek ve kağıt→tuval dönüşümleri (çizim ve sürükleme ortak kullanır). */
+export function katlamaYerlesimi(v: KatlamaVerisi, k: Kutu) {
   const K = katlamaHesapla(v);
   const iki = v.sekil1;
   const baslikPay = v.baslik ? 22 : 0;
@@ -698,6 +782,12 @@ function katlamaCiz(ctx: CanvasRenderingContext2D, v: KatlamaVerisi, k: Kutu) {
     ? [{ x: k.x, y: k.y, w: k.w * 0.44, h: k.h - baslikPay }, { x: k.x + k.w * 0.56, y: k.y, w: k.w * 0.44, h: k.h - baslikPay }]
     : [{ x: k.x, y: k.y, w: k.w, h: k.h - baslikPay }];
   const ikinciNoktalar: Nokta[] = [...K.sabit, ...K.katlananlar.flat(), ...K.koseler];
+  if (v.yer && !iki) {
+    const { olc, ox, oy } = v.yer;
+    const T = (p: Nokta): Nokta => ({ x: k.x + ox + p.x * olc, y: k.y + oy - p.y * olc });
+    const Tt = (q: Nokta): Nokta => ({ x: (q.x - k.x - ox) / olc, y: -(q.y - k.y - oy) / olc });
+    return { K, iki, kutular, ikinciNoktalar, olc, T1: T, T2: T, T1ters: Tt, T2ters: Tt };
+  }
   const bbox = (pts: Nokta[]) => ({ x0: Math.min(...pts.map((p) => p.x)), x1: Math.max(...pts.map((p) => p.x)), y0: Math.min(...pts.map((p) => p.y)), y1: Math.max(...pts.map((p) => p.y)) });
   const b1 = bbox(K.koseler), b2 = bbox(ikinciNoktalar);
   const PAY = 24;
@@ -705,7 +795,21 @@ function katlamaCiz(ctx: CanvasRenderingContext2D, v: KatlamaVerisi, k: Kutu) {
     Math.min((kt.w - 2 * PAY) / Math.max(b.x1 - b.x0, 1e-6), (kt.h - 2 * PAY) / Math.max(b.y1 - b.y0, 1e-6))));
   const olc = Math.max(0.01, olcK);
   const donustur = (kt: Kutu, b: ReturnType<typeof bbox>) => (p: Nokta): Nokta => ({ x: kt.x + kt.w / 2 + (p.x - (b.x0 + b.x1) / 2) * olc, y: kt.y + kt.h / 2 - (p.y - (b.y0 + b.y1) / 2) * olc });
+  const tersle = (kt: Kutu, b: ReturnType<typeof bbox>) => (q: Nokta): Nokta => ({ x: (q.x - kt.x - kt.w / 2) / olc + (b.x0 + b.x1) / 2, y: -(q.y - kt.y - kt.h / 2) / olc + (b.y0 + b.y1) / 2 });
   const T1 = donustur(kutular[0], b1), T2 = donustur(kutular[iki ? 1 : 0], b2);
+  const T1ters = tersle(kutular[0], b1), T2ters = tersle(kutular[iki ? 1 : 0], b2);
+  return { K, iki, kutular, ikinciNoktalar, olc, T1, T2, T1ters, T2ters };
+}
+
+/** Doğruya (p, birim yön d) göre yansıma. */
+export function katlamaYansit(L: { p: Nokta; d: Nokta }, a: Nokta): Nokta {
+  const t = (a.x - L.p.x) * L.d.x + (a.y - L.p.y) * L.d.y;
+  return { x: 2 * (L.p.x + L.d.x * t) - a.x, y: 2 * (L.p.y + L.d.y * t) - a.y };
+}
+
+/** Kağıt katlama çizimi: (isteğe bağlı) Şekil I → Şekil II yan yana. */
+function katlamaCiz(ctx: CanvasRenderingContext2D, v: KatlamaVerisi, k: Kutu) {
+  const { K, iki, kutular, ikinciNoktalar, T1, T2 } = katlamaYerlesimi(v, k);
   const yol = (pts: Nokta[], T: (p: Nokta) => Nokta, kapali = true) => {
     ctx.beginPath(); pts.forEach((p, i) => { const q = T(p); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); });
     if (kapali) ctx.closePath();
@@ -730,7 +834,7 @@ function katlamaCiz(ctx: CanvasRenderingContext2D, v: KatlamaVerisi, k: Kutu) {
     if (v.olcu) {
       kagitKenarlari(K.koseler).forEach((e) => {
         if (Math.abs(e.uz - Math.round(e.uz)) > 1e-6) return;
-        if (v.kagit.tur !== "dikucgen" && (e.ad === "CD" || e.ad === "DA")) return;
+        if ((v.kagit.tur === "dikdortgen" || v.kagit.tur === "kare") && (e.ad === "CD" || e.ad === "DA")) return;
         if (v.kagit.tur === "kare" && e.ad !== "AB") return;
         const P = T1(ortaNokta(e.p, e.q)), M = T1(m1);
         const dx = P.x - M.x, dy = P.y - M.y, l = Math.hypot(dx, dy) || 1;
@@ -778,12 +882,56 @@ function katlamaCiz(ctx: CanvasRenderingContext2D, v: KatlamaVerisi, k: Kutu) {
   K.sabit.forEach((n) => ekle({ x: n.x, y: n.y, ad: K.adlar.find((a) => yaklasik(a, n))?.ad }));
   K.katlananlar.forEach((poly) => poly.forEach(ekle));
   K.yeniNoktalar.forEach(ekle);
+  // Tek şekilde "eski konum" kesikli çiziliyorsa katlanan köşenin ESKİ yerini de adıyla göster (A ve A′).
+  if (v.eski && !iki) K.dogrular.forEach((L) => { if (L.hareketli) ekle({ x: L.hareketli.x, y: L.hareketli.y, ad: L.hareketli.ad }); });
   etiketli.forEach((n) => {
     if (n.ad === "O") { const P = T2(n); nok(P); fizikMetniCiz(ctx, "O", P.x, P.y - 11, 16); }
     else etiketKoy(n, n.ad ?? "", T2, m2);
   });
   K.yeniNoktalar.forEach((n) => nok(T2(n)));
+  if (v.eslikGoster) eslikIsaretleriCiz(ctx, K, T2);
   if (iki && v.baslik) fizikMetniCiz(ctx, "Şekil II", kutular[1].x + kutular[1].w / 2, k.y + k.h - 9, 15);
+}
+
+/**
+ * Katlamanın doğurduğu eşlikler: katlanan köşe V ile yansıması V′ için |VP| = |V′P| (çentik) ve
+ * ∠VPQ = ∠V′PQ (yay). Çizginin ilk ucunda tek, ikinci ucunda çift çentik/yay kullanılır.
+ */
+function eslikIsaretleriCiz(ctx: CanvasRenderingContext2D, K: ReturnType<typeof katlamaHesapla>, T: (p: Nokta) => Nokta) {
+  K.dogrular.forEach((L, i) => {
+    const uclar = K.katlamaCizgileri[i];
+    if (!L.hareketli || uclar.length !== 2) return;
+    const V = L.hareketli, Vy = katlamaYansit(L, V);
+    uclar.forEach((P, j) => {
+      const Ps = T(P), Os = T(uclar[1 - j]);
+      [V, Vy].forEach((X) => {
+        const Xs = T(X);
+        const uz = Math.hypot(Xs.x - Ps.x, Xs.y - Ps.y);
+        if (uz < 14) return;
+        const ux = (Xs.x - Ps.x) / uz, uy = (Xs.y - Ps.y) / uz;
+        const M = { x: (Xs.x + Ps.x) / 2, y: (Xs.y + Ps.y) / 2 };
+        ince(ctx, 0.9, () => {
+          for (let c = 0; c <= j; c += 1) {
+            const o = (c - j / 2) * 4;
+            ctx.beginPath();
+            ctx.moveTo(M.x + ux * o - uy * 4.5, M.y + uy * o + ux * 4.5);
+            ctx.lineTo(M.x + ux * o + uy * 4.5, M.y + uy * o - ux * 4.5);
+            ctx.stroke();
+          }
+          const a1 = Math.atan2(Os.y - Ps.y, Os.x - Ps.x), a2 = Math.atan2(Xs.y - Ps.y, Xs.x - Ps.x);
+          let d = a2 - a1;
+          while (d > Math.PI) d -= 2 * Math.PI;
+          while (d <= -Math.PI) d += 2 * Math.PI;
+          if (Math.abs(d) < 0.05) return;
+          for (let c = 0; c <= j; c += 1) {
+            ctx.beginPath();
+            ctx.arc(Ps.x, Ps.y, 15 + c * 4, a1, a1 + d, d < 0);
+            ctx.stroke();
+          }
+        });
+      });
+    });
+  });
 }
 
 function okUcu(ctx: CanvasRenderingContext2D, uc: Nokta, aci: number, boy = 9) {
@@ -793,6 +941,49 @@ function okUcu(ctx: CanvasRenderingContext2D, uc: Nokta, aci: number, boy = 9) {
   ctx.lineTo(uc.x - Math.cos(aci + 0.42) * boy, uc.y - Math.sin(aci + 0.42) * boy);
   ctx.closePath();
   ctx.fill();
+}
+
+const KAGIT_ADLARI = "ABCDEFGHIJKL";
+
+/** Köşe listesinden (y yukarı) serbest kâğıt. 3–12 köşe; adlar A, B, C… */
+export function kagitSerbest(noktalar: Nokta[]): KatlamaKagidi {
+  const n = noktalar.slice(0, 12);
+  const yuvarla = (x: number) => Math.round(x * 1e6) / 1e6;
+  const xs = n.map((q) => q.x), ys = n.map((q) => q.y);
+  const w = Math.max(1, Math.min(60, Math.max(...xs) - Math.min(...xs))), h = Math.max(1, Math.min(60, Math.max(...ys) - Math.min(...ys)));
+  return {
+    tur: "serbest", w, h, a: Math.max(w, h), p: w, q: h,
+    serbestKoseler: n.map((q, i) => ({ ad: KAGIT_ADLARI[i], x: yuvarla(q.x), y: yuvarla(q.y) })),
+  };
+}
+
+/** Kenarları |BC| = a, |CA| = b, |AB| = c olan üçgen (A sol-alt, B sağda). Üçgen eşitsizliği sağlanmazsa null. */
+export function kagitGenelUcgen(a: number, b: number, c: number): KatlamaKagidi | null {
+  if (!(a > 0 && b > 0 && c > 0) || a + b <= c || a + c <= b || b + c <= a) return null;
+  const x = (b * b + c * c - a * a) / (2 * c), y = Math.sqrt(Math.max(0, b * b - x * x));
+  return kagitSerbest([{ x: 0, y: 0 }, { x: c, y: 0 }, { x, y }]);
+}
+
+/** Yamuk: alt taban |AB| = alt, üst taban |DC| = ust, yükseklik h; `kayma` üst tabanın soldan ofseti (yok = ikizkenar). */
+export function kagitYamuk(alt: number, ust: number, h: number, kayma?: number): KatlamaKagidi {
+  const o = kayma ?? (alt - ust) / 2;
+  return kagitSerbest([{ x: 0, y: 0 }, { x: alt, y: 0 }, { x: o + ust, y: h }, { x: o, y: h }]);
+}
+
+/** Paralelkenar: |AB| = a, |AD| = b, A açısı derece. */
+export function kagitParalelkenar(a: number, b: number, aciDerece: number): KatlamaKagidi {
+  const r = (Math.max(10, Math.min(170, aciDerece)) * Math.PI) / 180;
+  const dx = b * Math.cos(r), dy = b * Math.sin(r);
+  return kagitSerbest([{ x: 0, y: 0 }, { x: a, y: 0 }, { x: a + dx, y: dy }, { x: dx, y: dy }]);
+}
+
+/** Düzgün n-gen (n = 3–12), çevrel çember yarıçapı R; A en alt-solda, saat yönünün tersine. */
+export function kagitDuzgunCokgen(n: number, R: number): KatlamaKagidi {
+  const m = Math.max(3, Math.min(12, Math.round(n)));
+  return kagitSerbest(Array.from({ length: m }, (_, i) => {
+    const t = -Math.PI / 2 - Math.PI / m + (2 * Math.PI * i) / m;
+    return { x: R * Math.cos(t), y: R * Math.sin(t) };
+  }));
 }
 
 export function varsayilanKatlama(ek: Partial<KatlamaVerisi> = {}): KatlamaVerisi {
@@ -847,15 +1038,24 @@ export function ekGeoGecerliMi(g: Record<string, unknown>): boolean {
   }
   if (g.tur === "katlama") {
     const k = g.kagit as Record<string, unknown> | undefined;
-    const kagitOk = !!k && typeof k === "object" && ["dikdortgen", "kare", "dikucgen"].includes(String(k.tur)) &&
-      ["w", "h", "a", "p", "q"].every((a) => sayi(k[a]) && (k[a] as number) >= 1 && (k[a] as number) <= 60);
+    const nk = (t: unknown) => !!t && typeof t === "object" && sayi((t as Nokta).x) && sayi((t as Nokta).y) && Math.abs((t as Nokta).x) <= 1000 && Math.abs((t as Nokta).y) <= 1000;
+    const serbestOk = !!k && (k.serbestKoseler === undefined ? k.tur !== "serbest" : Array.isArray(k.serbestKoseler) && k.serbestKoseler.length >= 3 && k.serbestKoseler.length <= 12 &&
+      k.serbestKoseler.every((q) => !!q && typeof (q as KagitKosesi).ad === "string" && (q as KagitKosesi).ad.length >= 1 && (q as KagitKosesi).ad.length <= 2 && nk(q)));
+    const kagitOk = !!k && typeof k === "object" && ["dikdortgen", "kare", "dikucgen", "serbest"].includes(String(k.tur)) &&
+      ["w", "h", "a", "p", "q"].every((a) => sayi(k[a]) && (k[a] as number) >= 1 && (k[a] as number) <= 60) && serbestOk;
     const adOk = (t: unknown) => typeof t === "string" && t.length <= 2;
     const katOk = Array.isArray(g.katlar) && g.katlar.length <= 2 && g.katlar.every((kt) => {
       const x = kt as Record<string, unknown>;
-      return !!x && ["iki", "nokta", "getir"].includes(String(x.mod)) && ["k1", "k2", "hareketli", "kose", "kenar", "hedef"].every((a) => adOk(x[a])) &&
-        sayi(x.uz) && (x.uz as number) >= 0 && (x.uz as number) <= 100;
+      return !!x && ["iki", "nokta", "getir", "ikiKenar", "serbestCizgi"].includes(String(x.mod)) && ["k1", "k2", "hareketli", "kose", "kenar", "hedef"].every((a) => adOk(x[a])) &&
+        sayi(x.uz) && (x.uz as number) >= 0 && (x.uz as number) <= 100 &&
+        (x.kenar1 === undefined || adOk(x.kenar1)) && (x.kenar2 === undefined || adOk(x.kenar2)) &&
+        (x.oran1 === undefined || (sayi(x.oran1) && (x.oran1 as number) >= 0 && (x.oran1 as number) <= 1)) &&
+        (x.oran2 === undefined || (sayi(x.oran2) && (x.oran2 as number) >= 0 && (x.oran2 as number) <= 1)) &&
+        (x.uc1 === undefined || nk(x.uc1)) && (x.uc2 === undefined || nk(x.uc2)) && (x.hedefXY === undefined || nk(x.hedefXY));
     });
-    return kagitOk && katOk && bool(g, "sekil1", "ok", "olcu", "eski", "baslik") && ["mavi", "gri", "tarali"].includes(String(g.dolgu));
+    return kagitOk && katOk && bool(g, "sekil1", "ok", "olcu", "eski", "baslik") && (g.eslikGoster === undefined || typeof g.eslikGoster === "boolean") &&
+      (g.yer === undefined || (!!g.yer && typeof g.yer === "object" && sayi((g.yer as Record<string, unknown>).olc) && (g.yer as { olc: number }).olc >= 0.01 && (g.yer as { olc: number }).olc <= 1000 &&
+        sayilar([(g.yer as { ox: number }).ox, (g.yer as { oy: number }).oy], 2, 1e5))) && ["mavi", "gri", "tarali"].includes(String(g.dolgu));
   }
   return false;
 }
@@ -866,4 +1066,24 @@ export function ekGeoYazilari(v: EkGeoVerisi): string[] {
   if (v.tur === "dortgen") return [...v.adlar, ...v.kenarlar, ...v.acilar, v.kesisimAdi, v.yukseklikAdi, v.yukseklikEtiket];
   if (v.tur === "kati") return [...v.etiketler, ...(v.koseAdlari ? v.adlar : [])];
   return ["A′", "Şekil II", "16"];
+}
+
+/**
+ * Sabit yerleşimli (`yer`) katlama şeklinin kutusunu içeriğe (kâğıt + katlanan parçalar + yazı payı)
+ * sığdırır. Kutunun MERKEZİ değişmez: döndürülmüş / aynalı şekilde de hiçbir nokta dünyada kaymaz.
+ * `yer` yoksa ya da Şekil I yan yana açıksa şekli aynen döndürür.
+ */
+export function katlamaKutusunuSigdir<T extends { x: number; y: number; w: number; h: number; geo?: GeometriVerisi }>(s: T): T {
+  const v = s.geo;
+  if (!v || v.tur !== "katlama" || !v.yer || v.sekil1) return s;
+  const Y = katlamaYerlesimi(v, { x: s.x, y: s.y, w: s.w, h: s.h });
+  const pts = Y.ikinciNoktalar.map(Y.T2);
+  if (!pts.length) return s;
+  const PAY = 24;
+  const cx = s.x + s.w / 2, cy = s.y + s.h / 2;
+  const hx = Math.max(...pts.map((p) => Math.abs(p.x - cx))) + PAY, hy = Math.max(...pts.map((p) => Math.abs(p.y - cy))) + PAY;
+  const w = Math.max(40, hx * 2), h = Math.max(40, hy * 2);
+  if (Math.abs(w - s.w) < 0.01 && Math.abs(h - s.h) < 0.01) return s;
+  const x = cx - w / 2, y = cy - h / 2;
+  return { ...s, x, y, w, h, geo: { ...v, yer: { olc: v.yer.olc, ox: v.yer.ox + (s.x - x), oy: v.yer.oy + (s.y - y) } } };
 }

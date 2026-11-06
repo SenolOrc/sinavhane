@@ -14,6 +14,7 @@ import { FIZIK_TANIMLARI, fizikMetniCiz, fizikMetniOlcu } from "./fizik";
 import { aciNormu, aciYayiCiz, dikAciIsaretiCiz, dilimTara, dogru, ince, koseAdi, noktaCiz, tirtikCiz } from "./geometriYardimci";
 import {
   DORTGEN_TIPLERI, KATI_TURLERI, ekGeoCiz, ekGeoGecerliMi, ekGeoMu, ekGeoYazilari,
+  kagitDuzgunCokgen, kagitGenelUcgen, kagitParalelkenar, kagitSerbest, kagitYamuk,
   varsayilanDogruAci, varsayilanDortgen, varsayilanKati, varsayilanKatlama,
 } from "./geometriEk";
 
@@ -748,6 +749,9 @@ export const KATI_SABLONLARI: GeometriSablonu[] = [
     olustur: () => varsayilanKati({ cisim: "prizma", kosegen: "yuzey" }) },
 ];
 
+/** Yeni katlama şablonlarının ortak görünümü: tek şekil üzerinde (eski konum kesikli), eş açı/kenar işaretli. */
+const KAT_TEK = { sekil1: false, ok: true, olcu: false, eski: true, baslik: false, dolgu: "tarali" as const, eslikGoster: true };
+
 export const KATLAMA_SABLONLARI: GeometriSablonu[] = [
   { id: "f-kosegen", ad: "Dikdörtgen köşegenden katlama", ipucu: "16×8 kağıt AC boyunca katlanır: D′ ve E oluşur", nesne: "kagitKatlama", aramaKelimeleri: ["kağıt katlama", "köşegen", "dikdörtgen", "katlama"],
     olustur: () => varsayilanKatlama() },
@@ -758,6 +762,42 @@ export const KATLAMA_SABLONLARI: GeometriSablonu[] = [
       { mod: "getir", k1: "A", k2: "C", hareketli: "B", kose: "A", kenar: "BC", uz: 4, hedef: "O" },
       { mod: "getir", k1: "A", k2: "C", hareketli: "D", kose: "A", kenar: "BC", uz: 4, hedef: "O" },
     ] }) },
+  { id: "f-ucgen-tepe-de", ad: "Üçgende tepeyi [DE] boyunca katla", ipucu: "A köşesi, AB ve AC üzerindeki D, E noktalarından geçen [DE] boyunca katlanır: |AD| = |A′D|, |AE| = |A′E|", nesne: "kagitKatlama",
+    aramaKelimeleri: ["üçgen katlama", "tepe katlama", "DE boyunca", "köşe katlama", "kağıt katlama"],
+    olustur: () => varsayilanKatlama({
+      kagit: kagitSerbest([{ x: 3, y: 7 }, { x: 0, y: 0 }, { x: 9, y: 0 }]),
+      katlar: [{ mod: "ikiKenar", k1: "A", k2: "B", hareketli: "A", kose: "A", kenar: "BC", uz: 4, hedef: "O", kenar1: "AB", oran1: 0.4, kenar2: "CA", oran2: 0.45 }],
+      ...KAT_TEK }) },
+  { id: "f-aciortay", ad: "Köşeyi kenar üzerine katla (açıortay)", ipucu: "|AB|=6, |AC|=9, |BC|=10: B köşesi [AD] açıortayı boyunca AC üzerindeki B′ noktasına gelir; |AB| = |AB′|", nesne: "kagitKatlama",
+    aramaKelimeleri: ["açıortay katlama", "köşeyi kenara katla", "üçgen katlama", "kağıt katlama"],
+    olustur: () => varsayilanKatlama({
+      kagit: kagitGenelUcgen(10, 9, 6)!,
+      katlar: [{ mod: "nokta", k1: "A", k2: "B", hareketli: "B", kose: "A", kenar: "BC", uz: 4, hedef: "O" }],
+      ...KAT_TEK, olcu: true }) },
+  { id: "f-dikme", ad: "Köşeyi kendi kenarı üzerine katla (dikme)", ipucu: "C köşesi, BC kenarına dik [DE] boyunca yine BC üzerindeki C′ noktasına katlanır: [DE] ⊥ [BC]", nesne: "kagitKatlama",
+    aramaKelimeleri: ["dikme katlama", "kenara dik katlama", "üçgen katlama", "kağıt katlama"],
+    olustur: () => varsayilanKatlama({
+      kagit: kagitSerbest([{ x: 3, y: 6 }, { x: 0, y: 0 }, { x: 10, y: 0 }]),
+      katlar: [{ mod: "getir", k1: "A", k2: "B", hareketli: "C", kose: "A", kenar: "BC", uz: 4, hedef: "O", hedefXY: { x: 4, y: 0 } }],
+      ...KAT_TEK, olcu: true }) },
+  { id: "f-paralelkenar", ad: "Paralelkenarda köşeyi köşegen boyunca katla", ipucu: "ABCD paralelkenarında B köşesi [AC] köşegeni boyunca katlanır", nesne: "kagitKatlama",
+    aramaKelimeleri: ["paralelkenar katlama", "köşegen katlama", "dörtgen katlama", "kağıt katlama"],
+    olustur: () => varsayilanKatlama({
+      kagit: kagitParalelkenar(8, 5, 60),
+      katlar: [{ mod: "iki", k1: "A", k2: "C", hareketli: "B", kose: "A", kenar: "BC", uz: 4, hedef: "O" }],
+      ...KAT_TEK, olcu: true }) },
+  { id: "f-yamuk", ad: "Yamukta köşeyi [DE] boyunca katla", ipucu: "ABCD ikizkenar yamukta D köşesi, CD ve DA kenarlarının orta noktalarından geçen doğru boyunca katlanır", nesne: "kagitKatlama",
+    aramaKelimeleri: ["yamuk katlama", "dörtgen katlama", "köşe katlama", "kağıt katlama"],
+    olustur: () => varsayilanKatlama({
+      kagit: kagitYamuk(12, 6, 5),
+      katlar: [{ mod: "ikiKenar", k1: "A", k2: "B", hareketli: "D", kose: "A", kenar: "BC", uz: 4, hedef: "O", kenar1: "CD", oran1: 0.5, kenar2: "DA", oran2: 0.5 }],
+      ...KAT_TEK }) },
+  { id: "f-besgen", ad: "Düzgün beşgende köşeyi katla", ipucu: "Düzgün beşgenin A köşesi, komşu kenarların orta noktalarından geçen doğru boyunca katlanır", nesne: "kagitKatlama",
+    aramaKelimeleri: ["beşgen katlama", "çokgen katlama", "köşe katlama", "kağıt katlama"],
+    olustur: () => varsayilanKatlama({
+      kagit: kagitDuzgunCokgen(5, 5),
+      katlar: [{ mod: "ikiKenar", k1: "A", k2: "B", hareketli: "A", kose: "A", kenar: "BC", uz: 4, hedef: "O", kenar1: "EA", oran1: 0.5, kenar2: "AB", oran2: 0.5 }],
+      ...KAT_TEK }) },
 ];
 
 /** Sol kütüphane için tüm geometri şablonları (her biri `nesne` + `aramaKelimeleri` taşır). */

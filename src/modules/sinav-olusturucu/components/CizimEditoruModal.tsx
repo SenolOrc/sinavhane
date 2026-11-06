@@ -59,7 +59,11 @@ import {
   sekilYatayCevir,
   type BaglantiPortu,
 } from "../cizim/etkilesim";
-import { geometriEnYakinKenarVeyaKose, geometriKoseTasi, geometriKoseTasiSekil, geometriKoseleri } from "../cizim/geometriEtkilesim";
+import {
+  geometriEnYakinKenarVeyaKose, geometriKoseTasi, geometriKoseTasiSekil, geometriKoseleri,
+  katlamaCizgisiCiz, katlamaTutamacTasi, katlamaTutamaclari, katlananTarafiDegistir, katlanabilirMi, sekliKatlamayaDonustur,
+  type KatlamaTutamac,
+} from "../cizim/geometriEtkilesim";
 import { geometriMi } from "../cizim/geometriSekilleri";
 import type { GrafikDuzeni } from "../cizim/grafik";
 import { SolKutuphane } from "./cizim/SolKutuphane";
@@ -394,6 +398,14 @@ export function CizimEditoruModal({
   const [uzerindekiId, setUzerindekiId] = useState<string | null>(null);
   /** Fare altındaki işlemin kısa açıklaması ("Taşımak için sürükle" gibi). */
   const [imlecIpucu, setImlecIpucu] = useState("");
+  /** "Katla" kipi: tuvalde çekilen çizgi seçili kâğıdı katlar. */
+  const [katlaKipi, setKatlaKipi] = useState(false);
+  const katlaKipiRef = useRef(false);
+  const katlaKipiAyarla = (v: boolean) => { katlaKipiRef.current = v; setKatlaKipi(v); };
+  useEffect(() => { if (katlaKipiRef.current && seciliIds.length !== 1) { katlaKipiRef.current = false; setKatlaKipi(false); } }, [seciliIds]);
+  const katlaCizgiRef = useRef<{ id: string; bas: Nokta } | null>(null);
+  /** Katlanan parçaya (sürüklemeden) tıklama: bırakılınca karşı taraf katlanır. */
+  const flapTikRef = useRef<{ yeni: Sekil; nokta: Nokta } | null>(null);
   /** Porttan sürüklenen bağlayıcının önizleme çizgisi. */
   const [portCizgisi, setPortCizgisi] = useState<{ bas: Nokta; son: Nokta } | null>(null);
   /** Çift tıklamada açılan yerinde düzenleme baloncuğu. */
@@ -448,7 +460,8 @@ export function CizimEditoruModal({
   const baglayiciSurukleRef = useRef<{ nokta: Nokta; yeniKaynak: boolean } | null>(null);
   /** Köşe/nokta tutamacı sürükleme; grafikte pencere sürükleme boyunca dondurulur. */
   const noktaSurukleRef = useRef<{
-    sekilId: string; tur: "geo" | "grafik"; i: number; egri?: number;
+    sekilId: string; tur: "geo" | "grafik" | "katlama"; i: number; egri?: number;
+    kat?: Pick<KatlamaTutamac, "tur" | "adim" | "uc">;
     pencere?: GrafikDuzeni;
     eskiPencere?: Pick<GrafikVerisi, "xMin" | "xMax" | "yMin" | "yMax" | "xAdim" | "yAdim">;
   } | null>(null);
@@ -515,16 +528,18 @@ export function CizimEditoruModal({
     }
     if (arac === "sec") {
       for (const t of noktaTutamaclari()) {
+        // Katlama: çizgi uçları (D, E) turuncu, katlanan köşenin yeni yeri (A′) mavi.
+        const renk = t.tur === "katlama" && t.kat?.tur === "uc" ? "#ea580c" : "#2563eb";
         ctx.beginPath();
         ctx.arc(t.x, t.y, 7 * b, 0, Math.PI * 2);
         ctx.fillStyle = "#ffffff";
         ctx.fill();
         ctx.lineWidth = 2.5 * b;
-        ctx.strokeStyle = "#2563eb";
+        ctx.strokeStyle = renk;
         ctx.stroke();
         ctx.beginPath();
         ctx.arc(t.x, t.y, 2.5 * b, 0, Math.PI * 2);
-        ctx.fillStyle = "#2563eb";
+        ctx.fillStyle = renk;
         ctx.fill();
       }
     }
@@ -605,6 +620,10 @@ export function CizimEditoruModal({
       }
       // Escape önce etkin aracı bırakır (sürekli bağlayıcı kipi, silgi, çizim
       // araçları) ve Seç'e döner; Seç'teyken seçimi temizler.
+      if (e.key === "Escape" && katlaKipiRef.current) {
+        katlaKipiAyarla(false); katlaCizgiRef.current = null; setPortCizgisi(null);
+        return;
+      }
       if (e.key === "Escape" && aracRef.current !== "sec") {
         setArac("sec"); setBaglayiciKaynakUcu(null); setPortCizgisi(null); setMetinNoktasi(null);
         return;
@@ -999,11 +1018,26 @@ export function CizimEditoruModal({
     return null;
   }
 
+  /** «Katla» düğmesi: şekli (gerekirse) katlanabilir kâğıda çevirir, çizgi çekme kipini açar/kapatır. */
+  function katlaBaslat() {
+    if (katlaKipiRef.current) { katlaKipiAyarla(false); return; }
+    const s = seciliIds.length === 1 ? sekillerRef.current.find((x) => x.id === seciliIds[0]) : undefined;
+    if (!s || !katlanabilirMi(s)) return;
+    const k = sekliKatlamayaDonustur(s);
+    if (!k) return;
+    if (k !== s) {
+      tarihceyeKaydet();
+      setSekiller((liste) => liste.map((x) => (x.id === s.id ? k : x)));
+    }
+    katlaKipiAyarla(true);
+  }
+
   /** Tek seçili şeklin doğrudan sürüklenebilir noktaları (üçgen köşesi, çember noktası, grafik köşesi). */
-  function noktaTutamaclari(): { tur: "geo" | "grafik"; i: number; egri?: number; x: number; y: number }[] {
-    if (seciliIds.length !== 1) return [];
+  function noktaTutamaclari(): { tur: "geo" | "grafik" | "katlama"; i: number; egri?: number; x: number; y: number; kat?: Pick<KatlamaTutamac, "tur" | "adim" | "uc">; ad?: string }[] {
+    if (seciliIds.length !== 1 || katlaKipiRef.current) return [];
     const s = sekillerRef.current.find((x) => x.id === seciliIds[0]);
     if (!s || s.tur !== "fizik") return [];
+    if (s.nesne === "kagitKatlama") return katlamaTutamaclari(s).map((t, i) => ({ tur: "katlama" as const, i, kat: { tur: t.tur, adim: t.adim, uc: t.uc }, ad: t.ad, x: t.x, y: t.y }));
     if (s.nesne === "grafik") return grafikNoktaTutamaclari(s).map((p) => ({ tur: "grafik" as const, i: p.nokta, egri: p.egri, x: p.x, y: p.y }));
     if (geometriNesnesiMi(s)) {
       // Düzgün çokgende köşe taşınmaz (düzgünlük bozulur): tutamaç gösterilmez.
@@ -1117,6 +1151,15 @@ export function CizimEditoruModal({
       sonBasisRef.current = { t: simdi, nokta };
       const cift = e.detail >= 2 || (!!onceki && simdi - onceki.t < 450 && Math.hypot(nokta.x - onceki.nokta.x, nokta.y - onceki.nokta.y) < 12 * (100 / Math.max(zoom, 1)));
       if (cift) sonBasisRef.current = null;
+      // KATLA KİPİ: seçili kâğıt üzerinde çizgi çekilir (bırakınca katlanır).
+      if (katlaKipiRef.current) {
+        const hedef = seciliId ? sekiller.find((x) => x.id === seciliId) : undefined;
+        if (hedef && hedef.tur === "fizik" && hedef.nesne === "kagitKatlama") {
+          katlaCizgiRef.current = { id: hedef.id, bas: nokta };
+          setPortCizgisi({ bas: nokta, son: nokta });
+        }
+        return;
+      }
       if (cift && ciftTiklamaIsle(ctx, nokta)) return;
       // BAĞLANTI PORTU: şeklin kenarındaki mavi halkadan sürükleyince bağlayıcı çekilir.
       const port = portBul(nokta);
@@ -1135,7 +1178,7 @@ export function CizimEditoruModal({
           const pencere = nt.tur === "grafik" && s0.grafik ? grafikPenceresi(s0, s0.grafik) : undefined;
           const g = s0.grafik;
           noktaSurukleRef.current = {
-            sekilId: s0.id, tur: nt.tur, i: nt.i, egri: nt.egri, pencere,
+            sekilId: s0.id, tur: nt.tur, i: nt.i, egri: nt.egri, kat: nt.kat, pencere,
             eskiPencere: g ? { xMin: g.xMin, xMax: g.xMax, yMin: g.yMin, yMax: g.yMax, xAdim: g.xAdim, yAdim: g.yAdim } : undefined,
           };
           return;
@@ -1189,6 +1232,12 @@ export function CizimEditoruModal({
           for (const aday of yAdaylar) if (Math.abs(vurulanTutamac.y - aday.deger) <= esik) susturulmusYRef.current.add(aday.deger);
         }
         return;
+      }
+      // Seçili katlamada katlanan parçaya tıklamak (sürüklemeden) karşı tarafı katlar.
+      flapTikRef.current = null;
+      if (seciliSekil && seciliSekil.tur === "fizik" && seciliSekil.nesne === "kagitKatlama" && !e.shiftKey) {
+        const cevrik = katlananTarafiDegistir(seciliSekil, nokta);
+        if (cevrik) flapTikRef.current = { yeni: cevrik, nokta };
       }
       const vurulan = [...sekiller].reverse().find((s) => sekilVuruldu(ctx, s, nokta, zoom, sekiller));
       if (vurulan) {
@@ -1304,6 +1353,13 @@ export function CizimEditoruModal({
   function isaretciHareket(e: PointerEvent<HTMLCanvasElement>) {
     const nokta = noktaAl(e);
 
+    // Katla kipi: çizgi önizlemesi (mavi kesikli) ve çapraz imleç.
+    if (katlaCizgiRef.current) {
+      setPortCizgisi({ bas: katlaCizgiRef.current.bas, son: nokta });
+      return;
+    }
+    if (katlaKipiRef.current && arac === "sec") { e.currentTarget.style.cursor = "crosshair"; return; }
+
     // Porttan bağlayıcı çekiliyor: önizleme çizgisi + bırakılacak hedefin portları.
     if (portSurukleRef.current) {
       setPortCizgisi({ bas: portSurukleRef.current.bas, son: nokta });
@@ -1320,6 +1376,9 @@ export function CizimEditoruModal({
         // Köşe kutu dışına çıkarsa kutu da büyür (seçim çerçevesi köşeyi kapsasın).
         const tasinan = geometriKoseTasiSekil(s0, ns.i, nokta);
         if (tasinan) yeni = tasinan;
+      } else if (ns.tur === "katlama" && ns.kat) {
+        const k = katlamaTutamacTasi(s0, ns.kat, nokta, 10 * (100 / Math.max(zoom, 1)));
+        if (k) yeni = k;
       } else if (ns.tur === "grafik" && ns.pencere && ns.egri !== undefined) {
         const p = ns.pencere;
         // Pencere sürükleme boyunca dondurulur: yoksa nokta değiştikçe eksenler
@@ -1567,6 +1626,34 @@ export function CizimEditoruModal({
 
   function isaretciYukari(e?: PointerEvent<HTMLCanvasElement>) {
     setIsaretciBasili(false);
+    // Katla kipi: çekilen çizgiyle kâğıdı katla.
+    const kc = katlaCizgiRef.current;
+    if (kc) {
+      katlaCizgiRef.current = null;
+      setPortCizgisi(null);
+      const son = e ? noktaAl(e) : null;
+      const s0 = sekillerRef.current.find((x) => x.id === kc.id);
+      if (son && s0 && s0.tur === "fizik" && Math.hypot(son.x - kc.bas.x, son.y - kc.bas.y) >= 12 * (100 / Math.max(zoom, 1))) {
+        const yeni = katlamaCizgisiCiz(s0, kc.bas, son);
+        if (yeni) {
+          tarihceyeKaydet();
+          setSekiller((liste) => liste.map((x) => (x.id === yeni.id ? yeni : x)));
+          katlaKipiAyarla(false);
+          setHata("");
+        } else {
+          setHata("Katlama çizgisi kâğıdı iki ayrı noktadan kesmeli. Şeklin içinden, bir kenardan başka bir kenara çizgi çekin.");
+        }
+      }
+      return;
+    }
+    // Katlanan parçaya sürüklemeden tıklandı: karşı taraf katlanır.
+    const ft = flapTikRef.current;
+    flapTikRef.current = null;
+    if (ft && e && !islemDegistiRef.current && !noktaSurukleRef.current && !boyutlandirmaBaslangici.current
+      && Math.hypot(noktaAl(e).x - ft.nokta.x, noktaAl(e).y - ft.nokta.y) < 6 * (100 / Math.max(zoom, 1))) {
+      tarihceyeKaydet();
+      setSekiller((liste) => liste.map((x) => (x.id === ft.yeni.id ? ft.yeni : x)));
+    }
     // Porttan çekilen bağlayıcı bırakıldı.
     if (portSurukleRef.current) {
       const ps = portSurukleRef.current;
@@ -1685,6 +1772,8 @@ export function CizimEditoruModal({
 
   function isaretciIptal() {
     setIsaretciBasili(false);
+    katlaCizgiRef.current = null;
+    flapTikRef.current = null;
     portSurukleRef.current = null;
     noktaSurukleRef.current = null;
     baglayiciSurukleRef.current = null;
@@ -2331,6 +2420,8 @@ export function CizimEditoruModal({
       // Grafik/istatistik/şema/kimya yazılı veri: çevirmek/döndürmek yazıları bozar.
       onCevir: cevrilebilirMi(s) && !cevrilemez ? () => seciliyeUygula(sekilYatayCevir) : undefined,
       onDondur: s.tur !== "baglayici" && !veriNesnesi ? () => seciliyeUygula(sekilDondur90) : undefined,
+      onKatla: katlanabilirMi(s) ? katlaBaslat : undefined,
+      katlaAktif: katlaKipi,
     };
   })();
 
@@ -2513,7 +2604,12 @@ export function CizimEditoruModal({
           (önizleme tuvalleri ana tuvalden önce bulunmasın), görsel sırası `order`. */}
       <div className="relative flex min-h-0 flex-1 gap-3">
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-          {arac === "sec" && (imlecIpucu || seciliIds.length === 1) && (() => {
+          {arac === "sec" && katlaKipi && (
+            <div data-testid="katla-ipucu" className="pointer-events-none absolute bottom-3 left-3 z-10 max-w-[85%] rounded-lg bg-brand-700 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg">
+              Katlama çizgisini çizin: bir kenardan başlayıp başka bir kenarda bırakın · Esc: vazgeç
+            </div>
+          )}
+          {arac === "sec" && !katlaKipi && (imlecIpucu || seciliIds.length === 1) && (() => {
             const secili = seciliIds.length === 1 ? sekiller.find((x) => x.id === seciliIds[0]) : undefined;
             if (!secili && !imlecIpucu) return null;
             return (
