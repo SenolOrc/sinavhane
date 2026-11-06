@@ -16,7 +16,7 @@ import {
   noktaCokgenIcindeMi,
   noktaSegmenteUzaklik,
 } from "./geometri";
-import { noktaYerel, sekilHamSinirlari } from "./sinirlar";
+import { birlesikSinir, noktaYerel, sekilHamSinirlari, sekilTutamaclari } from "./sinirlar";
 
 // Vuruş payı, tuvalin gerçek çizim uzayında sabit bir mesafe (VURUS_PAYI). Uzaklaştırılmış
 // (küçük zoom) görünümde ekrandaki 1 piksel, tuval uzayında daha fazla birime karşılık
@@ -144,4 +144,84 @@ export function noktaBaskaSekleDegiyorMu(
     if (sekilKenarUzakligi(ctx, s, nokta) <= DEGME_TOLERANSI) return true;
   }
   return false;
+}
+
+// ---------------------------------------------------------------------------
+// Bağlamsal imleç + ipucu: fare bir noktadayken tıklanırsa NE OLACAĞINI söyler.
+// Saf fonksiyon (tuval/React bilmez); tuvaldeki imleci ve ipucu etiketini besler.
+// ---------------------------------------------------------------------------
+
+export type EtkilesimTuru =
+  | "tasi" | "boyutlandir-nwse" | "boyutlandir-nesw" | "nokta"
+  | "dondur" | "bagla" | "sec";
+
+export type EtkilesimSonucu = { tur: EtkilesimTuru; hedefId: string | null };
+
+/** Bileşenin kendi bildiği (port / köşe-nokta tutamacı) durumlar. */
+export type EtkilesimEk = { portta?: boolean; noktaTutamacinda?: boolean };
+
+export function etkilesimBelirle(
+  ctx: CanvasRenderingContext2D,
+  sekiller: Sekil[],
+  seciliIds: string[],
+  nokta: Nokta,
+  zoom: number,
+  ek: EtkilesimEk = {},
+): EtkilesimSonucu {
+  if (ek.portta) return { tur: "bagla", hedefId: null };
+  if (ek.noktaTutamacinda) return { tur: "nokta", hedefId: seciliIds[0] ?? null };
+  const pay = tutamacPayi(zoom);
+  if (seciliIds.length > 1) {
+    const secilenler = sekiller.filter((s) => seciliIds.includes(s.id));
+    if (secilenler.length) {
+      const sinir = birlesikSinir(ctx, secilenler);
+      if (Math.hypot(nokta.x - (sinir.x + sinir.w / 2), nokta.y - (sinir.y - 26)) <= pay) return { tur: "dondur", hedefId: null };
+    }
+  } else if (seciliIds.length === 1) {
+    const secili = sekiller.find((s) => s.id === seciliIds[0]);
+    const tutamac = secili ? sekilTutamaclari(ctx, secili).find((t) => Math.hypot(nokta.x - t.x, nokta.y - t.y) <= pay) : undefined;
+    if (secili && tutamac) {
+      if (tutamac.id === "dondur") return { tur: "dondur", hedefId: secili.id };
+      if (tutamac.id === "sol-ust" || tutamac.id === "sag-alt") return { tur: "boyutlandir-nwse", hedefId: secili.id };
+      if (tutamac.id === "sag-ust" || tutamac.id === "sol-alt") return { tur: "boyutlandir-nesw", hedefId: secili.id };
+      return { tur: "nokta", hedefId: secili.id };
+    }
+  }
+  const vurulan = [...sekiller].reverse().find((s) => sekilVuruldu(ctx, s, nokta, zoom, sekiller));
+  if (vurulan) return { tur: "tasi", hedefId: vurulan.id };
+  return { tur: "sec", hedefId: null };
+}
+
+export function imlecSinifi(tur: EtkilesimTuru): string {
+  switch (tur) {
+    case "tasi": return "move";
+    case "boyutlandir-nwse": return "nwse-resize";
+    case "boyutlandir-nesw": return "nesw-resize";
+    case "nokta": return "grab";
+    case "dondur": return "grab";
+    case "bagla": return "crosshair";
+    default: return "crosshair";
+  }
+}
+
+export function etkilesimIpucu(tur: EtkilesimTuru): string {
+  switch (tur) {
+    case "tasi": return "Taşımak için sürükle · düzenlemek için çift tıkla";
+    case "boyutlandir-nwse":
+    case "boyutlandir-nesw": return "Boyutlandırmak için sürükle";
+    case "nokta": return "Köşeyi ya da noktayı sürükle";
+    case "dondur": return "Döndürmek için sürükle";
+    case "bagla": return "Bağlayıcı çizmek için sürükle";
+    default: return "";
+  }
+}
+
+const TUR_ADLARI: Record<string, string> = {
+  dogru: "Çizgi", dikdortgen: "Dikdörtgen", elips: "Elips", ucgen: "Üçgen", cokgen: "Çokgen",
+  dalga: "Dalga", serbest: "Serbest çizim", metin: "Metin", akis: "Akış kutusu",
+  baglayici: "Bağlayıcı", fizik: "Hazır şekil",
+};
+
+export function sekilTurAdi(sekil: Sekil): string {
+  return TUR_ADLARI[sekil.tur] ?? sekil.tur;
 }

@@ -3,16 +3,13 @@
 // modal yalnız durumu (kip, araç, bağlantı ayarı) tutup bunları çağırır.
 
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
 import { FlipHorizontal2, RotateCw } from "lucide-react";
 
 import { AKIS_DOLGU_PALETI } from "../cizim/sabitler";
 import {
-  FIZIK_GRUPLARI,
   FIZIK_TANIMLARI,
   fizikSimgeCiz,
 } from "../cizim/fizik";
-import type { FizikGrubu } from "../cizim/fizik";
 import { kimyaSiviliMi } from "../cizim/kimya";
 import { izgaraBoyutu } from "../cizim/geometri";
 import type { BaglayiciUcu, BaglayiciStili, BaglayiciYonu, FizikEtiketYeri, FizikNesnesi, Sekil } from "../cizim/tipler";
@@ -59,113 +56,6 @@ export function FizikSimgesi({ nesne }: { nesne: FizikNesnesi }) {
     fizikSimgeCiz(ctx, nesne, 44, 30);
   }, [nesne]);
   return <canvas ref={ref} width={44} height={30} style={{ width: 44, height: 30 }} aria-hidden="true" />;
-}
-
-export function FizikSeridi({
-  onEkle,
-  baglayiciAyari,
-  baglayiciAktif,
-  kaynakSecildi,
-  onBaglayici,
-  grafikIcerigi,
-  matematikIcerigi,
-  kimyaIcerigi,
-  grup: disGrup,
-  onGrupDegisti,
-}: {
-  /** Seçili şekil grubu DIŞARIDAN yönetilebilir. Verilmezse kendi durumunu tutar.
-   *  (v1.2'den beri çizim penceresi bu şeridi kullanmıyor; şekiller sol
-   *  kütüphaneden eklenir. Şerit bağımsız kullanım için korunuyor.) */
-  grup?: FizikGrubu;
-  onGrupDegisti?: (grup: FizikGrubu) => void;
-  /** "Kimya" grubunda gösterilir (laboratuvar, atom/molekül, periyodik tablo, grafik). */
-  kimyaIcerigi?: ReactNode;
-  /** "Matematik" grubunda nesne düğmeleri yerine gösterilir (fonksiyon, istatistik, şema şablonları). */
-  matematikIcerigi?: ReactNode;
-  /** "Grafik" grubunda nesne düğmeleri yerine gösterilir (şablonlar). */
-  grafikIcerigi?: ReactNode;
-  onEkle: (nesne: FizikNesnesi) => void;
-  baglayiciAyari: BaglayiciAyari;
-  baglayiciAktif: boolean;
-  kaynakSecildi: boolean;
-  onBaglayici: (ayar: BaglayiciAyari) => void;
-}) {
-  const [icGrup, setIcGrup] = useState<FizikGrubu>("mekanik");
-  const grup = disGrup ?? icGrup;
-  const setGrup = (g: FizikGrubu) => { setIcGrup(g); onGrupDegisti?.(g); };
-  const nesneler = (Object.keys(FIZIK_TANIMLARI) as FizikNesnesi[]).filter((n) => FIZIK_TANIMLARI[n].grup === grup || FIZIK_TANIMLARI[n].ekGruplar?.includes(grup));
-  return (
-    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-1.5" data-testid="fizik-seridi">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="px-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Fizik şekilleri</span>
-        {FIZIK_GRUPLARI.map((g) => (
-          <TogglePill key={g.id} aktif={grup === g.id} onClick={() => setGrup(g.id)}>
-            {g.ad}
-          </TogglePill>
-        ))}
-      </div>
-      <div className="mt-1.5 flex flex-wrap gap-1.5">
-        {grup === "grafik" && grafikIcerigi}
-        {grup === "matematik" && matematikIcerigi}
-        {grup === "kimya" && kimyaIcerigi}
-        {!(grup === "grafik" && grafikIcerigi) && !(grup === "matematik" && matematikIcerigi) && !(grup === "kimya" && kimyaIcerigi) && nesneler.map((nesne) => {
-          const t = FIZIK_TANIMLARI[nesne];
-          return (
-            <button
-              key={nesne}
-              type="button"
-              title={t.ipucu}
-              aria-label={`Ekle: ${t.ad}`}
-              onClick={() => onEkle(nesne)}
-              className="inline-flex flex-col items-center gap-0.5 rounded-lg border border-slate-200 bg-white px-2 pb-1 pt-1.5 text-[10px] font-semibold text-slate-600 transition hover:border-brand-200 hover:bg-brand-50"
-            >
-              <FizikSimgesi nesne={nesne} />
-              {t.ad}
-            </button>
-          );
-        })}
-      </div>
-      {grup !== "grafik" && grup !== "matematik" && grup !== "kimya" && (
-      <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-200 pt-1.5">
-        <span className="px-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Bağlantı</span>
-        {BAGLANTI_TURLERI.map((tur) => {
-          const secili = baglayiciAktif && tur.ayar.stil === baglayiciAyari.stil && tur.ayar.okUcu === baglayiciAyari.okUcu;
-          return (
-            <button
-              key={tur.id}
-              type="button"
-              title={tur.ipucu}
-              aria-pressed={secili}
-              onClick={() => onBaglayici({ ...tur.ayar, ...(baglayiciAyari.serbest ? { serbest: true } : {}) })}
-              className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition ${
-                secili
-                  ? "border-brand-300 bg-brand-50 text-brand-700"
-                  : "border-slate-200 bg-white text-slate-600 hover:border-brand-200 hover:bg-brand-50"
-              }`}
-            >
-              {tur.ad}
-            </button>
-          );
-        })}
-        <TogglePill
-          aktif={!!baglayiciAyari.serbest}
-          onClick={() => onBaglayici({ ...baglayiciAyari, serbest: !baglayiciAyari.serbest })}
-        >
-          <span title="Açıkken şeklin üstüne tıklamak şekle yapışmaz: ok, tıkladığınız noktadan başlar/biter (kuvveti cismin merkezinden çizmek için)">
-            Şekle yapışma: {baglayiciAyari.serbest ? "kapalı (serbest uç)" : "açık"}
-          </span>
-        </TogglePill>
-        {baglayiciAktif && (
-          <span className="text-[10px] font-semibold text-brand-700">
-            {kaynakSecildi
-              ? "Şimdi HEDEFE tıklayın (şekil ya da boş nokta)"
-              : "Önce KAYNAĞA tıklayın (şekil ya da boş nokta)"}
-          </span>
-        )}
-      </div>
-      )}
-    </div>
-  );
 }
 
 const SEMBOLLER = ["θ", "α", "β", "μ", "ω", "ρ", "Δ", "Ω", "π", "°", "·", "×", "±"];

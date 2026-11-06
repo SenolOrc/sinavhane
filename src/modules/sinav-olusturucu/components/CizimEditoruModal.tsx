@@ -140,7 +140,7 @@ import {
   sekilTamKutusu,
 } from "../cizim/sinirlar";
 import { icerigeKirp } from "../cizim/kirpma";
-import { sekilVuruldu, tutamacPayi } from "../cizim/vurus";
+import { etkilesimBelirle, etkilesimIpucu, imlecSinifi, sekilTurAdi, sekilVuruldu, tutamacPayi } from "../cizim/vurus";
 import { bosYerBul, type Kutu } from "../cizim/yerlesim";
 import {
   boyutlandirmaAdaylari,
@@ -392,6 +392,8 @@ export function CizimEditoruModal({
   const [sagPanelAcik, setSagPanelAcik] = useState(false);
   /** Bağlantı portları gösterilen (fareyle üstüne gelinen) şekil. */
   const [uzerindekiId, setUzerindekiId] = useState<string | null>(null);
+  /** Fare altındaki işlemin kısa açıklaması ("Taşımak için sürükle" gibi). */
+  const [imlecIpucu, setImlecIpucu] = useState("");
   /** Porttan sürüklenen bağlayıcının önizleme çizgisi. */
   const [portCizgisi, setPortCizgisi] = useState<{ bas: Nokta; son: Nokta } | null>(null);
   /** Çift tıklamada açılan yerinde düzenleme baloncuğu. */
@@ -1343,18 +1345,12 @@ export function CizimEditoruModal({
       && !grupDondurmeBaslangici.current && !secimKutusuBaslangiciRef.current) {
       const ctx = canvasRef.current?.getContext("2d");
       if (ctx) {
-        let imlec = "crosshair";
-        if (seciliIds.length > 1) {
-          const sinir = birlesikSinir(ctx, sekiller.filter((s) => seciliIds.includes(s.id)));
-          if (Math.hypot(nokta.x - (sinir.x + sinir.w / 2), nokta.y - (sinir.y - 26)) <= tutamacPayi(zoom)) imlec = "grab";
-        } else if (seciliId) {
-          const secili = sekiller.find((s) => s.id === seciliId);
-          const tutamac = secili ? sekilTutamaclari(ctx, secili).find((t) => Math.hypot(nokta.x - t.x, nokta.y - t.y) <= tutamacPayi(zoom)) : undefined;
-          if (tutamac) imlec = tutamac.id === "dondur" ? "grab" : "nwse-resize";
-        }
-        if (imlec === "crosshair" && [...sekiller].reverse().some((s) => sekilVuruldu(ctx, s, nokta, zoom, sekiller))) imlec = "move";
-        if (portBul(nokta)) imlec = "crosshair";
-        else if (noktaTutamaclari().some((t) => Math.hypot(t.x - nokta.x, t.y - nokta.y) <= portYaricapi())) imlec = "grab";
+        const portta = !!portBul(nokta);
+        const noktaTutamacinda = !portta && noktaTutamaclari().some((t) => Math.hypot(t.x - nokta.x, t.y - nokta.y) <= portYaricapi());
+        const etkilesim = etkilesimBelirle(ctx, sekiller, seciliIds, nokta, zoom, { portta, noktaTutamacinda });
+        const imlec = imlecSinifi(etkilesim.tur);
+        const ipucu = etkilesimIpucu(etkilesim.tur);
+        setImlecIpucu((onceki) => (onceki === ipucu ? onceki : ipucu));
         e.currentTarget.style.cursor = imlec;
       }
     }
@@ -2517,6 +2513,18 @@ export function CizimEditoruModal({
           (önizleme tuvalleri ana tuvalden önce bulunmasın), görsel sırası `order`. */}
       <div className="relative flex min-h-0 flex-1 gap-3">
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+          {arac === "sec" && (imlecIpucu || seciliIds.length === 1) && (() => {
+            const secili = seciliIds.length === 1 ? sekiller.find((x) => x.id === seciliIds[0]) : undefined;
+            if (!secili && !imlecIpucu) return null;
+            return (
+              <div
+                data-testid="imlec-ipucu"
+                className="pointer-events-none absolute bottom-3 left-3 z-10 max-w-[80%] rounded-lg bg-slate-900/85 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg"
+              >
+                {secili ? `${sekilTurAdi(secili)} seçili` : ""}{secili && imlecIpucu ? " · " : ""}{imlecIpucu}
+              </div>
+            );
+          })()}
           <div
             ref={containerRef}
             onScroll={() => setKaydirmaSayaci((n) => n + 1)}
@@ -2539,7 +2547,7 @@ export function CizimEditoruModal({
               onPointerMove={isaretciHareket}
               onPointerUp={isaretciYukari}
               onPointerCancel={isaretciIptal}
-              onPointerLeave={() => { if (uzerindekiId && !portSurukleRef.current) setUzerindekiId(null); }}
+              onPointerLeave={() => { setImlecIpucu(""); if (uzerindekiId && !portSurukleRef.current) setUzerindekiId(null); }}
               onKeyDown={(e) => {
                 if ((e.key === "Enter" || e.key === " ") && !e.ctrlKey && !e.metaKey) {
                   e.preventDefault(); klavyeyleSekilEkle();
