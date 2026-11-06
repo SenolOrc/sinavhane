@@ -297,6 +297,13 @@ export type GeometriVerisi =
       eski: boolean;
       baslik: boolean;
       dolgu: "mavi" | "gri" | "tarali";
+      /** Katlamadan doğan eş kenar (|AD| = |A′D|) ve eş açı işaretleri. */
+      eslikGoster?: boolean;
+      /**
+       * Sabit yerleşim (tuvaldeki şekilden dönüştürülen katlamalarda): kâğıt→tuval ölçeği `olc` piksel/birim ve
+       * kutunun sol-üstüne göre kayma (`ox`, `oy`). Katlama değişince çizim ölçeklenip KAYMAZ; kutu içeriğe göre büyür.
+       */
+      yer?: { olc: number; ox: number; oy: number };
     }
   | {
       tur: "benzer";
@@ -311,12 +318,31 @@ export type GeometriVerisi =
   | { tur: "cokgen"; n: number; adlar: string[]; merkez: boolean; kosegen: boolean; esKenar: boolean };
 
 /** Kağıt katlama: kağıt (dikdörtgen w×h, kare a, B'de dik üçgen |BC| = p, |AB| = q). Koordinat y yukarı. */
-export type KatlamaKagidi = { tur: "dikdortgen" | "kare" | "dikucgen"; w: number; h: number; a: number; p: number; q: number };
+export type KatlamaKagidi = {
+  tur: "dikdortgen" | "kare" | "dikucgen" | "serbest";
+  w: number; h: number; a: number; p: number; q: number;
+  /** Yalnız `tur: "serbest"`: herhangi bir üçgen/dörtgen/çokgen (3–12 köşe, y yukarı, saat yönünün tersi ya da saat yönü). */
+  serbestKoseler?: { ad: string; x: number; y: number }[];
+};
 /**
  * Bir katlama. iki: k1–k2 köşelerinden geçen çizgi · nokta: `kose` köşesi ile `kenar` kenarında, kenarın
  * ilk köşesinden `uz` birim uzaktaki nokta · getir: `hareketli` köşe `hedef`e (köşe ya da "O" merkez) gelir.
  */
-export type KatlamaAdimi = { mod: "iki" | "nokta" | "getir"; k1: string; k2: string; hareketli: string; kose: string; kenar: string; uz: number; hedef: string };
+export type KatlamaAdimi = {
+  /**
+   * ikiKenar: `kenar1` üzerinde `oran1`, `kenar2` üzerinde `oran2` konumundaki noktalardan geçen çizgi ([DE]) ·
+   * serbestCizgi: kağıt koordinatında `uc1`–`uc2` doğrusu (uçlar kenarlara kırpılır).
+   */
+  mod: "iki" | "nokta" | "getir" | "ikiKenar" | "serbestCizgi";
+  k1: string; k2: string;
+  /** Katlanan köşe. serbestCizgi'de "" = küçük taraf otomatik. */
+  hareketli: string;
+  kose: string; kenar: string; uz: number; hedef: string;
+  kenar1?: string; oran1?: number; kenar2?: string; oran2?: number;
+  uc1?: Nokta; uc2?: Nokta;
+  /** getir: köşe adı yerine serbest hedef noktası (fareyle sürüklenen A′). */
+  hedefXY?: Nokta;
+};
 
 export type IstatistikTuru ="sutun" | "cubuk" | "daire" | "cizgi" | "histogram" | "kutu" | "govde";
 

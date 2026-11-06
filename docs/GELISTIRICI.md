@@ -44,6 +44,12 @@ arayüz testleri JSDOM kullanır, PNG kırpma testleri `@napi-rs/canvas` varsa g
 - **Geometri** `cizim/geometriSekilleri.ts` (üçgen, çember, benzerlik, çokgen), `cizim/geometriEk.ts`
   (doğruda açılar, özel dörtgenler, katı cisimler, kağıt katlama), ortak çizim yardımcıları
   `cizim/geometriYardimci.ts`; paneli `components/GeometriPaneli.tsx`.
+  **Serbest katlama (v1.3):** hesap motoru çokgen-genel (`katlamaHesapla`); `KatlamaKagidi.serbestKoseler`
+  (3–12 köşe), `KatlamaAdimi.mod` `ikiKenar` (kenar1/oran1, kenar2/oran2) ve `serbestCizgi` (uc1/uc2),
+  `hedefXY` (sürüklenen A′), `KatlamaVerisi.eslikGoster` ve `yer` (sabit yerleşim: sürüklerken çizim kaymaz).
+  Tuval etkileşimi saf yardımcılarda (`cizim/geometriEtkilesim.ts`): `sekliKatlamayaDonustur`,
+  `katlamaCizgisiCiz`, `katlamaTutamaclari` / `katlamaTutamacTasi`, `katlananTarafiDegistir`;
+  kutuyu içeriğe sığdıran `katlamaKutusunuSigdir` (`geometriEk.ts`). Testler: `tests/katlama-v13-*.ts(x)`.
 - **Matematik** `cizim/grafik.ts` + `cizim/ifade.ts` (fonksiyon, bölge, kapalı denklem, alan, teğet),
   `cizim/istatistik.ts`, `cizim/sema.ts` (Venn, olasılık ağacı, sayı doğrusu) ve `cizim/semaEk.ts`
   (birim çember, işaret tablosu, fonksiyon ok diyagramı). Veri tabloları ortak `components/MiniTablo.tsx`

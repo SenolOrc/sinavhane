@@ -13,7 +13,11 @@
 
 import type { GeoAciIsareti, GeometriVerisi, Nokta, Sekil } from "./tipler";
 import { cemberYerlesimi, cokgenKoseleri, geometriNesneyeUygun, geometriVerisiGecerliMi, ucgenYerlesimi, varsayilanGeometri } from "./geometriSekilleri";
-import { dortgenYerlesimi } from "./geometriEk";
+import {
+  dogruyuKagidaKirp, dortgenYerlesimi, kagitKoseleri, kagitSerbest, katDuzelt, katlamaYansit, katlamaYerlesimi,
+  katlamaKutusunuSigdir, sinirdaEnYakin, varsayilanKatlama,
+} from "./geometriEk";
+import { noktaDondur } from "./geometri";
 
 type FizikSekli = Extract<Sekil, { tur: "fizik" }>;
 
@@ -258,4 +262,219 @@ export function geometriEtiketiAyarla(v: GeometriVerisi, hedef: GeoHedef, yama: 
     if (i >= 0 && i <= 4) { const a = [...v.adlar]; while (a.length < i + 2) a.push(""); a[i + 1] = kes(yama.ad); return { ...v, adlar: a }; }
   }
   return v;
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// Serbest katlama (v1.3): tuvaldeki üçgen/dörtgen/çokgeni katlanabilir kâğıda çevirme,
+// tuvalde çizgi çekerek katlama, katlama uçlarını (D, E) ve katlanan köşeyi (A′) sürükleme.
+// Hepsi saf: dünya (tuval) koordinatı alır, yeni şekil döndürür.
+// ════════════════════════════════════════════════════════════════════════════
+
+type KatlamaVerisi = Extract<GeometriVerisi, { tur: "katlama" }>;
+type KatlamaAdimi = KatlamaVerisi["katlar"][number];
+
+const KAGIT_PAY = 24;
+const yuvarla3 = (x: number) => Math.round(x * 1000) / 1000;
+const HARFLER = "ABCDEFGHIJKL";
+
+/** Köşeleri (dünya, y aşağı) bu şekilden okunabilen şekil mi? Katla düğmesi bunu sorar. */
+export function katlanabilirMi(s: Sekil): boolean {
+  if (s.tur === "ucgen" || s.tur === "dikdortgen") return true;
+  if (s.tur === "cokgen") return s.noktalar.length >= 3 && s.noktalar.length <= 12;
+  if (s.tur !== "fizik") return false;
+  if (s.nesne === "kagitKatlama") return true;
+  if (!["ucgenABC", "dikUcgen", "dortgenGeo", "cokgenAd"].includes(s.nesne)) return false;
+  const n = geometriKoseleri(s).filter((t) => t.tur === "kose").length;
+  return n >= 3 && n <= 12;
+}
+
+function kaynakKoseleri(s: Sekil): { ad: string; x: number; y: number }[] | null {
+  let noktalar: { ad?: string; x: number; y: number }[] | null = null;
+  if (s.tur === "ucgen") noktalar = [{ x: s.x1, y: s.y1 }, { x: s.x2, y: s.y2 }, { x: s.x3, y: s.y3 }];
+  else if (s.tur === "dikdortgen") {
+    noktalar = s.serbestKoseler && s.serbestKoseler.length === 4
+      ? s.serbestKoseler.map((p) => ({ x: p.x, y: p.y }))
+      : [{ x: s.x, y: s.y }, { x: s.x + s.w, y: s.y }, { x: s.x + s.w, y: s.y + s.h }, { x: s.x, y: s.y + s.h }];
+  } else if (s.tur === "cokgen") noktalar = s.noktalar.map((p) => ({ x: p.x, y: p.y }));
+  else if (s.tur === "fizik" && ["ucgenABC", "dikUcgen", "dortgenGeo", "cokgenAd"].includes(s.nesne)) {
+    const t = geometriKoseleri(s).filter((k) => k.tur === "kose");
+    noktalar = t.map((k) => ({ ad: k.ad, x: k.x, y: k.y }));
+  }
+  if (!noktalar || noktalar.length < 3 || noktalar.length > 12) return null;
+  if (noktalar.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.y))) return null;
+  // Dönmüş basit şekiller: kutu merkezi etrafında döndür.
+  const donus = (s as { donus?: number }).donus ?? 0;
+  if (donus && s.tur !== "fizik") {
+    const xs = noktalar.map((p) => p.x), ys = noktalar.map((p) => p.y);
+    const m = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
+    noktalar = noktalar.map((p) => ({ ...p, ...noktaDondur(p, m, donus) }));
+  }
+  const kullanilan = new Set<string>();
+  return noktalar.map((p, i) => {
+    const aday = p.ad && /^[A-Z]$/.test(p.ad) && !kullanilan.has(p.ad) ? p.ad : HARFLER[i];
+    kullanilan.add(aday);
+    return { ad: aday, x: p.x, y: p.y };
+  });
+}
+
+/**
+ * Üçgen / dikdörtgen / dörtgen / çokgeni, köşe koordinatlarını koruyarak katlanabilir kâğıda çevirir
+ * (henüz katlama yok). Şekil aynı yerde kalır; sonra tuvalde çizgi çekilerek katlanır.
+ * Zaten katlama ise aynen döner; katlanamayan şekilde null.
+ */
+export function sekliKatlamayaDonustur(s: Sekil): FizikSekli | null {
+  if (s.tur === "fizik" && s.nesne === "kagitKatlama") return s;
+  const K = kaynakKoseleri(s);
+  if (!K) return null;
+  const xs = K.map((p) => p.x), ys = K.map((p) => p.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const boyut = Math.max(x1 - x0, y1 - y0);
+  if (boyut < 1e-6) return null;
+  // Kâğıt birimi: en uzun kenar 12 birim (ölçek `olc` piksel/birim olarak aynı büyüklükte geri gelir).
+  const ol = 12 / boyut;
+  const kagit = kagitSerbest(K.map((p) => ({ x: yuvarla3((p.x - x0) * ol), y: yuvarla3((y1 - p.y) * ol) })));
+  kagit.serbestKoseler = kagit.serbestKoseler!.map((q, i) => ({ ...q, ad: K[i].ad }));
+  const geo: KatlamaVerisi = varsayilanKatlama({ kagit, katlar: [], sekil1: false, ok: true, olcu: false, eski: true, baslik: false, dolgu: "tarali", eslikGoster: false, yer: { olc: 1 / ol, ox: KAGIT_PAY, oy: y1 - y0 + KAGIT_PAY } });
+  return {
+    id: s.id, tur: "fizik", nesne: "kagitKatlama", kalinlik: "kalinlik" in s ? s.kalinlik : 2, ...("cizgiTipi" in s && s.cizgiTipi ? { cizgiTipi: s.cizgiTipi } : {}),
+    x: x0 - KAGIT_PAY, y: y0 - KAGIT_PAY, w: x1 - x0 + 2 * KAGIT_PAY, h: y1 - y0 + 2 * KAGIT_PAY, geo,
+  };
+}
+
+const katVerisi = (s: FizikSekli): KatlamaVerisi | null => (s.nesne === "kagitKatlama" && s.geo && s.geo.tur === "katlama" && geometriVerisiGecerliMi(s.geo) ? s.geo : null);
+const asilKutu = (s: FizikSekli) => ({ x: s.x, y: s.y, w: s.w, h: s.h });
+
+/** Dünya noktası → (yerleşim, kâğıt koordinatı). Çizim ve sürükleme aynı dönüşümü kullanır. */
+function kagitaCevir(s: FizikSekli, v: KatlamaVerisi, dunya: Nokta) {
+  const Y = katlamaYerlesimi(v, asilKutu(s));
+  const yerel = geoDunyadanYerele(s, dunya);
+  return { Y, kagit: (Y.iki ? Y.T1ters : Y.T2ters)(yerel), kagit2: Y.T2ters(yerel) };
+}
+
+const KENAR_AYAR = (s: FizikSekli, v: KatlamaVerisi): FizikSekli => katlamaKutusunuSigdir({ ...s, geo: v });
+
+/**
+ * Tuvalde bir noktadan ötekine çekilen çizgiyle katlama: çizgi kâğıdın kenarlarına kırpılır,
+ * küçük taraf katlanır (`hareketli` otomatik). En çok 2 katlama; üçüncüde sonuncunun yerine geçer.
+ * Çizgi kâğıdı kesmiyorsa ya da bir kenar boyunca gidiyorsa null.
+ */
+export function katlamaCizgisiCiz(s: FizikSekli, a: Nokta, b: Nokta): FizikSekli | null {
+  const v = katVerisi(s);
+  if (!v) return null;
+  const A = kagitaCevir(s, v, a), B = kagitaCevir(s, v, b);
+  const koseler = kagitKoseleri(v.kagit);
+  const uc = dogruyuKagidaKirp(koseler, A.kagit2, B.kagit2);
+  if (!uc) return null;
+  const orta = { x: (uc[0].x + uc[1].x) / 2, y: (uc[0].y + uc[1].y) / 2 };
+  if (sinirdaEnYakin(koseler, orta).uzaklik < 1e-6) return null;
+  const adim = katDuzelt({ mod: "serbestCizgi", k1: "A", k2: "B", hareketli: "", kose: "A", kenar: koseler[0].ad + koseler[1].ad, uz: 1, hedef: "O", uc1: uc[0], uc2: uc[1] }, koseler);
+  const katlar = v.katlar.length < 2 ? [...v.katlar, adim] : [v.katlar[0], adim];
+  return KENAR_AYAR(s, { ...v, katlar });
+}
+
+export type KatlamaTutamac = {
+  /** uc: katlama çizgisinin kenardaki ucu (D, E) · hedef: katlanan köşenin yeni konumu (A′). */
+  tur: "uc" | "hedef";
+  adim: number;
+  /** tur "uc" için: 0 ya da 1 (çizginin hangi ucu). */
+  uc: number;
+  ad: string;
+  x: number;
+  y: number;
+};
+
+/** Seçili katlama şekli için sürükleme tutamaçları (dünya). Katlama yoksa boş. */
+export function katlamaTutamaclari(s: FizikSekli): KatlamaTutamac[] {
+  const v = katVerisi(s);
+  if (!v || !v.katlar.length) return [];
+  const Y = katlamaYerlesimi(v, asilKutu(s));
+  const T = Y.iki ? Y.T1 : Y.T2;
+  const liste: KatlamaTutamac[] = [];
+  Y.K.dogrular.forEach((L, i) => {
+    const uclar = Y.K.katlamaCizgileri[i];
+    uclar.forEach((n, j) => {
+      const d = geoYereldenDunyaya(s, T(n));
+      const ad = Y.K.adlar.find((a) => Math.hypot(a.x - n.x, a.y - n.y) < 1e-6)?.ad ?? "";
+      liste.push({ tur: "uc", adim: i, uc: j, ad, x: d.x, y: d.y });
+    });
+    if (L.hareketli) {
+      const yan = katlamaYansit(L, L.hareketli);
+      const d = geoYereldenDunyaya(s, Y.T2(yan));
+      liste.push({ tur: "hedef", adim: i, uc: 0, ad: `${L.hareketli.ad}′`, x: d.x, y: d.y });
+    }
+  });
+  return liste;
+}
+
+/**
+ * Bir tutamacı `nokta`ya (dünya) sürükler. Uç: kenar üzerinde kayar (çizgi serbestCizgi olur).
+ * Hedef (A′): katlama çizgisi A ile A′'nün orta dikmesi olur; A′ köşelere, ağırlık merkezine ve
+ * kenarlara mıknatıslanır (`mikEsik` piksel). Geçersizse (çizgi kenar boyunca, A′ = A) null.
+ */
+export function katlamaTutamacTasi(s: FizikSekli, t: Pick<KatlamaTutamac, "tur" | "adim" | "uc">, nokta: Nokta, mikEsik = 10): FizikSekli | null {
+  const v = katVerisi(s);
+  if (!v || !v.katlar[t.adim]) return null;
+  const { Y, kagit, kagit2 } = kagitaCevir(s, v, nokta);
+  const koseler = kagitKoseleri(v.kagit);
+  const L = Y.K.dogrular[t.adim];
+  const eski = v.katlar[t.adim];
+  const yenile = (adim: KatlamaAdimi) => KENAR_AYAR(s, { ...v, katlar: v.katlar.map((k, i) => (i === t.adim ? katDuzelt(adim, koseler) : k)) });
+  if (t.tur === "uc") {
+    const uclar = Y.K.katlamaCizgileri[t.adim];
+    if (uclar.length !== 2) return null;
+    const yeni = sinirdaEnYakin(koseler, kagit).nokta;
+    const uc1 = t.uc === 0 ? yeni : uclar[0], uc2 = t.uc === 1 ? yeni : uclar[1];
+    if (Math.hypot(uc1.x - uc2.x, uc1.y - uc2.y) < 1e-3) return null;
+    const orta = { x: (uc1.x + uc2.x) / 2, y: (uc1.y + uc2.y) / 2 };
+    if (sinirdaEnYakin(koseler, orta).uzaklik < 1e-6) return null;
+    // Katlanan köşe çizginin üstüne düşerse otomatiğe dön.
+    const ad = L.hareketli?.ad ?? "";
+    const V = koseler.find((k) => k.ad === ad);
+    const dx = uc2.x - uc1.x, dy = uc2.y - uc1.y;
+    const vYan = V ? Math.abs(dx * (V.y - uc1.y) - dy * (V.x - uc1.x)) / (Math.hypot(dx, dy) || 1) : 0;
+    return yenile({ ...eski, mod: "serbestCizgi", uc1, uc2, hareketli: V && vYan > 1e-6 ? ad : "" });
+  }
+  const V = L.hareketli;
+  if (!V) return null;
+  // Mıknatıs: köşeler, ağırlık merkezi, kenar noktaları (piksel eşiği → kâğıt birimi).
+  const esik = mikEsik / (Y.olc || 1);
+  const merkez = { x: koseler.reduce((m, k) => m + k.x, 0) / koseler.length, y: koseler.reduce((m, k) => m + k.y, 0) / koseler.length };
+  let hedef: Nokta = kagit2;
+  const adaylar: Nokta[] = [...koseler.filter((k) => k.ad !== V.ad), merkez];
+  let en = esik;
+  adaylar.forEach((a) => { const d = Math.hypot(a.x - kagit2.x, a.y - kagit2.y); if (d < en) { en = d; hedef = { x: a.x, y: a.y }; } });
+  if (en === esik) {
+    const sn = sinirdaEnYakin(koseler, kagit2);
+    if (sn.uzaklik < esik) hedef = sn.nokta;
+  }
+  if (Math.hypot(hedef.x - V.x, hedef.y - V.y) < 0.05) return null;
+  void kagit;
+  return yenile({ ...eski, mod: "getir", hareketli: V.ad, hedefXY: { x: yuvarla3(hedef.x), y: yuvarla3(hedef.y) } });
+}
+
+/** Katlanan parçaya tıklanırsa katlamanın hangi tarafı katlanacağını tersine çevirir; parçada değilse null. */
+export function katlananTarafiDegistir(s: FizikSekli, nokta: Nokta): FizikSekli | null {
+  const v = katVerisi(s);
+  if (!v || !v.katlar.length) return null;
+  const Y = katlamaYerlesimi(v, asilKutu(s));
+  const yerel = geoDunyadanYerele(s, nokta);
+  const icinde = (poly: Nokta[], p: Nokta) => {
+    let c = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i, i += 1) {
+      if ((poly[i].y > p.y) !== (poly[j].y > p.y) && p.x < ((poly[j].x - poly[i].x) * (p.y - poly[i].y)) / (poly[j].y - poly[i].y) + poly[i].x) c = !c;
+    }
+    return c;
+  };
+  const i = Y.K.katlananlar.findIndex((poly) => poly.length >= 3 && icinde(poly.map(Y.T2), yerel));
+  if (i < 0) return null;
+  const adim = v.katlar[i], L = Y.K.dogrular[i];
+  if (adim.mod === "getir" || !L.hareketli) return null;
+  const koseler = kagitKoseleri(v.kagit);
+  const mesafe = (n: Nokta) => L.d.x * (n.y - L.p.y) - L.d.y * (n.x - L.p.x);
+  const isaret = mesafe(L.hareketli) >= 0 ? 1 : -1;
+  let enIyi: string | null = null, enD = 1e-9;
+  koseler.forEach((k) => { const d = -isaret * mesafe(k); if (d > enD) { enD = d; enIyi = k.ad; } });
+  if (!enIyi) return null;
+  return KENAR_AYAR(s, { ...v, katlar: v.katlar.map((k, j) => (j === i ? katDuzelt({ ...k, hareketli: enIyi! }, koseler) : k)) });
 }
