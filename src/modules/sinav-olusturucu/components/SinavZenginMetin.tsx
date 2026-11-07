@@ -404,8 +404,13 @@ export function RichTextEditor({
   /** İmlecin bulunduğu tablo hücresi (editörün içinde), yoksa null. */
   function imlecHucresi(): HTMLTableCellElement | null {
     const editor = editorRef.current;
-    const aralik = aktifAralik();
-    if (!editor || !aralik) return null;
+    if (!editor) return null;
+    // Hücre için CANLI seçim esas alınır: aktifAralik() çökmüş imleçte eski (dolu) kayıtlı seçimi
+    // döndürebilir; metin seçip başka hücreye tıklayınca satır/sütun işlemi eski hücreye uygulanırdı.
+    const secim = window.getSelection();
+    const canli = secim && secim.rangeCount > 0 && editor.contains(secim.getRangeAt(0).commonAncestorContainer) ? secim.getRangeAt(0) : null;
+    const aralik = canli ?? aktifAralik();
+    if (!aralik) return null;
     const dugum = aralik.startContainer;
     const el = dugum.nodeType === 1 ? (dugum as Element) : dugum.parentElement;
     const hucre = el?.closest("td, th") as HTMLTableCellElement | null;
