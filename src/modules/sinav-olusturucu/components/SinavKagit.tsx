@@ -707,6 +707,8 @@ function CevapAlaniCizgisi({ soru, yazdirmaModu }: { soru: SoruOgesi; yazdirmaMo
         pointerEvents: "none",
         backgroundImage: tur === "cizgi" ? cizgi : `${cizgi}, ${dikey}`,
         backgroundSize: tur === "cizgi" ? `100% ${a}` : `100% ${a}, ${a} 100%`,
+        // Karelerde desen yalnız alt/sağ kenarları çizer; üst, sol ve (son kare yarım kalırsa) sağ kenar kapanmazsa ızgara açık kalır.
+        boxShadow: tur === "kare" ? `inset 0 ${kalin} 0 ${renk}, inset ${kalin} 0 0 ${renk}, inset -${kalin} 0 0 ${renk}` : undefined,
         WebkitPrintColorAdjust: "exact",
         printColorAdjust: "exact",
       }}
