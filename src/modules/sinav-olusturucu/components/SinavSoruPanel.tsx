@@ -666,14 +666,53 @@ export function InlineSoruDuzenlemePanel({
                     label="Boşluk sonrası"
                     value={soru.boslukMm}
                     onChange={(v) =>
-                      onChange({ boslukMm: sayiSinirla(v, 0, 80) })
+                      onChange({ boslukMm: sayiSinirla(v, 0, 240) })
                     }
                     min={0}
-                    max={80}
+                    max={240}
                   />
                   <p className="mt-1 text-[10px] text-slate-400">
                     ≈ {(soru.boslukMm / SATIR_MM).toFixed(1)} cevap satırı
                   </p>
+                </div>
+              </div>
+
+              <div className="mt-2 grid grid-cols-2 gap-2" data-testid="cevap-alani">
+                <div>
+                  <AlanEtiket>Cevap satırı sayısı</AlanEtiket>
+                  <input
+                    type="number"
+                    min={0}
+                    max={30}
+                    step={1}
+                    aria-label="Cevap satırı sayısı"
+                    value={Math.round(soru.boslukMm / SATIR_MM)}
+                    onChange={(e) => {
+                      const n = Math.round(Number(e.target.value));
+                      if (Number.isFinite(n)) onChange({ boslukMm: sayiSinirla(n * SATIR_MM, 0, 240) });
+                    }}
+                    className={INPUT_CLASS}
+                  />
+                </div>
+                <div>
+                  <AlanEtiket>Cevap alanı</AlanEtiket>
+                  <div className="flex gap-1" role="group" aria-label="Cevap alanı görünümü">
+                    {([["bos", "Boş"], ["cizgi", "Çizgili"], ["kare", "Kareli"]] as const).map(([k, ad]) => {
+                      const secili = (soru.cevapAlani ?? "bos") === k;
+                      return (
+                        <button
+                          key={k}
+                          type="button"
+                          aria-pressed={secili}
+                          data-testid={`cevap-alani-${k}`}
+                          onClick={() => onChange({ cevapAlani: k })}
+                          className={`flex-1 rounded-md border px-1.5 py-1.5 text-[11px] font-semibold ${secili ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"}`}
+                        >
+                          {ad}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 

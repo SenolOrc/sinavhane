@@ -678,6 +678,42 @@ function OgretmenImzaAlani({
   );
 }
 
+/** Sorunun altındaki boşluğu (marginBottom) çizgili ya da kareli gösterir.
+ *  Mutlak konumlu: yerleşim ölçümüne hiç etki etmez, yalnız mevcut boşluğu doldurur.
+ *  Kâğıt B/Y basıldığı için tek tonlu ince çizgi kullanılır. */
+function CevapAlaniCizgisi({ soru, yazdirmaModu }: { soru: SoruOgesi; yazdirmaModu?: boolean }) {
+  const tur = soru.cevapAlani;
+  if ((tur !== "cizgi" && tur !== "kare") || !(soru.boslukMm > 0)) return null;
+  const adim = tur === "cizgi" ? SATIR_MM : 5;
+  const yukseklik = Math.floor(soru.boslukMm / adim) * adim;
+  if (yukseklik <= 0) return null;
+  const renk = "#8a8a8a";
+  // mmOlcu ekranda birimsiz sayı döner (px); gradient boyutu birim ister.
+  const birim = (mm: number) => (yazdirmaModu ? `${mm}mm` : `${mmPx(mm)}px`);
+  const a = birim(adim);
+  const kalin = birim(0.25);
+  const cizgi = `linear-gradient(to bottom, transparent calc(100% - ${kalin}), ${renk} 0)`;
+  const dikey = `linear-gradient(to right, transparent calc(100% - ${kalin}), ${renk} 0)`;
+  return (
+    <div
+      aria-hidden="true"
+      data-testid="cevap-alani-cizgi"
+      style={{
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top: "100%",
+        height: mmOlcu(yukseklik, yazdirmaModu),
+        pointerEvents: "none",
+        backgroundImage: tur === "cizgi" ? cizgi : `${cizgi}, ${dikey}`,
+        backgroundSize: tur === "cizgi" ? `100% ${a}` : `100% ${a}, ${a} 100%`,
+        WebkitPrintColorAdjust: "exact",
+        printColorAdjust: "exact",
+      }}
+    />
+  );
+}
+
 function SoruBlok({
   soru,
   sira,
@@ -760,6 +796,7 @@ function SoruBlok({
         outlineOffset: 3,
       }}
     >
+      <CevapAlaniCizgisi soru={soru} yazdirmaModu={yazdirmaModu} />
       {tasarimModu && (
         // Rozet SAĞ ÜSTTE ve tamamen kutunun DIŞINDA duruyor.
         // Eskiden `top:-10, left:8`'di: 18px'lik rozetin alt 8px'i kutunun

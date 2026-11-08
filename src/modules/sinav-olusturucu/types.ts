@@ -74,6 +74,8 @@ export type SoruOgesi = {
   paketParcaSayisi?: number;
   paketBasligi?: string;
   boslukMm: number;
+  /** Soru altındaki boşluğun görünümü: boş (varsayılan), çizgili ya da kareli. Eski kayıtlarda yok = boş. */
+  cevapAlani?: CevapAlani;
   punto: number;
   puan: number | null;
   /**
@@ -108,6 +110,8 @@ export type SoruOgesi = {
   /** Türetilmiş parçada numara altında gösterilecek puan (`null` = gösterme). */
   gosterilenPuan?: number | null;
 };
+
+export type CevapAlani = "bos" | "cizgi" | "kare";
 
 export type MetinTaslak = {
   html: string;

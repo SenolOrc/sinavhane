@@ -335,10 +335,10 @@ export function GorselSoruModal({
           label="Boşluk sonrası"
           value={taslak.boslukMm}
           onChange={(v) =>
-            onChange({ ...taslak, boslukMm: sayiSinirla(v, 0, 80) })
+            onChange({ ...taslak, boslukMm: sayiSinirla(v, 0, 240) })
           }
           min={0}
-          max={80}
+          max={240}
         />
       </div>
       <ModalAlt>
