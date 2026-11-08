@@ -88,7 +88,7 @@ const kutle = (id: string, x: number, y: number, ek: Partial<Extract<Sekil, { tu
 const tumNesneler = Object.keys(FIZIK_TANIMLARI) as FizikNesnesi[];
 
 test("Katalog: otuz beş nesne, her biri bir grupta, ölçüleri pozitif", () => {
-  dogrula(tumNesneler.length === 67 + 4 /* v1.2 geometri */ + 3 /* v1.2 fizik: egikKuvvet, optikDuzenek, siviKabi */, `nesne sayısı ${tumNesneler.length}`);
+  dogrula(tumNesneler.length === 67 + 4 /* v1.2 geometri */ + 3 /* v1.2 fizik: egikKuvvet, optikDuzenek, siviKabi */ + 1 /* coğrafya şekilleri */, `nesne sayısı ${tumNesneler.length}`);
   const gruplar = new Set(FIZIK_GRUPLARI.map((g) => g.id));
   for (const n of tumNesneler) {
     const t = FIZIK_TANIMLARI[n];

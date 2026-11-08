@@ -18,6 +18,7 @@ import {
   KATI_SABLONLARI,
   KATI_TURLERI,
   KATLAMA_SABLONLARI,
+  COGRAFYA_SABLONLARI,
   UCGEN_SABLONLARI,
   geometriNesneyeUygun,
   geometriSablonOnizlemeCiz,
@@ -42,6 +43,7 @@ import {
 } from "../cizim/fizikEk";
 import type { FizikEk, GeoAciIsareti, GeometriVerisi, KatlamaAdimi, KatlamaKagidi, Sekil } from "../cizim/tipler";
 import { MetinGirdisi, OndalikGirdisi } from "./GrafikPaneli";
+import { COGRAFYA_BOYUTLARI, SEMA, type Alan, type CografyaVerisi } from "../cizim/cografya";
 import { EnerjiTablolari } from "./EnerjiDuzeyTablosu";
 import { TogglePill } from "./ModalParcalari";
 
@@ -52,7 +54,7 @@ const SATIR = "mt-2 flex flex-wrap items-center gap-1.5";
 
 export const GEO_PANELLI_NESNELER = [
   "ucgenABC", "dikUcgen", "benzerUcgen", "cemberGeo", "cokgenAd",
-  "dogrudaAcilar", "dortgenGeo", "katiCisim", "kagitKatlama",
+  "dogrudaAcilar", "dortgenGeo", "katiCisim", "kagitKatlama", "cografyaSekil",
   "aciYayi", "dikAci", "esIsaret",
   "isinOk", "halkaAkim", "solenoid", "telAlan", "alanNokta", "dalgaGirisim", "enerjiDuzeyi",
 ];
@@ -469,6 +471,61 @@ function DortgenPaneli({ geo, yaz, tarihce }: { geo: Extract<GeometriVerisi, { t
   );
 }
 
+function SayilarGirdisi({ alan, deger, onDegis, onOdak }: { alan: Extract<Alan, { k: "sayilar" }>; deger: number[]; onDegis: (v: number[]) => void; onOdak: () => void }) {
+  const [metin, setMetin] = useState(deger.join(", "));
+  const odakta = useRef(false);
+  useEffect(() => { if (!odakta.current) setMetin(deger.join(", ")); }, [deger]);
+  const sayilar = metin.split(/[;\s]+|,(?!\d)/).join(",").split(",").map((t) => t.trim()).filter((t) => t !== "").map((t) => Number(t.replace(",", ".")));
+  // Ondalık ayracı olarak virgül de kabul: "0,1 1,5" → boşluk/noktalı virgülle ayrılır; önce ';' ya da boşluk dene
+  const parca = metin.trim().split(/\s*;\s*|\s+/).filter(Boolean).map((t) => Number(t.replace(",", ".")));
+  const aday = parca.length === alan.n ? parca : sayilar;
+  const gecerli = aday.length === alan.n && aday.every((x) => Number.isFinite(x) && x >= alan.min && x <= alan.max);
+  return (
+    <label className="flex flex-col gap-0.5 text-[11px] font-semibold text-slate-600">
+      {alan.ad}
+      <input
+        aria-label={alan.ad}
+        value={metin}
+        onFocus={() => { odakta.current = true; onOdak(); }}
+        onBlur={() => { odakta.current = false; setMetin(deger.join(", ")); }}
+        onChange={(e) => { setMetin(e.target.value); const p = e.target.value.trim().split(/\s*;\s*|\s+/).filter(Boolean).map((t) => Number(t.replace(",", "."))); if (p.length === alan.n && p.every((x) => Number.isFinite(x) && x >= alan.min && x <= alan.max)) onDegis(p); }}
+        className={`w-full rounded-md border px-1.5 py-1 text-[11px] ${gecerli ? "border-slate-300" : "border-rose-400 bg-rose-50"}`}
+      />
+      <span className="text-[10px] font-normal text-slate-400">{alan.n} sayıyı boşlukla ya da ; ile ayırın ({alan.min} ile {alan.max} arası; ondalık için nokta ya da virgül).</span>
+    </label>
+  );
+}
+
+function CografyaPaneli({ geo, yaz, tarihce }: { geo: CografyaVerisi; yaz: (g: import("../cizim/tipler").GeometriVerisi) => void; tarihce: () => void }) {
+  const sema = SEMA[geo.yapi];
+  const grup = COGRAFYA_SABLONLARI.filter((sb) => sb.altBaslik === sema.alt);
+  const ayarla = (a: string, d: CografyaVerisi["ayar"][string]) => yaz({ ...geo, ayar: { ...geo.ayar, [a]: d } });
+  const deger = (al: Alan) => (geo.ayar[al.a] !== undefined ? geo.ayar[al.a] : al.v);
+  return (
+    <div className="flex flex-col gap-1.5" data-testid="geo-cografya">
+      <SablonSirasi ad={sema.alt.replace("Coğrafya – ", "Hazır: ")} sablonlar={grup} onSec={(i) => { tarihce(); yaz(grup[i].olustur()); }} />
+      <div className="flex flex-wrap items-center gap-2">
+        {sema.alanlar.filter((al) => al.k === "sec" || al.k === "mantik" || al.k === "sayi").map((al) => {
+          if (al.k === "sec") return <Secenekler key={al.a} baslik={al.ad} deger={String(deger(al))} secenekler={al.sec} onSec={(v) => { tarihce(); ayarla(al.a, v); }} />;
+          if (al.k === "mantik") return <TogglePill key={al.a} aktif={deger(al) === true} onClick={() => { tarihce(); ayarla(al.a, deger(al) !== true); }}>{al.ad}</TogglePill>;
+          if (al.k === "sayi") return <OndalikGirdisi key={al.a} etiket={al.ad} deger={Number(deger(al))} onOdak={tarihce} onDegis={(v) => v !== undefined && v >= al.min && v <= al.max && ayarla(al.a, v)} />;
+          return null;
+        })}
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {sema.alanlar.map((al) => {
+          if (al.k === "metin") return (
+            <MetinGirdisi key={al.a} etiket={al.ad} deger={String(deger(al))} genislik="w-full" enCok={al.en} yerTutucu={al.ipucu} onOdak={tarihce}
+              onDegis={(v) => { if (!al.desen || al.desen.test(v)) ayarla(al.a, v); }} />
+          );
+          if (al.k === "sayilar") return <SayilarGirdisi key={al.a} alan={al} deger={deger(al) as number[]} onOdak={tarihce} onDegis={(v) => ayarla(al.a, v)} />;
+          return null;
+        })}
+      </div>
+    </div>
+  );
+}
+
 function KatiPaneli({ geo, yaz, tarihce }: { geo: Extract<GeometriVerisi, { tur: "kati" }>; yaz: (g: GeometriVerisi) => void; tarihce: () => void }) {
   const gunc = (yama: Partial<typeof geo>) => yaz({ ...geo, ...yama });
   const tur = KATI_TURLERI.find((t) => t.id === geo.cisim)!;
@@ -697,9 +754,15 @@ export function GeoEkPaneli({ sekil, guncelle, tarihceyeKaydet }: {
   const ekYaz = (yama: Partial<FizikEk>) => guncelle({ ek: { ...ek, ...yama } });
   let icerik: React.ReactNode = null;
 
-  if (["ucgenABC", "dikUcgen", "benzerUcgen", "cemberGeo", "cokgenAd", "dogrudaAcilar", "dortgenGeo", "katiCisim", "kagitKatlama"].includes(nesne)) {
+  if (["ucgenABC", "dikUcgen", "benzerUcgen", "cemberGeo", "cokgenAd", "dogrudaAcilar", "dortgenGeo", "katiCisim", "kagitKatlama", "cografyaSekil"].includes(nesne)) {
     const geo = sekil.geo && geometriVerisiGecerliMi(sekil.geo) && geometriNesneyeUygun(nesne, sekil.geo) ? sekil.geo : varsayilanGeometri(nesne);
     const yaz = (g: GeometriVerisi) => {
+      if (g.tur === "cografya") {
+        // Yapı değişince (şablon seçimi) kutu o yapının önerilen boyutuna gelir; yoksa yalnız veri güncellenir.
+        const eski = sekil.geo && sekil.geo.tur === "cografya" ? sekil.geo.yapi : null;
+        if (eski !== g.yapi) { const b = COGRAFYA_BOYUTLARI[g.yapi]; guncelle({ geo: g, w: b.w, h: b.h }); } else guncelle({ geo: g });
+        return;
+      }
       if (g.tur !== "katlama" || !g.yer) { guncelle({ geo: g }); return; }
       // Sabit yerleşimli katlamada kutu, katlanan parçaları kapsayacak biçimde büyür/küçülür.
       const f = katlamaKutusunuSigdir({ ...sekil, geo: g });
@@ -711,6 +774,7 @@ export function GeoEkPaneli({ sekil, guncelle, tarihceyeKaydet }: {
       : geo.tur === "dogruAci" ? <DogruAciPaneli geo={geo} yaz={yaz} tarihce={tarihceyeKaydet} />
       : geo.tur === "dortgen" ? <DortgenPaneli geo={geo} yaz={yaz} tarihce={tarihceyeKaydet} />
       : geo.tur === "kati" ? <KatiPaneli geo={geo} yaz={yaz} tarihce={tarihceyeKaydet} />
+      : geo.tur === "cografya" ? <CografyaPaneli geo={geo} yaz={yaz} tarihce={tarihceyeKaydet} />
       : geo.tur === "katlama" ? <KatlamaPaneli geo={geo} yaz={yaz} tarihce={tarihceyeKaydet} />
       : <CokgenPaneli geo={geo} yaz={yaz} tarihce={tarihceyeKaydet} />;
   } else if (nesne === "aciYayi") {

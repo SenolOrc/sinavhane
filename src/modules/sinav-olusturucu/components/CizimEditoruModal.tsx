@@ -1,4 +1,5 @@
 import type { PointerEvent } from "react";
+import { COGRAFYA_BOYUTLARI } from "../cizim/cografya";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDisariTiklama } from "@/lib/disariTiklama";
 import {
@@ -1908,7 +1909,8 @@ export function CizimEditoruModal({
     const t0 = FIZIK_TANIMLARI[nesne];
     // Kimya ve şema kutusu içeriğe göre ölçülür (birim çember, 3 aşamalı ağaç sıkışmasın).
     const t = nesne === "kimya" ? { ...t0, ...kimyaBoyutu(ek?.kimya ?? varsayilanKimya()) }
-      : nesne === "sema" ? { ...t0, ...semaBoyutu(ek?.sema ?? varsayilanSema()) } : t0;
+      : nesne === "sema" ? { ...t0, ...semaBoyutu(ek?.sema ?? varsayilanSema()) }
+      : ek?.geo && ek.geo.tur === "cografya" ? { ...t0, ...COGRAFYA_BOYUTLARI[ek.geo.yapi] } : t0;
     const ctx = canvasRef.current?.getContext("2d");
     const kutular: Kutu[] = ctx
       ? sekiller

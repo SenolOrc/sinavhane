@@ -117,6 +117,7 @@ export const FIZIK_TANIMLARI: Record<FizikNesnesi, FizikTanimi> = {
   dortgenGeo: { ad: "Özel dörtgen", grup: "geometri", w: 260, h: 170, etiketYeri: "alt", etiket: "", ipucu: "Paralelkenar, eşkenar dörtgen, yamuk, deltoid, dikdörtgen, kare; köşegen, yükseklik" },
   katiCisim: { ad: "Katı cisim (3B)", grup: "geometri", w: 220, h: 200, etiketYeri: "alt", etiket: "", ipucu: "Küp, prizma, silindir, koni, piramit, küre; arka ayrıtlar kesikli" },
   kagitKatlama: { ad: "Kağıt katlama", grup: "geometri", w: 420, h: 220, etiketYeri: "alt", etiket: "", ipucu: "Dikdörtgen/kare/dik üçgen kağıt; köşegenden, noktadan ya da köşeyi bir noktaya getirerek katla" },
+  cografyaSekil: { ad: "Coğrafya şekli", grup: "geometri", w: 340, h: 250, etiketYeri: "alt", etiket: "", ipucu: "Türkiye haritası, izohips, jeoloji blokları, iklim grafikleri, mevsimler" },
   // Fizik ek şekilleri
   isinOk: { ad: "Işın + ara ok", grup: "optik", w: 170, h: 26, etiketYeri: "ust", etiket: "", ipucu: "Işın çizgisi; üzerinde yön oku (1–4 ara ok). Döndürerek eğik ışın yapın" },
   halkaAkim: { ad: "Halka akım", grup: "elektrik", w: 210, h: 170, etiketYeri: "alt", etiket: "", ipucu: "Halka akımın kesiti (⊙ ⊗) ve manyetik alan çizgileri. Yön ayarı panelden" },
@@ -871,7 +872,7 @@ function govdeCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
       kimyaCiz(ctx, s);
       return;
     case "ucgenABC": case "dikUcgen": case "benzerUcgen": case "cemberGeo": case "cokgenAd":
-    case "dogrudaAcilar": case "dortgenGeo": case "katiCisim": case "kagitKatlama":
+    case "dogrudaAcilar": case "dortgenGeo": case "katiCisim": case "kagitKatlama": case "cografyaSekil":
       geometriCiz(ctx, s);
       return;
     case "aciYayi": case "dikAci": case "esIsaret":
@@ -1007,7 +1008,7 @@ export function fizikCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
   // Grafikte başlık (etiket) grafiğin kendi çiziminde, eksen sayılarının altında.
   if (s.nesne === "grafik" || s.nesne === "istatistik" || s.nesne === "sema" || s.nesne === "kimya") return;
   // Geometri şekilleri ve açı yayı etiketlerini köşeye/yaya bağlı kendileri çizer.
-  if (["ucgenABC", "dikUcgen", "benzerUcgen", "cemberGeo", "cokgenAd", "aciYayi", "dogrudaAcilar", "dortgenGeo", "katiCisim", "kagitKatlama"].includes(s.nesne)) return;
+  if (["ucgenABC", "dikUcgen", "benzerUcgen", "cemberGeo", "cokgenAd", "aciYayi", "dogrudaAcilar", "dortgenGeo", "katiCisim", "kagitKatlama", "cografyaSekil"].includes(s.nesne)) return;
   // Hesaplı düzenekler kendi yazılarını çizer.
   if (s.nesne === "egikKuvvet" || s.nesne === "optikDuzenek" || s.nesne === "siviKabi") return;
 

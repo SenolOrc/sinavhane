@@ -316,7 +316,7 @@ export function kutuphaneGirdileri(kullaniciSablonlari: KullaniciSablonu[] = [])
     kapsananGeo.add(n);
     const t = FIZIK_TANIMLARI[n];
     liste.push({
-      id: `geo:${sb.id}`, ad: sb.ad, kategori: "geometri", altBaslik: geoAltBasliklari[ornek.tur] ?? "Geometri", ipucu: sb.ipucu,
+      id: `geo:${sb.id}`, ad: sb.ad, kategori: "geometri", altBaslik: sb.altBaslik ?? geoAltBasliklari[ornek.tur] ?? "Geometri", ipucu: sb.ipucu,
       aramaKelimeleri: [...kayitKelimeleri(sb), ...(EK_KELIMELER[sb.id] ?? [])],
       onizleme: { tur: "sekiller", sekiller: () => [fizikOnizlemeSekli(n, { geo: sb.olustur() }, t.w, t.h)] },
       ekle: () => ({ tur: "fizik", nesne: n, ek: { geo: sb.olustur() } }),

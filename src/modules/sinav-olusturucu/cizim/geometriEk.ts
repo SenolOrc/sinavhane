@@ -8,6 +8,7 @@
 
 import type { GeoAciIsareti, GeometriVerisi, KatlamaAdimi, KatlamaKagidi, Nokta } from "./tipler";
 import { fizikMetniCiz } from "./fizik";
+import { cografyaCiz, cografyaGecerliMi, cografyaYazilari, type CografyaVerisi } from "./cografya";
 import { aciNormu, aciYayiCiz, dikAciIsaretiCiz, dogru, ince, koseAdi, tirtikCiz } from "./geometriYardimci";
 
 export type DogruAciVerisi = Extract<GeometriVerisi, { tur: "dogruAci" }>;
@@ -998,13 +999,14 @@ export function varsayilanKatlama(ek: Partial<KatlamaVerisi> = {}): KatlamaVeris
 // Dağıtıcı, doğrulama, dış pay
 // ════════════════════════════════════════════════════════════════════════════
 
-export type EkGeoVerisi = DogruAciVerisi | DortgenVerisi | KatiVerisi | KatlamaVerisi;
-export const ekGeoMu = (v: GeometriVerisi): v is EkGeoVerisi => v.tur === "dogruAci" || v.tur === "dortgen" || v.tur === "kati" || v.tur === "katlama";
+export type EkGeoVerisi = DogruAciVerisi | DortgenVerisi | KatiVerisi | KatlamaVerisi | CografyaVerisi;
+export const ekGeoMu = (v: GeometriVerisi): v is EkGeoVerisi => v.tur === "dogruAci" || v.tur === "dortgen" || v.tur === "kati" || v.tur === "katlama" || v.tur === "cografya";
 
 export function ekGeoCiz(ctx: CanvasRenderingContext2D, v: EkGeoVerisi, k: Kutu) {
   if (v.tur === "dogruAci") dogruAciCiz(ctx, v, k);
   else if (v.tur === "dortgen") dortgenCiz(ctx, v, k);
   else if (v.tur === "kati") katiCiz(ctx, v, k);
+  else if (v.tur === "cografya") cografyaCiz(ctx, v, k);
   else katlamaCiz(ctx, v, k);
 }
 
@@ -1036,6 +1038,7 @@ export function ekGeoGecerliMi(g: Record<string, unknown>): boolean {
       (g.olcu as number[]).length >= 1 && (g.olcu as number[]).every((n) => n > 0) &&
       metinler(g.etiketler, 3) && metinler(g.adlar, 8) && bool(g, "koseAdlari", "gizliKesik") && ["yok", "cisim", "yuzey"].includes(String(g.kosegen));
   }
+  if (g.tur === "cografya") return cografyaGecerliMi(g);
   if (g.tur === "katlama") {
     const k = g.kagit as Record<string, unknown> | undefined;
     const nk = (t: unknown) => !!t && typeof t === "object" && sayi((t as Nokta).x) && sayi((t as Nokta).y) && Math.abs((t as Nokta).x) <= 1000 && Math.abs((t as Nokta).y) <= 1000;
@@ -1065,6 +1068,7 @@ export function ekGeoYazilari(v: EkGeoVerisi): string[] {
   if (v.tur === "dogruAci") return [...v.etiketler, ...v.adlar, ...v.dogruAdlari, v.olcuYaz ? "179,9°" : ""];
   if (v.tur === "dortgen") return [...v.adlar, ...v.kenarlar, ...v.acilar, v.kesisimAdi, v.yukseklikAdi, v.yukseklikEtiket];
   if (v.tur === "kati") return [...v.etiketler, ...(v.koseAdlari ? v.adlar : [])];
+  if (v.tur === "cografya") return cografyaYazilari(v);
   return ["A′", "Şekil II", "16"];
 }
 

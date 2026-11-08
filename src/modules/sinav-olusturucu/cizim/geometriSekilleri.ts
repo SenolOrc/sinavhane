@@ -8,6 +8,7 @@
 //
 // Her şey saf (tuval/React bilmez); çizim yalnız `ctx` yöntemlerini çağırır.
 
+import { COGRAFYA_BOYUTLARI, varsayilanCografya } from "./cografya";
 import type { FizikEk, GeoAciIsareti, GeometriVerisi, Nokta, Sekil } from "./tipler";
 import { MUREKKEP } from "./sabitler";
 import { FIZIK_TANIMLARI, fizikMetniCiz, fizikMetniOlcu } from "./fizik";
@@ -27,7 +28,7 @@ type BenzerVerisi = Extract<GeometriVerisi, { tur: "benzer" }>;
 type CokgenVerisi = Extract<GeometriVerisi, { tur: "cokgen" }>;
 type Kutu = { x: number; y: number; w: number; h: number };
 
-export const GEOMETRI_NESNELERI = ["ucgenABC", "dikUcgen", "benzerUcgen", "cemberGeo", "cokgenAd", "dogrudaAcilar", "dortgenGeo", "katiCisim", "kagitKatlama"] as const;
+export const GEOMETRI_NESNELERI = ["ucgenABC", "dikUcgen", "benzerUcgen", "cemberGeo", "cokgenAd", "dogrudaAcilar", "dortgenGeo", "katiCisim", "kagitKatlama", "cografyaSekil"] as const;
 export const geometriMi = (nesne: string) => (GEOMETRI_NESNELERI as readonly string[]).includes(nesne);
 /** `ek` ayarlarıyla çizilen basit işaretler. */
 export const GEOMETRI_ISARETLERI = ["aciYayi", "dikAci", "esIsaret"] as const;
@@ -545,7 +546,7 @@ export function geometriCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
  * kutusunda çizip (w×h) alana sığdırır. Gerçek çizim rutini kullanılır.
  */
 export function geometriOnizlemeCiz(ctx: CanvasRenderingContext2D, nesne: string, geo: GeometriVerisi, w: number, h: number) {
-  const t = (FIZIK_TANIMLARI as Record<string, { w: number; h: number } | undefined>)[nesne] ?? { w: 220, h: 170 };
+  const t = geo.tur === "cografya" ? COGRAFYA_BOYUTLARI[geo.yapi] : (FIZIK_TANIMLARI as Record<string, { w: number; h: number } | undefined>)[nesne] ?? { w: 220, h: 170 };
   // Yazılar kutu dışına taşabildiği için çevresine pay bırakılır.
   const payX = 30, payY = 26;
   const olcek = Math.min(w / (t.w + 2 * payX), h / (t.h + 2 * payY));
@@ -560,7 +561,7 @@ export function geometriOnizlemeCiz(ctx: CanvasRenderingContext2D, nesne: string
 /** Şablon önizlemesi (sol kütüphane): `sb.nesne` yoksa veri türünden tahmin edilir. */
 export function geometriSablonOnizlemeCiz(ctx: CanvasRenderingContext2D, sb: GeometriSablonu, w: number, h: number) {
   const geo = sb.olustur();
-  const nesne = sb.nesne ?? ({ ucgen: "ucgenABC", cember: "cemberGeo", benzer: "benzerUcgen", cokgen: "cokgenAd", dogruAci: "dogrudaAcilar", dortgen: "dortgenGeo", kati: "katiCisim", katlama: "kagitKatlama" } as const)[geo.tur];
+  const nesne = sb.nesne ?? ({ ucgen: "ucgenABC", cember: "cemberGeo", benzer: "benzerUcgen", cokgen: "cokgenAd", dogruAci: "dogrudaAcilar", dortgen: "dortgenGeo", kati: "katiCisim", katlama: "kagitKatlama", cografya: "cografyaSekil" } as const)[geo.tur];
   geometriOnizlemeCiz(ctx, nesne, geo, w, h);
 }
 
@@ -624,7 +625,7 @@ export function varsayilanUcgen(ek: Partial<UcgenVerisi> = {}): UcgenVerisi {
  * Hazır geometri şablonu. `aramaKelimeleri`: sol kütüphane aramasında (Türkçe karakter duyarsız)
  * kullanılan anahtar sözcükler. `nesne`: şablonun eklendiği fizik nesnesi (kütüphane için).
  */
-export type GeometriSablonu = { id: string; ad: string; ipucu: string; olustur: () => GeometriVerisi; aramaKelimeleri?: string[]; nesne?: string };
+export type GeometriSablonu = { id: string; ad: string; ipucu: string; olustur: () => GeometriVerisi; aramaKelimeleri?: string[]; nesne?: string; altBaslik?: string };
 
 export const UCGEN_SABLONLARI: GeometriSablonu[] = [
   { id: "g-genel", ad: "Genel üçgen", ipucu: "a, b, c uzunluklarıyla (6, 5, 4)", olustur: () => varsayilanUcgen(), nesne: "ucgenABC", aramaKelimeleri: ["üçgen", "abc", "kenar", "çeşitkenar"] },
@@ -801,9 +802,47 @@ export const KATLAMA_SABLONLARI: GeometriSablonu[] = [
 ];
 
 /** Sol kütüphane için tüm geometri şablonları (her biri `nesne` + `aramaKelimeleri` taşır). */
+
+const cg = (id: string, ad: string, ipucu: string, yapi: Parameters<typeof varsayilanCografya>[0], ek: Parameters<typeof varsayilanCografya>[1], anahtar: string[]): GeometriSablonu => ({
+  id, ad, ipucu, nesne: "cografyaSekil", altBaslik: SEMA_ALT[yapi], aramaKelimeleri: ["coğrafya", ...anahtar], olustur: () => varsayilanCografya(yapi, ek),
+});
+const SEMA_ALT: Record<string, string> = {
+  harita: "Coğrafya – Harita", izohips: "Coğrafya – İzohips", horstGraben: "Coğrafya – Jeoloji blokları", antiklinal: "Coğrafya – Jeoloji blokları", senklinal: "Coğrafya – Jeoloji blokları",
+  walter: "Coğrafya – İklim ve nüfus", piramit: "Coğrafya – İklim ve nüfus", mevsim: "Coğrafya – Dünya ve Güneş", aydinlanma: "Coğrafya – Dünya ve Güneş",
+};
+export const COGRAFYA_SABLONLARI: GeometriSablonu[] = [
+  cg("c-turkiye-bos", "Türkiye haritası (il sınırlı)", "81 il sınırı; işaretli illere A, B, C yazılır", "harita", {}, ["türkiye", "harita", "il", "plaka", "boş harita", "yer bulma", "karadeniz", "akdeniz", "ege"]),
+  cg("c-turkiye-sade", "Türkiye haritası (sade, il sınırsız)", "Yalnız dış sınır; deniz adları", "harita", { iller: false, isaret: "" }, ["türkiye", "harita", "sade", "boş harita", "kontur"]),
+  cg("c-turkiye-nehir", "Türkiye: nehirler ve göller", "Kızılırmak, Fırat, Dicle… Van, Tuz gölü", "harita", { nehir: true, gol: true, isaret: "", plaka: false }, ["türkiye", "nehir", "göl", "akarsu", "kızılırmak", "fırat", "dicle", "van gölü", "tuz gölü", "sakarya"]),
+  cg("c-turkiye-plaka", "Türkiye: plaka numaralı il haritası", "Her ilde plaka numarası", "harita", { plaka: true, isaret: "", deniz: false }, ["türkiye", "plaka", "il", "numara"]),
+  cg("c-izohips-tepe", "İzohips: tepe", "Halka halka kapalı eğriler, zirve noktası", "izohips", { arazi: "tepe" }, ["izohips", "eş yükselti", "tepe", "yükselti", "topografya", "harita"]),
+  cg("c-izohips-iki-tepe", "İzohips: iki tepe", "İki zirve ve aradaki boyun", "izohips", { arazi: "ikiTepe", aralik: 100, yukseklik: 800 }, ["izohips", "iki tepe", "boyun", "eş yükselti"]),
+  cg("c-izohips-vadi", "İzohips: vadi", "Eğriler yüksek yere doğru V biçimli", "izohips", { arazi: "vadi", aralik: 100, yukseklik: 800 }, ["izohips", "vadi", "eş yükselti", "akarsu vadisi"]),
+  cg("c-izohips-sirt", "İzohips: sırt", "Eğriler alçak yere doğru V biçimli", "izohips", { arazi: "sirt", aralik: 100, yukseklik: 800 }, ["izohips", "sırt", "eş yükselti", "tepe sırtı"]),
+  cg("c-izohips-boyun", "İzohips: boyun (semer)", "İki tepe arasındaki alçak geçit", "izohips", { arazi: "boyun", aralik: 100, yukseklik: 800 }, ["izohips", "boyun", "semer", "geçit", "eş yükselti"]),
+  cg("c-izohips-yamac", "İzohips: yamaç (eğim)", "Sık eğriler dik, seyrek eğriler yatay", "izohips", { arazi: "yamac", aralik: 100, yukseklik: 800 }, ["izohips", "yamaç", "eğim", "dik", "eş yükselti"]),
+  cg("c-izohips-profil", "İzohips ve A–B profili", "Haritanın altında A–B kesit grafiği", "izohips", { arazi: "ikiTepe", aralik: 100, yukseklik: 800, profil: true }, ["izohips", "profil", "kesit", "topografya profili", "eş yükselti"]),
+  cg("c-horst-graben", "Horst – Graben", "Faylarla çöken (graben) ve yüksekte kalan (horst) bloklar", "horstGraben", {}, ["horst", "graben", "fay", "çöküntü", "yarık", "blok diyagram", "jeoloji", "kırık", "yer kabuğu", "tektonik"]),
+  cg("c-horst-graben-renkli", "Horst – Graben (renkli)", "Bej katmanlar, kahverengi taban", "horstGraben", { renk: "renkli" }, ["horst", "graben", "renkli", "fay", "blok diyagram"]),
+  cg("c-antiklinal", "Antiklinal (dom kıvrım)", "Katmanlar yukarı kıvrılır; ortada en yaşlı katman", "antiklinal", {}, ["antiklinal", "kıvrım", "dom", "anti", "blok diyagram", "jeoloji", "kıvrılma", "tektonik"]),
+  cg("c-antiklinal-kivrimli", "Antiklinal (kıvrımlı yüzey)", "Yüzey kıvrımı izler (aşınmamış)", "antiklinal", { yuzey: "kivrimli", renk: "renkli" }, ["antiklinal", "kıvrım", "dom", "blok diyagram"]),
+  cg("c-senklinal", "Senklinal (çanak kıvrım)", "Katmanlar aşağı kıvrılır; ortada en genç katman", "senklinal", {}, ["senklinal", "kıvrım", "çanak", "sin", "blok diyagram", "jeoloji", "çukur kıvrım", "tektonik"]),
+  cg("c-senklinal-kivrimli", "Senklinal (kıvrımlı yüzey)", "Yüzey kıvrımı izler (aşınmamış)", "senklinal", { yuzey: "kivrimli", renk: "renkli" }, ["senklinal", "kıvrım", "çanak", "blok diyagram"]),
+  cg("c-walter", "Sıcaklık–yağış grafiği (Ankara)", "Aylık sıcaklık eğrisi + yağış çubukları, kurak dönem taralı", "walter", {}, ["iklim", "grafik", "sıcaklık", "yağış", "walter", "ombrotermik", "iklim grafiği", "ankara", "kurak dönem", "karasal", "akdeniz iklimi"]),
+  cg("c-walter-izmir", "Sıcaklık–yağış grafiği (Akdeniz iklimi)", "Yazlar sıcak ve kurak, kışlar ılık ve yağışlı", "walter", { baslik: "İzmir", sicaklik: [8.9, 9.6, 12.1, 16.1, 21, 25.7, 28.4, 27.9, 23.9, 19, 13.9, 10.4], yagis: [128, 98, 76, 49, 31, 12, 4, 3, 17, 47, 92, 146] }, ["iklim", "akdeniz iklimi", "izmir", "sıcaklık", "yağış", "grafik", "walter"]),
+  cg("c-walter-rize", "Sıcaklık–yağış grafiği (Karadeniz iklimi)", "Her mevsim yağışlı", "walter", { baslik: "Rize", sicaklik: [7.2, 7.1, 8.9, 12.5, 16.3, 20.2, 22.9, 23.2, 19.9, 16.1, 11.7, 8.9], yagis: [211, 160, 134, 94, 73, 111, 95, 120, 198, 260, 245, 240], kuru: false }, ["iklim", "karadeniz iklimi", "rize", "sıcaklık", "yağış", "grafik", "walter"]),
+  cg("c-piramit", "Nüfus piramidi", "Yaş grubu ve cinsiyete göre nüfus (%)", "piramit", {}, ["nüfus", "piramit", "yaş", "yaş grubu", "genç nüfus", "yaşlı nüfus", "demografi", "erkek", "kadın"]),
+  cg("c-piramit-genc", "Nüfus piramidi (genç nüfus, geniş taban)", "Gelişmekte olan ülke", "piramit", { baslik: "Genç nüfuslu ülke", erkek: [16, 14, 12, 10, 8, 6, 4, 2, 1], kadin: [15.5, 13.8, 11.8, 9.8, 7.8, 5.8, 4, 2.2, 1.2] }, ["nüfus", "piramit", "genç nüfus", "geniş taban"]),
+  cg("c-piramit-yasli", "Nüfus piramidi (yaşlı nüfus, dar taban)", "Gelişmiş ülke", "piramit", { baslik: "Yaşlı nüfuslu ülke", erkek: [4.6, 5, 5.6, 6.6, 7.4, 8, 6.8, 4.6, 2.6], kadin: [4.4, 4.8, 5.4, 6.4, 7.3, 8.2, 7.4, 5.6, 4] }, ["nüfus", "piramit", "yaşlı nüfus", "dar taban"]),
+  cg("c-mevsim", "Mevsimlerin oluşumu (Dünya'nın yörüngesi)", "Dört konumda Dünya, 23°27′ eğik eksen, gece yarısı gri", "mevsim", {}, ["mevsim", "yörünge", "dünya", "güneş", "ekinoks", "gündönümü", "eksen eğikliği", "yıllık hareket", "21 haziran", "22 aralık"]),
+  cg("c-aydinlanma-haziran", "Aydınlanma çemberi: 21 Haziran", "Kuzey yarımkürede en uzun gündüz; Kuzey Kutup Dairesi içinde kutup gündüzü", "aydinlanma", { tarih: "haziran" }, ["aydınlanma çemberi", "21 haziran", "yengeç dönencesi", "kutup gündüzü", "gece gündüz", "dönence", "kutup dairesi"]),
+  cg("c-aydinlanma-aralik", "Aydınlanma çemberi: 22 Aralık", "Güney yarımkürede en uzun gündüz; Kuzey Kutup Dairesi içinde kutup gecesi", "aydinlanma", { tarih: "aralik" }, ["aydınlanma çemberi", "22 aralık", "oğlak dönencesi", "kutup gecesi", "gece gündüz", "dönence"]),
+  cg("c-aydinlanma-ekinoks", "Aydınlanma çemberi: 21 Mart / 23 Eylül", "Her yerde gece ile gündüz eşit", "aydinlanma", { tarih: "ekinoks" }, ["aydınlanma çemberi", "ekinoks", "21 mart", "23 eylül", "gece gündüz eşit"]),
+];
+
 export const GEOMETRI_KUTUPHANESI: GeometriSablonu[] = [
   ...UCGEN_SABLONLARI, ...CEMBER_SABLONLARI, ...BENZER_SABLONLARI, ...COKGEN_SABLONLARI,
-  ...DOGRU_ACI_SABLONLARI, ...DORTGEN_SABLONLARI, ...KATI_SABLONLARI, ...KATLAMA_SABLONLARI,
+  ...DOGRU_ACI_SABLONLARI, ...DORTGEN_SABLONLARI, ...KATI_SABLONLARI, ...KATLAMA_SABLONLARI, ...COGRAFYA_SABLONLARI,
 ];
 
 export function varsayilanGeometri(nesne: string): GeometriVerisi {
@@ -815,6 +854,7 @@ export function varsayilanGeometri(nesne: string): GeometriVerisi {
   if (nesne === "dortgenGeo") return varsayilanDortgen();
   if (nesne === "katiCisim") return varsayilanKati();
   if (nesne === "kagitKatlama") return varsayilanKatlama();
+  if (nesne === "cografyaSekil") return varsayilanCografya("harita");
   return varsayilanUcgen();
 }
 
@@ -822,7 +862,7 @@ export function varsayilanGeometri(nesne: string): GeometriVerisi {
 export function geometriNesneyeUygun(nesne: string, v: GeometriVerisi): boolean {
   const bek: Record<string, GeometriVerisi["tur"][]> = {
     ucgenABC: ["ucgen"], dikUcgen: ["ucgen"], benzerUcgen: ["benzer"], cemberGeo: ["cember"], cokgenAd: ["cokgen"],
-    dogrudaAcilar: ["dogruAci"], dortgenGeo: ["dortgen"], katiCisim: ["kati"], kagitKatlama: ["katlama"],
+    dogrudaAcilar: ["dogruAci"], dortgenGeo: ["dortgen"], katiCisim: ["kati"], kagitKatlama: ["katlama"], cografyaSekil: ["cografya"],
   };
   return !bek[nesne] || bek[nesne].includes(v.tur);
 }
