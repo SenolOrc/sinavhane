@@ -223,5 +223,6 @@ const TUR_ADLARI: Record<string, string> = {
 };
 
 export function sekilTurAdi(sekil: Sekil): string {
+  if (sekil.tur === "fizik" && sekil.nesne === "kagitKatlama") return "Katlanan kâğıt";
   return TUR_ADLARI[sekil.tur] ?? sekil.tur;
 }

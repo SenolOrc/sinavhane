@@ -31,7 +31,9 @@ import {
   varsayilanUcgen,
 } from "../cizim/geometriSekilleri";
 import type { GeometriSablonu } from "../cizim/geometriSekilleri";
-import { dortgenKoseleri, kagitKenarlari, kagitKoseleri, katDuzelt, varsayilanKati } from "../cizim/geometriEk";
+import {
+  dortgenKoseleri, kagitDuzgunCokgen, kagitGenelUcgen, kagitKenarlari, kagitKoseleri, kagitParalelkenar, kagitYamuk, katDuzelt, katlamaKutusunuSigdir, varsayilanKati,
+} from "../cizim/geometriEk";
 import {
   ENERJI_VARSAYILAN_DUZEYLER,
   ENERJI_VARSAYILAN_GECISLER,
@@ -501,7 +503,20 @@ function KatiPaneli({ geo, yaz, tarihce }: { geo: Extract<GeometriVerisi, { tur:
   );
 }
 
-const KATLAMA_MODLARI = [["iki", "İki köşeden"], ["nokta", "Köşe + kenardaki nokta"], ["getir", "Köşeyi bir noktaya getir"]] as const;
+const KATLAMA_MODLARI = [
+  ["iki", "İki köşeden"], ["nokta", "Köşe + kenardaki nokta"], ["getir", "Köşeyi bir noktaya getir"],
+  ["ikiKenar", "İki kenardaki noktalardan [DE]"], ["serbestCizgi", "Serbest çizgi (tuvalde çek)"],
+] as const;
+
+/** Serbest kâğıt için hazır çokgenler (köşeler sonradan tuvalde "Katla" ile de gelebilir). */
+const SERBEST_KAGITLAR: [string, () => KatlamaKagidi][] = [
+  ["Genel üçgen", () => kagitGenelUcgen(6, 7, 8)!],
+  ["İkizkenar yamuk", () => kagitYamuk(10, 6, 4)],
+  ["Dik yamuk", () => kagitYamuk(10, 6, 4, 0)],
+  ["Paralelkenar", () => kagitParalelkenar(8, 5, 60)],
+  ["Düzgün beşgen", () => kagitDuzgunCokgen(5, 5)],
+  ["Düzgün altıgen", () => kagitDuzgunCokgen(6, 5)],
+];
 
 function KatlamaPaneli({ geo, yaz, tarihce }: { geo: Extract<GeometriVerisi, { tur: "katlama" }>; yaz: (g: GeometriVerisi) => void; tarihce: () => void }) {
   const gunc = (yama: Partial<typeof geo>) => yaz({ ...geo, ...yama });
@@ -520,11 +535,28 @@ function KatlamaPaneli({ geo, yaz, tarihce }: { geo: Extract<GeometriVerisi, { t
   return (
     <div className="flex flex-col gap-1.5" data-testid="geo-katlama">
       <SablonSirasi ad="Hazır katlama" sablonlar={KATLAMA_SABLONLARI} onSec={(i) => { tarihce(); yaz(KATLAMA_SABLONLARI[i].olustur()); }} />
-      <Secenekler baslik="Kağıt" deger={geo.kagit.tur} secenekler={[["dikdortgen", "Dikdörtgen"], ["kare", "Kare"], ["dikucgen", "Dik üçgen"]] as const} onSec={(t) => { tarihce(); kagitYaz({ tur: t }); }} />
-      <div className="flex flex-wrap items-center gap-2">
-        {geo.kagit.tur === "dikdortgen" ? [olcu("|AB| (genişlik)", "w"), olcu("|BC| (yükseklik)", "h")]
-          : geo.kagit.tur === "kare" ? [olcu("Kenar", "a")] : [olcu("|AB| (dik kenar)", "q"), olcu("|BC| (dik kenar)", "p")]}
-      </div>
+      <Secenekler baslik="Kağıt" deger={geo.kagit.tur} secenekler={[["dikdortgen", "Dikdörtgen"], ["kare", "Kare"], ["dikucgen", "Dik üçgen"], ["serbest", "Üçgen / dörtgen / çokgen"]] as const}
+        onSec={(t) => {
+          tarihce();
+          if (t === "serbest" && !geo.kagit.serbestKoseler) { const k = SERBEST_KAGITLAR[0][1](); gunc({ kagit: k, yer: undefined, katlar: geo.katlar.map((x) => katDuzelt(x, kagitKoseleri(k))) }); }
+          else kagitYaz({ tur: t });
+        }} />
+      {geo.kagit.tur === "serbest" ? (
+        <div className="flex flex-col gap-1" data-testid="katlama-serbest-kagit">
+          <div className="flex flex-wrap items-center gap-1">
+            {SERBEST_KAGITLAR.map(([ad, uret]) => (
+              <button key={ad} type="button" onClick={() => { tarihce(); const k = uret(); gunc({ kagit: k, yer: undefined, katlar: geo.katlar.map((x) => katDuzelt(x, kagitKoseleri(k))) }); }}
+                className="rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">{ad}</button>
+            ))}
+          </div>
+          <span className={IPUCU}>{kos.length} köşeli kâğıt. Kendi çizdiğiniz üçgeni/çokgeni katlamak için tuvalde şekli seçip «Katla» düğmesine basın.</span>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          {geo.kagit.tur === "dikdortgen" ? [olcu("|AB| (genişlik)", "w"), olcu("|BC| (yükseklik)", "h")]
+            : geo.kagit.tur === "kare" ? [olcu("Kenar", "a")] : [olcu("|AB| (dik kenar)", "q"), olcu("|BC| (dik kenar)", "p")]}
+        </div>
+      )}
       {geo.katlar.map((kt, i) => {
         const e = kenarlar.find((x) => x.ad === kt.kenar);
         const sec = (l: string[]) => l.map((a) => ({ id: a, ad: a }));
@@ -536,7 +568,7 @@ function KatlamaPaneli({ geo, yaz, tarihce }: { geo: Extract<GeometriVerisi, { t
                 <button type="button" onClick={() => { tarihce(); gunc({ katlar: geo.katlar.filter((_, j) => j !== i) }); }} className="text-[10px] font-semibold text-red-600 hover:underline">Sil</button>
               )}
             </div>
-            <Secenekler baslik="Nasıl" deger={kt.mod} secenekler={KATLAMA_MODLARI} onSec={(m) => { tarihce(); katYaz(i, { mod: m }); }} />
+            <Secenekler baslik="Nasıl" deger={kt.mod} secenekler={KATLAMA_MODLARI} onSec={(m) => { tarihce(); katYaz(i, { mod: m, ...(m === "ikiKenar" || m === "serbestCizgi" ? { hareketli: "" } : {}) }); }} />
             <div className="flex flex-wrap items-center gap-2">
               {kt.mod === "iki" && <>
                 <SecimKutusu etiket="Çizginin 1. ucu" deger={kt.k1} secenekler={sec(adlar)} onSec={(v) => { tarihce(); katYaz(i, { k1: v }); }} />
@@ -551,7 +583,41 @@ function KatlamaPaneli({ geo, yaz, tarihce }: { geo: Extract<GeometriVerisi, { t
               </>}
               {kt.mod === "getir" && <>
                 <SecimKutusu etiket="Katlanan köşe" deger={kt.hareketli} secenekler={sec(adlar)} onSec={(v) => { tarihce(); katYaz(i, { hareketli: v }); }} />
-                <SecimKutusu etiket="Nereye" deger={kt.hedef} secenekler={[{ id: "O", ad: "Merkez (O)" }, ...adlar.filter((a) => a !== kt.hareketli).map((a) => ({ id: a, ad: `${a} köşesi` }))]} onSec={(v) => { tarihce(); katYaz(i, { hedef: v }); }} />
+                <SecimKutusu etiket="Nereye" deger={kt.hedefXY ? "__serbest" : kt.hedef} secenekler={[...(kt.hedefXY ? [{ id: "__serbest", ad: "Serbest nokta (A′ sürüklendi)" }] : []), { id: "O", ad: "Merkez (O)" }, ...adlar.filter((a) => a !== kt.hareketli).map((a) => ({ id: a, ad: `${a} köşesi` }))]}
+                  onSec={(v) => { if (v === "__serbest") return; tarihce(); gunc({ katlar: geo.katlar.map((k, j) => (j === i ? katDuzelt({ ...k, hedef: v, hedefXY: undefined }, kos) : k)) }); }} />
+                {kt.hedefXY && <span className={IPUCU}>Katlanan köşeyi tuvalde fareyle tutup istediğiniz yere sürükleyebilirsiniz.</span>}
+              </>}
+              {kt.mod === "ikiKenar" && (() => {
+                const ortak = kenarlar.filter((x) => x.ad.includes(kt.hareketli));
+                const vden = (e: (typeof kenarlar)[number], t: number) => (e.ad[0] === kt.hareketli ? t : 1 - t);
+                const V = kos.find((k) => k.ad === kt.hareketli);
+                const hizli = (ad: string, fn: () => void, aktif = true) => (
+                  <button type="button" disabled={!aktif} onClick={() => { tarihce(); fn(); }} className="rounded-md border border-brand-300 bg-white px-1.5 py-0.5 text-[11px] font-semibold text-brand-700 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-40">{ad}</button>
+                );
+                return <>
+                  <SecimKutusu etiket="Katlanan köşe" deger={kt.hareketli} secenekler={sec(adlar)} onSec={(v) => { tarihce(); katYaz(i, { hareketli: v }); }} />
+                  <SecimKutusu etiket="D: kenar" deger={kt.kenar1 ?? ""} secenekler={kenarlar.map((x) => ({ id: x.ad, ad: `[${x.ad}]` }))} onSec={(v) => { tarihce(); katYaz(i, { kenar1: v }); }} />
+                  <OndalikGirdisi etiket={`D konumu (% , ${(kt.kenar1 ?? "")[0] ?? ""}'den)`} deger={Math.round((kt.oran1 ?? 0.5) * 100)} onOdak={tarihce} onDegis={(v) => v !== undefined && katYaz(i, { oran1: v / 100 })} />
+                  <SecimKutusu etiket="E: kenar" deger={kt.kenar2 ?? ""} secenekler={kenarlar.filter((x) => x.ad !== kt.kenar1).map((x) => ({ id: x.ad, ad: `[${x.ad}]` }))} onSec={(v) => { tarihce(); katYaz(i, { kenar2: v }); }} />
+                  <OndalikGirdisi etiket={`E konumu (% , ${(kt.kenar2 ?? "")[0] ?? ""}'den)`} deger={Math.round((kt.oran2 ?? 0.5) * 100)} onOdak={tarihce} onDegis={(v) => v !== undefined && katYaz(i, { oran2: v / 100 })} />
+                  <div className="flex w-full flex-wrap items-center gap-1" data-testid="katlama-hizli">
+                    {hizli("Tabana paralel (orta taban)", () => katYaz(i, { kenar1: ortak[0]?.ad, kenar2: ortak[1]?.ad, oran1: vden(ortak[0], 0.5), oran2: vden(ortak[1], 0.5) }), ortak.length === 2)}
+                    {hizli("Açıortay boyunca katla", () => {
+                      const e = kenarlar.find((x) => !x.ad.includes(kt.hareketli))!;
+                      const P = kos.find((k) => k.ad === e.ad[0])!, Q = kos.find((k) => k.ad === e.ad[1])!;
+                      const vp = Math.hypot(P.x - V!.x, P.y - V!.y), vq = Math.hypot(Q.x - V!.x, Q.y - V!.y);
+                      katYaz(i, { mod: "nokta", kose: kt.hareketli, kenar: e.ad, uz: e.uz * vp / (vp + vq), hareketli: P.ad });
+                    }, kos.length === 3 && !!V)}
+                    {hizli("Kenara dik katla (B′ kenar üstünde)", () => {
+                      const e = ortak[0], W = kos.find((k) => k.ad === (e.ad[0] === kt.hareketli ? e.ad[1] : e.ad[0]))!;
+                      katYaz(i, { mod: "getir", hareketli: kt.hareketli, hedefXY: { x: V!.x + (W.x - V!.x) * 0.5, y: V!.y + (W.y - V!.y) * 0.5 } });
+                    }, ortak.length >= 1 && !!V)}
+                  </div>
+                </>;
+              })()}
+              {kt.mod === "serbestCizgi" && <>
+                <SecimKutusu etiket="Katlanan köşe" deger={kt.hareketli} secenekler={[{ id: "", ad: "Otomatik (küçük taraf)" }, ...sec(adlar)]} onSec={(v) => { tarihce(); katYaz(i, { hareketli: v }); }} />
+                <span className={IPUCU}>Çizgiyi tuvalde fareyle çekin; uçlarını (D, E) sürükleyin. Katlanan parçaya tıklarsanız karşı taraf katlanır.</span>
               </>}
             </div>
           </div>
@@ -569,6 +635,7 @@ function KatlamaPaneli({ geo, yaz, tarihce }: { geo: Extract<GeometriVerisi, { t
       <div className="flex flex-wrap items-center gap-1.5">
         <TogglePill aktif={geo.sekil1} onClick={() => { tarihce(); gunc({ sekil1: !geo.sekil1 }); }}>Şekil I (katlamadan önce) yanında</TogglePill>
         <TogglePill aktif={geo.eski} onClick={() => { tarihce(); gunc({ eski: !geo.eski }); }}>Eski konum kesikli</TogglePill>
+        <TogglePill aktif={!!geo.eslikGoster} onClick={() => { tarihce(); gunc({ eslikGoster: !geo.eslikGoster }); }}>Eş açı ve eş kenar işaretlerini göster</TogglePill>
         <Secenekler baslik="Katlanan parça" deger={geo.dolgu} secenekler={[["mavi", "Açık mavi"], ["gri", "Gri"], ["tarali", "Taralı (siyah-beyaz)"]] as const} onSec={(d) => { tarihce(); gunc({ dolgu: d }); }} />
       </div>
       <DigerAyarlar ad="Diğer ayarlar">
@@ -632,7 +699,12 @@ export function GeoEkPaneli({ sekil, guncelle, tarihceyeKaydet }: {
 
   if (["ucgenABC", "dikUcgen", "benzerUcgen", "cemberGeo", "cokgenAd", "dogrudaAcilar", "dortgenGeo", "katiCisim", "kagitKatlama"].includes(nesne)) {
     const geo = sekil.geo && geometriVerisiGecerliMi(sekil.geo) && geometriNesneyeUygun(nesne, sekil.geo) ? sekil.geo : varsayilanGeometri(nesne);
-    const yaz = (g: GeometriVerisi) => guncelle({ geo: g });
+    const yaz = (g: GeometriVerisi) => {
+      if (g.tur !== "katlama" || !g.yer) { guncelle({ geo: g }); return; }
+      // Sabit yerleşimli katlamada kutu, katlanan parçaları kapsayacak biçimde büyür/küçülür.
+      const f = katlamaKutusunuSigdir({ ...sekil, geo: g });
+      guncelle({ geo: f.geo, x: f.x, y: f.y, w: f.w, h: f.h });
+    };
     icerik = geo.tur === "ucgen" ? <UcgenPaneli geo={geo} yaz={yaz} tarihce={tarihceyeKaydet} />
       : geo.tur === "cember" ? <CemberPaneli geo={geo} yaz={yaz} tarihce={tarihceyeKaydet} />
       : geo.tur === "benzer" ? <BenzerPaneli geo={geo} yaz={yaz} tarihce={tarihceyeKaydet} />
