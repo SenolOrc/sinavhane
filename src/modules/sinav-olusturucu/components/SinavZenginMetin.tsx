@@ -23,7 +23,7 @@ import {
   Subscript,
   Superscript,
   Table as TabloIkonu,
-} from "lucide-react";
+ ImagePlus } from "lucide-react";
 
 import { sayiSinirla, yeniId } from "../utils";
 import { useDisariTiklama } from "@/lib/disariTiklama";
@@ -639,6 +639,48 @@ export function RichTextEditor({
     setDuzenlenenDenklemBelgesi(undefined);
   }
 
+  /** Fotoğraf: dosya seçilir, en çok 1000 px'e küçültülüp JPEG yapılır (kayıt ve baskı hafif kalsın). */
+  const fotoKonumu = useRef<Range | null>(null);
+  const fotoDosyaRef = useRef<HTMLInputElement>(null);
+  function fotoEklemeyiAc() {
+    const editor = editorRef.current;
+    const kayitli = kayitliSecim.current;
+    fotoKonumu.current = kayitli && editor && editor.contains(kayitli.commonAncestorContainer) ? kayitli : aktifAralik();
+    fotoDosyaRef.current?.click();
+  }
+  async function fotoSecildi(dosya: File | undefined) {
+    if (!dosya) return;
+    if (!/^image\/(png|jpe?g|webp|gif|bmp)$/.test(dosya.type)) return uyariGoster("Yalnız resim dosyası seçin (PNG, JPEG, WebP).");
+    if (dosya.size > 15 * 1024 * 1024) return uyariGoster("Resim çok büyük (en çok 15 MB).");
+    try {
+      const bmp = await createImageBitmap(dosya);
+      const olcek = Math.min(1, 1000 / Math.max(bmp.width, bmp.height));
+      const tuval = document.createElement("canvas");
+      tuval.width = Math.max(1, Math.round(bmp.width * olcek));
+      tuval.height = Math.max(1, Math.round(bmp.height * olcek));
+      const c = tuval.getContext("2d");
+      if (!c) throw new Error("tuval yok");
+      c.fillStyle = "#fff";
+      c.fillRect(0, 0, tuval.width, tuval.height);
+      c.drawImage(bmp, 0, 0, tuval.width, tuval.height);
+      let url = tuval.toDataURL("image/jpeg", 0.82);
+      if (url.length > 1_400_000) url = tuval.toDataURL("image/jpeg", 0.6);
+      const editor = editorRef.current;
+      if (!editor) return;
+      const konum = fotoKonumu.current;
+      const aralik = konum && editor.contains(konum.commonAncestorContainer) ? konum : aktifAralik();
+      editor.focus();
+      if (aralik) araligiGeriYukle(aralik);
+      document.execCommand("insertHTML", false, `<img src="${url}" class="foto-inline" alt="fotoğraf" style="height:160px;vertical-align:middle;cursor:pointer;" />&nbsp;`);
+      icerikGonder();
+    } catch {
+      uyariGoster("Resim açılamadı. Başka bir dosya deneyin.");
+    } finally {
+      fotoKonumu.current = null;
+      if (fotoDosyaRef.current) fotoDosyaRef.current.value = "";
+    }
+  }
+
   function cizimEklemeyiAc() {
     // Denklem ekleme ile aynı gerekçe: imleç konumu modal açılmadan ÖNCE
     // yakalanır, çünkü modal açıkken kullanıcı uzun süre şekil düzenleyebilir
@@ -714,6 +756,14 @@ export function RichTextEditor({
     if (hedef instanceof HTMLImageElement && hedef.classList.contains("denklem-inline")) {
       event.preventDefault();
       denklemDuzenlemeyeAc(hedef);
+    } else if (hedef instanceof HTMLImageElement && hedef.classList.contains("foto-inline")) {
+      // Tıkla: küçük → orta → büyük → çok büyük → küçük.
+      event.preventDefault();
+      const adimlar = [90, 160, 260, 380];
+      const simdiki = parseFloat(hedef.style.height) || 160;
+      const sonraki = adimlar.find((a) => a > simdiki + 1) ?? adimlar[0];
+      hedef.style.height = `${sonraki}px`;
+      icerikGonder();
     } else if (hedef instanceof HTMLImageElement && hedef.classList.contains("cizim-inline")) {
       event.preventDefault();
       cizimDuzenlemeyeAc(hedef);
@@ -1122,6 +1172,18 @@ export function RichTextEditor({
         >
           <PenTool size={14} />
         </button>
+        <button
+          type="button"
+          className={arac}
+          title="Fotoğraf ekle (bilgisayardan resim; eklenince üzerine tıklayarak boyutu değiştir)"
+          aria-label="Fotoğraf ekle (bilgisayardan resim; eklenince üzerine tıklayarak boyutu değiştir)"
+          data-testid="foto-ekle"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={fotoEklemeyiAc}
+        >
+          <ImagePlus size={14} />
+        </button>
+        <input ref={fotoDosyaRef} type="file" accept="image/*" className="hidden" data-testid="foto-dosya" onChange={(e) => void fotoSecildi(e.target.files?.[0])} />
         <span className={`${dar ? "ml-auto" : "absolute right-2 top-1.5"} inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white p-0.5 pl-1.5`}>
           <span className="text-[10px] font-semibold text-slate-500">Punto</span>
           <input

@@ -276,6 +276,22 @@ async function calistir() {
     dogrula(htmlTemizle(bir) === bir, "Tablo temizliği idempotent değil.");
   });
 
+  senaryo("Fotoğraf: yalnız uygulamanın ürettiği JPEG kalır, boyut ve öznitelikler sınırlanır", () => {
+    const jpeg = "data:image/jpeg;base64,/9j/4AAQSkZJRg==";
+    const iyi = ayristir(htmlTemizle(`<p><img class="foto-inline" src="${jpeg}" onerror="kotu()" style="height:9999px" data-x="1"></p>`));
+    const img = iyi.querySelector("img.foto-inline") as HTMLImageElement | null;
+    dogrula(!!img, "Geçerli fotoğraf silindi.");
+    dogrula(img!.style.height === "400px", `Fotoğraf yüksekliği 400 px ile sınırlanmalı: ${img!.style.height}`);
+    dogrula(!/onerror|data-x/.test(iyi.innerHTML), "Fotoğrafta fazladan öznitelik kaldı.");
+    dogrula(!ayristir(htmlTemizle(`<img class="foto-inline" src="https://ornek.com/a.jpg">`)).querySelector("img"), "Dış bağlantılı resim kalmamalı.");
+    dogrula(!ayristir(htmlTemizle(`<img class="foto-inline" src="data:image/svg+xml;base64,PHN2Zz4=">`)).querySelector("img"), "SVG fotoğraf kalmamalı.");
+    dogrula(!ayristir(htmlTemizle(`<img src="${jpeg}">`)).querySelector("img"), "Sınıfsız JPEG kalmamalı.");
+    const hucre = ayristir(htmlTemizle(`<table><tr><td><img class="foto-inline" src="${jpeg}"></td></tr></table>`));
+    dogrula(!!hucre.querySelector("td img.foto-inline"), "Tablo hücresindeki fotoğraf silindi.");
+    const bir = htmlTemizle(`<p><img class="foto-inline" src="${jpeg}" style="height:120px"></p>`);
+    dogrula(htmlTemizle(bir) === bir, "Fotoğraf temizliği idempotent değil: " + bir + " ≠ " + htmlTemizle(bir));
+  });
+
   console.log("TÜM HTML TEMİZLEME SENARYOLARI BAŞARILI");
 }
 

@@ -97,6 +97,25 @@ function divParagrafaDonustur(html: string) {
 // İki türden hangisi olduğu silinmeden ÖNCE class/dataset'ten belirlenir.
 function satirIciGorselTemizle(img: HTMLImageElement) {
   const src = img.getAttribute("src") ?? "";
+  // Fotoğraf (kullanıcının yüklediği resim): yalnız uygulamanın küçültüp JPEG'e çevirdiği veri.
+  if (img.classList.contains("foto-inline")) {
+    if (!/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(src) || src.length > 1_500_000) {
+      img.remove();
+      return;
+    }
+    const m = img.style.height.match(/^(\d+(?:\.\d+)?)px$/);
+    const h = m ? Math.min(400, Math.max(30, parseFloat(m[1]))) : 160;
+    Array.from(img.attributes).forEach((o) => {
+      if (o.name !== "src") img.removeAttribute(o.name); // sıra sabit kalsın (idempotent)
+    });
+    img.setAttribute("class", "foto-inline");
+    img.setAttribute("alt", "fotoğraf");
+    img.style.height = `${h}px`;
+    img.style.verticalAlign = "middle";
+    img.style.cursor = "pointer";
+    img.style.display = "inline-block";
+    return;
+  }
   if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(src)) {
     img.remove();
     return;
