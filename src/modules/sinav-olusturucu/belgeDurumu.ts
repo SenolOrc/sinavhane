@@ -131,6 +131,8 @@ export function bosBelgeDurumu(): SinavBelgeDurumu {
       sureDakika: "",
       logoDataUrl: undefined,
       logoBoyut: VARSAYILAN_LOGO_BOYUT,
+      duzen: "klasik",
+      ortaSatirlar: "",
     },
     sorular: [],
     ayarlar: {
@@ -195,6 +197,8 @@ export function belgeDurumunuNormallestir(
       // öğretmenin bildirdiği sorunun ta kendisiydi, eski değeri korumak
       // düzeltmeyi yalnız yeni sınavlara uygulardı.
       logoBoyut: baslik.logoBoyut ?? VARSAYILAN_LOGO_BOYUT,
+      duzen: baslik.duzen === "merkez" ? "merkez" : "klasik",
+      ortaSatirlar: typeof baslik.ortaSatirlar === "string" ? baslik.ortaSatirlar.slice(0, 1000) : "",
     },
     sorular,
     ayarlar: {

@@ -263,11 +263,13 @@ export function sinavTaslaginiDogrula(deger: unknown): SinavTaslagi {
   if (!nesneMi(deger.baslik) || !nesneMi(deger.ayarlar) || !Array.isArray(deger.sorular)) throw new Error("Sınav taslağının temel yapısı eksik.");
   if (deger.sorular.length > AZAMI_SORU) throw new Error(`Sınav taslağı en fazla ${AZAMI_SORU} soru içerebilir.`);
   const b = deger.baslik;
-  if (!yalnizAlanlar(b, ["okulAdi", "sinifSeviyesi", "donem", "yaziliNo", "ders", "tarih", "sureDakika", "logoDataUrl", "logoBoyut"])) throw new Error("Sınav başlığı bilinmeyen alan içeriyor.");
+  if (!yalnizAlanlar(b, ["okulAdi", "sinifSeviyesi", "donem", "yaziliNo", "ders", "tarih", "sureDakika", "logoDataUrl", "logoBoyut", "duzen", "ortaSatirlar"])) throw new Error("Sınav başlığı bilinmeyen alan içeriyor.");
   if (!["okulAdi", "sinifSeviyesi", "donem", "yaziliNo", "ders"].every((alan) => metinMi(b[alan], 500))) throw new Error("Sınav başlık alanları geçersiz.");
   if (!opsiyonelMetin(b, "tarih", 50) || !opsiyonelMetin(b, "sureDakika", 20)
     || (b.logoDataUrl !== undefined && !veriUrlMi(b.logoDataUrl))
-    || (b.logoBoyut !== undefined && !["kucuk", "orta", "buyuk"].includes(String(b.logoBoyut)))) throw new Error("Sınav başlığındaki isteğe bağlı alanlar geçersiz.");
+    || (b.logoBoyut !== undefined && !["kucuk", "orta", "buyuk"].includes(String(b.logoBoyut)))
+    || (b.duzen !== undefined && !["klasik", "merkez"].includes(String(b.duzen)))
+    || !opsiyonelMetin(b, "ortaSatirlar", 1000)) throw new Error("Sınav başlığındaki isteğe bağlı alanlar geçersiz.");
   const a = deger.ayarlar;
   if (!yalnizAlanlar(a, ["kenarBosluk", "varsayilanSoruBosluk", "ogretmenler", "sayfaNoGoster", "sayfaDuzeni", "sutunAra", "sutunAyirici", "bGrubuAktif", "bSeed", "aktifGrup", "sonYazdirilanBSeed", "sinavTuru", "testBaslik", "testSonucKutusu", "sikBicimi", "sikDuzeni", "bepAktif", "bepSeciliIds", "bepPuntoArtis", "kaynakSecimSayaci"])) throw new Error("Sınav ayarları bilinmeyen alan içeriyor.");
   if (!sayiMi(a.kenarBosluk, 0, 50) || !sayiMi(a.varsayilanSoruBosluk, 0, 300)

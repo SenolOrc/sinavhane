@@ -151,6 +151,9 @@ function geriAlKapsamiSenaryolari() {
       const yer = sira.indexOf(mevcut as LogoBoyut);
       return sira[(yer < 0 ? 0 : yer + 1) % sira.length];
     }
+    // `duzen` iki değerli bir küme ("klasik" | "merkez"); genel string dalı geçersiz bir
+    // değer üretir ve normalleştirici onu varsayılana çevirir.
+    if (alan === "duzen") return mevcut === "merkez" ? "klasik" : "merkez";
     if (typeof mevcut === "boolean") return !mevcut;
     if (typeof mevcut === "number") return mevcut + 1;
     if (typeof mevcut === "string") return `${mevcut}-degisti`;

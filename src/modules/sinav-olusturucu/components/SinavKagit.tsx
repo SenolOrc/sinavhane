@@ -66,6 +66,11 @@ export function A4Onizleme(props: {
   logoDataUrl?: string;
   /** Antetteki logo kutusunun ölçüsü; verilmezse varsayılan kullanılır. */
   logoBoyut?: LogoBoyut;
+  /** "merkez": logo solda, ortada serbest satırlar, sağ üstte Toplam Puan kutusu, altta tek satır kimlik. */
+  baslikDuzeni?: "klasik" | "merkez";
+  /** Merkez düzeninde ortadaki satırlar (çıktı) ve tasarım görünümündeki yer tutuculu hâli. */
+  ortaSatirlar?: string[];
+  ortaSatirlarTasarim?: string[];
   tarih?: string;
   sureDakika?: string;
   grupEtiketi?: string;
@@ -229,7 +234,20 @@ export function A4Onizleme(props: {
                 fontFamily: "'Times New Roman', Times, serif",
               }}
             >
-              {sayfaIndex === 0 ? (
+              {sayfaIndex === 0 && props.baslikDuzeni === "merkez" ? (
+                <MerkezBaslik
+                  satirlar={(tasarim ? props.ortaSatirlarTasarim : props.ortaSatirlar) ?? []}
+                  grupEtiketi={props.grupEtiketi}
+                  logoDataUrl={props.logoDataUrl}
+                  logoMm={logoBoyutMm}
+                  puanKutusu={props.kimlikPuanGoster !== false}
+                  kimlik={props.kimlikAlaniGoster}
+                  tarih={props.tarih}
+                  sureDakika={props.sureDakika}
+                  olcu={olcu}
+                  punto={punto}
+                />
+              ) : sayfaIndex === 0 ? (
                 <div
                   className="text-center"
                   style={{
@@ -713,6 +731,67 @@ function CevapAlaniCizgisi({ soru, yazdirmaModu }: { soru: SoruOgesi; yazdirmaMo
         printColorAdjust: "exact",
       }}
     />
+  );
+}
+
+/** MEB tarzı başlık: solda logo, ortada serbest satırlar, sağ üstte "Toplam Puan" kutusu,
+ *  altta tek satırda üç çizgili kimlik alanı. Çizgiler kenarlıkla çizilir (yazdırmada arka plan atılır). */
+function MerkezBaslik({
+  satirlar, grupEtiketi, logoDataUrl, logoMm, puanKutusu, kimlik, tarih, sureDakika, olcu, punto,
+}: {
+  satirlar: string[];
+  grupEtiketi?: string;
+  logoDataUrl?: string;
+  logoMm: number;
+  puanKutusu: boolean;
+  kimlik: boolean;
+  tarih?: string;
+  sureDakika?: string;
+  olcu: (mm: number) => string | number;
+  punto: (pt: number) => string | number;
+}) {
+  const yan = olcu(34);
+  const cizgi = "1px solid #334155";
+  return (
+    <div style={{ paddingBottom: olcu(2) }} data-testid="baslik-merkez">
+      <div style={{ display: "flex", alignItems: "center", gap: olcu(3) }}>
+        <div style={{ width: yan, flexShrink: 0, display: "flex", alignItems: "center" }}>
+          {logoDataUrl && (
+            <img src={logoDataUrl} alt="Logo" style={{ width: olcu(logoMm), height: olcu(logoMm), objectFit: "contain" }} />
+          )}
+        </div>
+        <div style={{ flex: 1, minWidth: 0, textAlign: "center", fontSize: punto(10.5), lineHeight: 1.45, color: "#0f172a" }}>
+          {satirlar.map((s, i) => (
+            <div key={i}>{s}</div>
+          ))}
+          {grupEtiketi ? <div style={{ fontWeight: 700 }}>{grupEtiketi}</div> : null}
+        </div>
+        <div style={{ width: yan, flexShrink: 0, display: "flex", justifyContent: "flex-end" }}>
+          {puanKutusu && (
+            <div style={{ width: olcu(30), border: cizgi, borderRadius: olcu(1.5), textAlign: "center", fontSize: punto(9.5) }}>
+              <div style={{ borderBottom: cizgi, padding: `${olcu(0.8)} 0` }}>Toplam Puan</div>
+              <div style={{ height: olcu(9) }} />
+            </div>
+          )}
+        </div>
+      </div>
+      {kimlik && (
+        <div style={{ display: "flex", gap: olcu(5), marginTop: olcu(3), fontSize: punto(10) }}>
+          {["Adı ve Soyadı:", "Sınıfı/Şubesi:", "Öğrenci Numarası:"].map((e, i) => (
+            <div key={e} style={{ flex: i === 0 ? 1.3 : 1, display: "flex", alignItems: "flex-end", borderBottom: cizgi, paddingBottom: olcu(0.3) }}>
+              {e}
+            </div>
+          ))}
+        </div>
+      )}
+      {(tarih || sureDakika) && (
+        <div style={{ marginTop: olcu(1.5), textAlign: "right", fontSize: punto(9.5) }}>
+          {tarih && <span><b>Tarih:</b> {tarih}</span>}
+          {tarih && sureDakika && <span> &nbsp;&nbsp; </span>}
+          {sureDakika && <span><b>Süre:</b> {sureDakika} dk</span>}
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -170,7 +170,15 @@ export type BaslikBilgileri = {
   logoDataUrl?: string;
   /** Logo kutusunun ölçüsü; logo yokken çıktıda karşılığı yoktur. */
   logoBoyut?: LogoBoyut;
+  /** Başlık düzeni: "klasik" (varsayılan; tek satır başlık, alt alta kimlik alanları) ya da
+   *  "merkez" (solda logo, ortada serbest satırlar, sağ üstte Toplam Puan kutusu, altta tek
+   *  satırda üç çizgili kimlik alanı). */
+  duzen?: BaslikDuzeni;
+  /** "merkez" düzeninde ortadaki satırlar (her satır ayrı). Boşsa dönem/sınıf/ders/okul alanlarından türetilir. */
+  ortaSatirlar?: string;
 };
+
+export type BaslikDuzeni = "klasik" | "merkez";
 
 export type SinavTaslagi = {
   /** Kullanım geçmişindeki hedef kimliğinin oturumlar arasında sabit kalmasını sağlar. */

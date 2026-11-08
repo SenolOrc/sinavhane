@@ -184,6 +184,7 @@ export function taslakAnlamliMi(taslak: SinavTaslagi): boolean {
       b.ders,
       b.tarih,
       b.sureDakika,
+      b.ortaSatirlar,
     ].some((v) => v?.trim())
   ) return true;
   if (b.logoDataUrl) return true;

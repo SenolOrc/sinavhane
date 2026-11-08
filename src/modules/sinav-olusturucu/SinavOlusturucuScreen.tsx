@@ -259,7 +259,7 @@ export function SinavOlusturucuScreen() {
     return { ...b, baslik: { ...b.baslik, okulAdi: okulProfiliOku().okulAdi } };
   });
   const { baslik, sorular, ayarlar } = belge;
-  const { okulAdi, sinifSeviyesi, donem, yaziliNo, ders, tarih, sureDakika, logoDataUrl, logoBoyut } = baslik;
+  const { okulAdi, sinifSeviyesi, donem, yaziliNo, ders, tarih, sureDakika, logoDataUrl, logoBoyut, duzen, ortaSatirlar } = baslik;
   const {
     kenarBosluk, varsayilanSoruBosluk, ogretmenler, sayfaNoGoster, sayfaDuzeni,
     sutunAra, sutunAyirici, bGrubuAktif, bSeed, aktifGrup, sonYazdirilanBSeed,
@@ -1003,6 +1003,28 @@ export function SinavOlusturucuScreen() {
           .map((p) => p.trim())
           .filter(Boolean)
           .join(" ");
+  // "Merkez" başlığın ortadaki satırları: öğretmen yazdıysa onlar; yazmadıysa mevcut alanlardan türetilir.
+  const baslikDuzeni: "klasik" | "merkez" = !testModu && duzen === "merkez" ? "merkez" : "klasik";
+  const merkezSatirlari = (yerTutucu: boolean): string[] => {
+    const yazilan = (ortaSatirlar ?? "").split("\n").map((s) => s.trim()).filter(Boolean);
+    if (yazilan.length > 0) return yazilan;
+    const ilk = [donem, yaziliNo].map((p) => p.trim()).filter(Boolean).join(" ");
+    const ikinci = [sinifSeviyesi, ders].map((p) => p.trim()).filter(Boolean).join(" ");
+    const okul = okulAdi.trim();
+    return yerTutucu
+      ? [ilk || "Eğitim Öğretim Yılı / Dönem / Yazılı", ikinci || "Sınıf ve Ders", okul || "Okul adı"]
+      : [ilk, ikinci, okul].filter(Boolean);
+  };
+  const merkezSatirlariCikti = useMemo(
+    () => merkezSatirlari(false),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ortaSatirlar, donem, yaziliNo, sinifSeviyesi, ders, okulAdi],
+  );
+  const merkezSatirlariTasarim = useMemo(
+    () => merkezSatirlari(true),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ortaSatirlar, donem, yaziliNo, sinifSeviyesi, ders, okulAdi],
+  );
   const resmiBaslik = useMemo(
     () => resmiBaslikOlustur(false),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3231,6 +3253,9 @@ export function SinavOlusturucuScreen() {
                 resmiBaslikTasarim={resmiBaslikTasarim}
                 logoDataUrl={logoDataUrl}
                 logoBoyut={logoBoyut}
+                baslikDuzeni={baslikDuzeni}
+                ortaSatirlar={merkezSatirlariCikti}
+                ortaSatirlarTasarim={merkezSatirlariTasarim}
                 tarih={tarih}
                 sureDakika={sureDakika}
                 grupEtiketi={grupEtiketi}
@@ -3564,6 +3589,35 @@ export function SinavOlusturucuScreen() {
                   <span className="text-[10px] text-slate-400">
                     {LOGO_BOYUT_MM[logoBoyut ?? VARSAYILAN_LOGO_BOYUT]} mm
                   </span>
+                </div>
+              )}
+              {!testModu && (
+                <div className="mb-3" data-testid="baslik-duzeni">
+                  <AlanEtiket>Başlık düzeni</AlanEtiket>
+                  <div className="flex gap-1">
+                    <TogglePill aktif={(duzen ?? "klasik") === "klasik"} onClick={() => baslikAyarla("duzen", "klasik")}>
+                      Klasik
+                    </TogglePill>
+                    <TogglePill aktif={duzen === "merkez"} onClick={() => baslikAyarla("duzen", "merkez")}>
+                      Ortalı (logo · satırlar · Toplam Puan)
+                    </TogglePill>
+                  </div>
+                  {duzen === "merkez" && (
+                    <label className="mt-2 block">
+                      <AlanEtiket>Orta satırlar (her satır ayrı yazılır)</AlanEtiket>
+                      <textarea
+                        value={ortaSatirlar ?? ""}
+                        onChange={(e) => baslikAyarla("ortaSatirlar", e.target.value.slice(0, 1000))}
+                        rows={5}
+                        className={INPUT_CLASS}
+                        placeholder={"2026-2027 Eğitim Öğretim Yılı\n1. Dönem 1. Ortak Yazılı Sınavı\n9. Sınıf Astronomi ve Uzay Bilimleri Dersi\nOkulunuzun adı"}
+                        data-testid="orta-satirlar"
+                      />
+                      <p className="mt-1 text-[10px] text-slate-400">
+                        Boş bırakırsanız dönem, sınıf, ders ve okul alanlarından otomatik yazılır.
+                      </p>
+                    </label>
+                  )}
                 </div>
               )}
               {logoHatasi && (
@@ -4349,6 +4403,9 @@ export function SinavOlusturucuScreen() {
             resmiBaslik={resmiBaslik}
             logoDataUrl={logoDataUrl}
             logoBoyut={logoBoyut}
+            baslikDuzeni={baslikDuzeni}
+            ortaSatirlar={merkezSatirlariCikti}
+            ortaSatirlarTasarim={merkezSatirlariTasarim}
             cevapAnahtari={
               yazdirmaHedefi === "sinavVeAnahtar" ? cevapAnahtari : undefined
             }
