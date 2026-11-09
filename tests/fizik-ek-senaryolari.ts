@@ -5,6 +5,7 @@ import { cografyaCiz, cografyaGecerliMi, fizikHesapOzeti, varsayilanCografya, CO
 import { torricelliHesapla, hidrolikF2, manometreBasinc } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizEk";
 import { bhmHesap, cemberselHesap, donmeHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizDinamik";
 import { coulombHesap, cubukHesap, trafoHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizElektrik";
+import { yolYerHesap, bagilHesap, dusmeHesap, stroboHesap, grafikHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizHareket";
 import { atmaYuksekligi, dalgaHesap, rezonansHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizDalga";
 
 function dogrula(k: unknown, m: string) { if (!k) { console.error("✗ " + m); process.exit(1); } }
@@ -169,6 +170,49 @@ senaryo("Paket 4 şekilleri uç değerlerde çökmez ve boş değildir", () => {
     ["basitHarmonik", { tip: "yay", veri: true }], ["basitHarmonik", { tip: "sarkac", aci: 40, veri: true }], ["basitHarmonik", { tip: "grafik", grafik: "v" }], ["basitHarmonik", { tip: "grafik", grafik: "a", noktalar: false }],
     ["donme", { tip: "makara", m1: 1, m2: 20, M: 0 }], ["donme", { tip: "makara", m1: 20, m2: 20, M: 20, kuvvet: true }], ["donme", { tip: "tekerlek", sekil: "kure", aci: 60, kuvvet: true }], ["donme", { tip: "tekerlek", sekil: "halka", aci: 10 }],
     ["donme", { tip: "aciSal", r1: 5, r2: 0.5 }], ["donme", { tip: "aciSal", r1: 0.5, r2: 5 }],
+  ];
+  for (const [y, e] of liste) dogrula(mürekkep(ayar(y, e as never)) > 300, y + " boş/çöktü " + JSON.stringify(e));
+});
+// ── Paket 5: Hareket kavramları
+senaryo("Yol ve yer değiştirme: 3 kare doğu + 4 kare kuzey → yol 7, yer değiştirme 5", () => {
+  const h = yolYerHesap(ayar("yolYer", {}));
+  dogrula(yakin(h.yol, 7) && yakin(h.yer, 5), "3-4-5");
+  const d = yolYerHesap(ayar("yolYer", { tip: "dogru", konum: [6, -2, 3, 3] }));
+  dogrula(yakin(d.yol, 6 + 8 + 5) && yakin(d.yer, 3), "doğru üzerinde gidip dönme");
+  dogrula(yakin(yolYerHesap(ayar("yolYer", { kareBoy: 10 })).yol, 70), "kare boyu ölçeği");
+  dogrula(fizikHesapOzeti(ayar("yolYer", {}))?.includes("yol ≥ |yer değiştirme|"), "özet");
+});
+senaryo("Bağıl hareket: nehir bileşke hızı, süre, sürüklenme; araç bağıl hızı", () => {
+  const h = bagilHesap(ayar("bagilHareket", { vt: 4, va: 3, aci: 0, d: 100 }));
+  dogrula(yakin(h.vb, 5) && yakin(h.t, 25) && yakin(h.x, 75), "3-4-5 nehir");
+  const e = bagilHesap(ayar("bagilHareket", { vt: 6, va: 3, aci: -30 }));
+  dogrula(yakin(e.vx, 0), "akıntıya karşı 30° → sürüklenme yok");
+  dogrula(yakin(bagilHesap(ayar("bagilHareket", { v1: 20, v2: 10 })).v21, -10), "v21 = v2 − v1");
+  dogrula(fizikHesapOzeti(ayar("bagilHareket", {}))?.includes("5"), "nehir özeti");
+});
+senaryo("Serbest düşme ve düşey atış formülleri", () => {
+  const b = dusmeHesap(ayar("serbestDusme", { n: 4, g: 10 }));
+  dogrula(yakin(b.hmax, 80) && yakin(b.vson, 40), "h = ½gt², v = gt");
+  const a = dusmeHesap(ayar("serbestDusme", { tip: "yukari", v0: 30, g: 10 }));
+  dogrula(yakin(a.T, 3) && yakin(a.hmax, 45) && yakin(a.ucus, 6), "çıkış süresi ve h_max");
+});
+senaryo("Stroboskop: aralık oranları ve grafik alanları", () => {
+  const h = stroboHesap(ayar("stroboskop", { n: 5 }));
+  dogrula(h.aralik.join() === "1,3,5,7" && h.toplam === 16, "1:3:5:7");
+  dogrula(stroboHesap(ayar("stroboskop", { tip: "yavaslayan", n: 5 })).aralik.join() === "7,5,3,1", "ters oran");
+  dogrula(stroboHesap(ayar("stroboskop", { tip: "duzgun", n: 4 })).aralik.join() === "1,1,1", "sabit hız");
+  const g = grafikHesap(ayar("hareketGrafigi", { vdeg: [0, 6, 6, 0, -4] }));
+  dogrula(yakin(g.yer, 6 + 12 + 6 - 4) && yakin(g.yol, 6 + 12 + 6 + 4), "v–t: yer değiştirme ve yol");
+  const x = grafikHesap(ayar("hareketGrafigi", { tip: "xt", xdeg: [0, 8, 8, -4, 0] }));
+  dogrula(yakin(x.yer, 0) && yakin(x.yol, 8 + 12 + 4), "x–t: yol ve yer değiştirme");
+});
+senaryo("Paket 5 şekilleri uç değerlerde çökmez ve boş değildir", () => {
+  const liste: [Parameters<typeof varsayilanCografya>[0], Record<string, unknown>][] = [
+    ["yolYer", {}], ["yolYer", { dx: [0, 0, 0, 0], dy: [0, 0, 0, 0] }], ["yolYer", { tip: "dogru", konum: [0, 0, 0, 0] }], ["yolYer", { dx: [8, -8, 8, -8], dy: [8, 8, -8, -8], izgara: false, deger: false }],
+    ["bagilHareket", { tip: "nehir", va: 0, sonuc: true }], ["bagilHareket", { tip: "nehir", aci: 60, vt: 1, va: 20 }], ["bagilHareket", { tip: "yol", gozlem: "a2" }], ["bagilHareket", { tip: "yol", v1: 0, v2: 0 }],
+    ["serbestDusme", { n: 2 }], ["serbestDusme", { n: 5, g: 15 }], ["serbestDusme", { tip: "yukari", v0: 5, n: 5 }], ["serbestDusme", { tip: "yukari", v0: 60, g: 5, n: 5, hiz: false }],
+    ["stroboskop", { n: 4, tip: "duzgun" }], ["stroboskop", { n: 8, tip: "hizlanan", nesne: "araba" }], ["stroboskop", { n: 8, tip: "yavaslayan", cetvel: false }],
+    ["hareketGrafigi", { vdeg: [0, 0, 0, 0, 0] }], ["hareketGrafigi", { vdeg: [-20, 20, -20, 20, -20] }], ["hareketGrafigi", { tip: "xt", xdeg: [40, -40, 40, -40, 40] }],
   ];
   for (const [y, e] of liste) dogrula(mürekkep(ayar(y, e as never)) > 300, y + " boş/çöktü " + JSON.stringify(e));
 });

@@ -6,7 +6,8 @@ export type FizikEkYapi =
   | "torricelli" | "bernoulli" | "hidrolik" | "manometre"
   | "atma" | "dalga" | "rezonans" | "doppler" | "kirinim"
   | "elektrikAlan" | "coulomb" | "levhaYuk" | "manyetikParcacik" | "iletkenCubuk" | "transformator"
-  | "cembersel" | "yorunge" | "basitHarmonik" | "donme";
+  | "cembersel" | "yorunge" | "basitHarmonik" | "donme"
+  | "yolYer" | "bagilHareket" | "serbestDusme" | "stroboskop" | "hareketGrafigi";
 
 type Sema = { ad: string; alt: string; alanlar: Alan[] };
 
@@ -294,6 +295,76 @@ export const FIZIK_EK_SEMA: Record<FizikEkYapi, Sema> = {
       { k: "mantik", a: "veri", ad: "Değerleri yaz", v: true },
     ],
   },
+  // ── Paket 5: Hareket kavramları
+  yolYer: {
+    ad: "Yol ve yer değiştirme", alt: "Fizik – Hareket",
+    alanlar: [
+      { k: "sec", a: "tip", ad: "Hareket", sec: [["dogru", "Doğru üzerinde (konum ekseni)"], ["duzlem", "Düzlemde (kareli)"]], v: "duzlem" },
+      { k: "sayilar", a: "konum", ad: "Doğru üzerinde: sırayla ulaşılan konumlar (m)", n: 4, min: -10, max: 10, v: [6, -2, 3, 3] },
+      { k: "sayilar", a: "dx", ad: "Düzlemde: her etapın yatay bileşeni (kare)", n: 4, min: -8, max: 8, v: [3, 0, 0, 0] },
+      { k: "sayilar", a: "dy", ad: "Düzlemde: her etapın düşey bileşeni (kare)", n: 4, min: -8, max: 8, v: [0, 4, 0, 0] },
+      { k: "sayi", a: "kareBoy", ad: "1 kare = (m)", min: 1, max: 100, adim: 1, v: 1 },
+      { k: "mantik", a: "deger", ad: "Yol ve yer değiştirme değerlerini yaz", v: true },
+      { k: "mantik", a: "izgara", ad: "Kare çizgileri", v: true },
+      { k: "mantik", a: "nokta", ad: "Nokta adları (A, B, C…)", v: true },
+      { k: "mantik", a: "yerOk", ad: "Yer değiştirme vektörü", v: true },
+    ],
+  },
+  bagilHareket: {
+    ad: "Bağıl hareket (nehir, araçlar)", alt: "Fizik – Hareket",
+    alanlar: [
+      { k: "sec", a: "tip", ad: "Durum", sec: [["nehir", "Nehirde tekne"], ["yol", "Yolda iki araç"]], v: "nehir" },
+      { k: "sayi", a: "vt", ad: "Teknenin suya göre hızı (m/s)", min: 1, max: 20, adim: 1, v: 4, kok: true },
+      { k: "sayi", a: "va", ad: "Akıntı hızı (m/s)", min: 0, max: 20, adim: 1, v: 3, kok: true },
+      { k: "sayi", a: "aci", ad: "Teknenin yönü (karşıya dikten sapma, °)", min: -60, max: 60, adim: 1, v: 0 },
+      { k: "sayi", a: "d", ad: "Nehir genişliği (m)", min: 10, max: 500, adim: 10, v: 100 },
+      { k: "sayi", a: "v1", ad: "1. aracın yere göre hızı (m/s, − sola)", min: -40, max: 40, adim: 1, v: 20, kok: true },
+      { k: "sayi", a: "v2", ad: "2. aracın yere göre hızı (m/s, − sola)", min: -40, max: 40, adim: 1, v: 10, kok: true },
+      { k: "sec", a: "gozlem", ad: "Gözlemci", sec: [["yer", "Yerdeki gözlemci"], ["a1", "1. araçtaki gözlemci"], ["a2", "2. araçtaki gözlemci"]], v: "yer" },
+      { k: "mantik", a: "veri", ad: "Değerleri yaz", v: true },
+      { k: "mantik", a: "sonuc", ad: "Bileşke / bağıl hız değerini yaz", v: false },
+      { k: "mantik", a: "surukle", ad: "Nehir: sürüklenme x ve genişlik d", v: true },
+      { k: "mantik", a: "kokYaz", ad: "Köklü değerleri √ ile yaz", v: false },
+    ],
+  },
+  serbestDusme: {
+    ad: "Serbest düşme ve düşey atış", alt: "Fizik – Hareket",
+    alanlar: [
+      { k: "sec", a: "tip", ad: "Hareket", sec: [["birak", "Serbest düşme (bırakma)"], ["yukari", "Yukarı düşey atış"]], v: "birak" },
+      { k: "sayi", a: "n", ad: "Gösterilen saniye sayısı", min: 2, max: 5, adim: 1, v: 4 },
+      { k: "sayi", a: "v0", ad: "İlk hız v₀ (m/s)", min: 5, max: 60, adim: 5, v: 30 },
+      { k: "sayi", a: "g", ad: "g (m/s²)", min: 5, max: 15, adim: 1, v: 10 },
+      { k: "mantik", a: "hiz", ad: "Hız okları ve değerleri", v: true },
+      { k: "mantik", a: "yuk", ad: "Yükseklik / yol değerleri", v: true },
+      { k: "mantik", a: "oran", ad: "Ardışık yol oranı (1 : 3 : 5…)", v: true },
+      { k: "mantik", a: "yer", ad: "Zemin", v: true },
+    ],
+  },
+  stroboskop: {
+    ad: "Stroboskop (çok pozlu) görüntü", alt: "Fizik – Hareket",
+    alanlar: [
+      { k: "sec", a: "tip", ad: "Hareket", sec: [["duzgun", "Sabit hızlı"], ["hizlanan", "Durgundan hızlanan (1:3:5…)"], ["yavaslayan", "Yavaşlayan (…5:3:1)"]], v: "hizlanan" },
+      { k: "sayi", a: "n", ad: "Konum sayısı", min: 4, max: 8, adim: 1, v: 5 },
+      { k: "sec", a: "nesne", ad: "Cisim", sec: [["top", "Top"], ["araba", "Araba"]], v: "top" },
+      { k: "mantik", a: "olcu", ad: "Aralık ölçüleri (d, 3d, 5d…)", v: true },
+      { k: "mantik", a: "hizOk", ad: "Hız okları", v: true },
+      { k: "mantik", a: "zaman", ad: "Zaman etiketleri (t₀, t₁…)", v: true },
+      { k: "mantik", a: "cetvel", ad: "Cetvel", v: true },
+    ],
+  },
+  hareketGrafigi: {
+    ad: "Hareket grafikleri (hız–zaman, konum–zaman)", alt: "Fizik – Hareket",
+    alanlar: [
+      { k: "sec", a: "tip", ad: "Grafik", sec: [["vt", "Hız – zaman (v–t)"], ["xt", "Konum – zaman (x–t)"]], v: "vt" },
+      { k: "sayilar", a: "vdeg", ad: "v–t: t = 0, 2, 4, 6, 8 s anındaki hızlar (m/s)", n: 5, min: -20, max: 20, v: [0, 6, 6, 0, -4] },
+      { k: "sayilar", a: "xdeg", ad: "x–t: t = 0, 2, 4, 6, 8 s anındaki konumlar (m)", n: 5, min: -40, max: 40, v: [0, 8, 8, -4, 0] },
+      { k: "mantik", a: "alan", ad: "v–t: alanları boya (yer değiştirme)", v: true },
+      { k: "mantik", a: "egim", ad: "Etap yazıları (ivme / hız)", v: true },
+      { k: "mantik", a: "nokta", ad: "Köşe noktaları", v: true },
+      { k: "mantik", a: "izgara", ad: "Kare çizgileri", v: true },
+      { k: "mantik", a: "sayi", ad: "Eksen sayıları", v: true },
+    ],
+  },
 };
 
 export const FIZIK_EK_BOYUT: Record<FizikEkYapi, { w: number; h: number }> = {
@@ -301,4 +372,5 @@ export const FIZIK_EK_BOYUT: Record<FizikEkYapi, { w: number; h: number }> = {
   atma: { w: 440, h: 210 }, dalga: { w: 440, h: 210 }, rezonans: { w: 420, h: 200 }, doppler: { w: 440, h: 230 }, kirinim: { w: 440, h: 270 },
   elektrikAlan: { w: 420, h: 250 }, coulomb: { w: 440, h: 230 }, levhaYuk: { w: 420, h: 240 }, manyetikParcacik: { w: 400, h: 260 }, iletkenCubuk: { w: 440, h: 240 }, transformator: { w: 440, h: 240 },
   cembersel: { w: 380, h: 260 }, yorunge: { w: 420, h: 260 }, basitHarmonik: { w: 440, h: 250 }, donme: { w: 440, h: 260 },
+  yolYer: { w: 440, h: 260 }, bagilHareket: { w: 440, h: 250 }, serbestDusme: { w: 400, h: 290 }, stroboskop: { w: 460, h: 190 }, hareketGrafigi: { w: 440, h: 260 },
 };

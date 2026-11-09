@@ -853,7 +853,8 @@ const FIZIK_ALT: Record<string, string> = { atis: "Fizik – Atış", enerji: "F
   torricelli: "Fizik – Akışkanlar", bernoulli: "Fizik – Akışkanlar", hidrolik: "Fizik – Akışkanlar", manometre: "Fizik – Akışkanlar",
   atma: "Fizik – Dalgalar", dalga: "Fizik – Dalgalar", rezonans: "Fizik – Dalgalar", doppler: "Fizik – Dalgalar", kirinim: "Fizik – Dalgalar",
   elektrikAlan: "Fizik – Elektrik", coulomb: "Fizik – Elektrik", levhaYuk: "Fizik – Elektrik", manyetikParcacik: "Fizik – Manyetizma", iletkenCubuk: "Fizik – Manyetizma", transformator: "Fizik – Manyetizma",
-  cembersel: "Fizik – Çembersel hareket", yorunge: "Fizik – Çekim", basitHarmonik: "Fizik – Salınım", donme: "Fizik – Dönme" };
+  cembersel: "Fizik – Çembersel hareket", yorunge: "Fizik – Çekim", basitHarmonik: "Fizik – Salınım", donme: "Fizik – Dönme",
+  yolYer: "Fizik – Hareket", bagilHareket: "Fizik – Hareket", serbestDusme: "Fizik – Hareket", stroboskop: "Fizik – Hareket", hareketGrafigi: "Fizik – Hareket" };
 const fz = (id: string, ad: string, ipucu: string, yapi: Parameters<typeof varsayilanCografya>[0], ek: Parameters<typeof varsayilanCografya>[1], anahtar: string[]): GeometriSablonu => ({
   id, ad, ipucu, nesne: "fizikSekil", altBaslik: FIZIK_ALT[yapi], aramaKelimeleri: ["fizik", ...anahtar], olustur: () => varsayilanCografya(yapi, ek),
 });
@@ -965,6 +966,19 @@ export const FIZIK_SABLONLARI: GeometriSablonu[] = [
   fz("f-donme-tekerlek", "Eğik düzlemde yuvarlanma", "Dolu silindir, f sürtünme", "donme", { tip: "tekerlek" }, ["yuvarlanma", "eğik düzlem", "eylemsizlik momenti", "dönme", "açısal ivme"]),
   fz("f-donme-halka", "Eğik düzlemde halka", "I = mR²: daha yavaş yuvarlanır", "donme", { tip: "tekerlek", sekil: "halka" }, ["halka", "yuvarlanma", "eğik düzlem", "eylemsizlik momenti"]),
   fz("f-donme-acisal", "Açısal momentum korunumu", "r küçülünce ω artar", "donme", { tip: "aciSal" }, ["açısal momentum", "korunum", "eylemsizlik momenti", "buz patencisi", "dönme"]),
+  fz("f-yol-duzlem", "Yol ve yer değiştirme (düzlem)", "3 kare doğu, 4 kare kuzey: yol 7, yer değiştirme 5", "yolYer", {}, ["yol", "yer değiştirme", "vektör", "skaler"]),
+  fz("f-yol-dogru", "Doğru üzerinde yol ve yer değiştirme", "Gidip dönen cisim", "yolYer", { tip: "dogru" }, ["yol", "yer değiştirme", "konum", "doğru"]),
+  fz("f-bagil-nehir", "Nehirde karşıya geçen tekne", "Bileşke hız, geçiş süresi, sürüklenme", "bagilHareket", { tip: "nehir", sonuc: true }, ["bağıl hareket", "nehir", "bileşke hız", "akıntı", "tekne"]),
+  fz("f-bagil-nehir-aci", "Nehirde eğik giden tekne", "Akıntıya karşı açılı yönelme", "bagilHareket", { tip: "nehir", aci: -30, vt: 6, va: 3 }, ["bağıl hareket", "nehir", "açılı", "akıntı"]),
+  fz("f-bagil-yol", "İki araç: yerdeki gözlemci", "v₁ ve v₂ yere göre", "bagilHareket", { tip: "yol" }, ["bağıl hız", "araç", "gözlemci", "yer"]),
+  fz("f-bagil-yol-a1", "İki araç: 1. araçtaki gözlemci", "v₂₁ = v₂ − v₁", "bagilHareket", { tip: "yol", gozlem: "a1" }, ["bağıl hız", "araç", "gözlemci"]),
+  fz("f-dusme-birak", "Serbest düşme", "1 : 3 : 5 yol oranı", "serbestDusme", {}, ["serbest düşme", "g", "ivme", "düşey"]),
+  fz("f-dusme-atis", "Yukarı düşey atış", "Çıkış süresi ve maksimum yükseklik", "serbestDusme", { tip: "yukari" }, ["düşey atış", "yukarı atış", "maksimum yükseklik", "g"]),
+  fz("f-strobo-hizlanan", "Stroboskop: hızlanan hareket", "Aralıklar d, 3d, 5d…", "stroboskop", {}, ["stroboskop", "çok pozlu", "düzgün hızlanan"]),
+  fz("f-strobo-duzgun", "Stroboskop: sabit hız", "Eşit aralıklı konumlar", "stroboskop", { tip: "duzgun", nesne: "araba" }, ["stroboskop", "sabit hız", "düzgün doğrusal"]),
+  fz("f-strobo-yavas", "Stroboskop: yavaşlayan hareket", "Aralıklar azalıyor", "stroboskop", { tip: "yavaslayan" }, ["stroboskop", "yavaşlayan", "düzgün yavaşlayan"]),
+  fz("f-grafik-vt", "Hız–zaman grafiği", "Alan = yer değiştirme, eğim = ivme", "hareketGrafigi", {}, ["v-t", "hız zaman", "grafik", "alan", "ivme"]),
+  fz("f-grafik-xt", "Konum–zaman grafiği", "Eğim = hız", "hareketGrafigi", { tip: "xt" }, ["x-t", "konum zaman", "grafik", "eğim", "hız"]),
   // <<PAKET-EK-SABLON>>
 ];
 
