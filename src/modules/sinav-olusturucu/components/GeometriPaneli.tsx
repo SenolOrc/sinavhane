@@ -6,6 +6,11 @@
 //
 // `FizikSecimPaneli` seçili şekil bunlardan biriyse bu paneli etiket satırının altına koyar.
 
+import { kokluCoz, kokluMu } from "../cizim/kokluDeger";
+
+/** Etiket köklü yazımsa ve sayıyla uyuşuyorsa kutuda onu göster ("5√2"); değilse undefined. */
+const kokYaziEs = (etiket: string | undefined, sayi: number | undefined): string | undefined =>
+  etiket && sayi !== undefined && kokluMu(etiket) && Math.abs((kokluCoz(etiket) ?? NaN) - sayi) < 1e-6 ? etiket : undefined;
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -179,9 +184,23 @@ function UcgenPaneli({ geo, yaz, tarihce }: { geo: Extract<GeometriVerisi, { tur
       </div>
       {geo.mod !== "serbest" ? (
         <div className="flex flex-wrap items-center gap-2">
-          {olcuAdlari.map((ad, i) => (
-            <OndalikGirdisi key={ad} etiket={ad} deger={geo.olcu[i]} onOdak={tarihce} onDegis={(v) => v !== undefined && gunc({ olcu: dizi(geo.olcu, i, v, 0) })} />
-          ))}
+          {olcuAdlari.map((ad, i) => {
+            const ki = geo.mod === "kenar" ? i : i < 2 ? i + 1 : undefined; // ölçü → kenar etiketi sırası
+            const eskiYazi = ki === undefined ? undefined : kokYaziEs(geo.kenarlar[ki], geo.olcu[i]);
+            return (
+              <OndalikGirdisi key={ad} etiket={ad} deger={geo.olcu[i]} kok={ki !== undefined || i === 2 ? ki !== undefined : false} yazi={eskiYazi} onOdak={tarihce}
+                onDegis={(v, ky) => {
+                  if (v === undefined) return;
+                  const yama: Partial<typeof geo> = { olcu: dizi(geo.olcu, i, v, 0) };
+                  // Köklü yazılan uzunluk kenar etiketine de yazılır (5√2); düz sayıya dönünce o etiket silinir.
+                  if (ki !== undefined) {
+                    if (ky) yama.kenarlar = dizi(geo.kenarlar, ki, ky, "");
+                    else if (eskiYazi) yama.kenarlar = dizi(geo.kenarlar, ki, "", "");
+                  }
+                  gunc(yama);
+                }} />
+            );
+          })}
         </div>
       ) : (
         <span className={IPUCU}>Köşeleri tuvalde fareyle sürükleyebilir, kenar ya da açı üzerine çift tıklayarak etiket yazabilirsiniz (konumları aşağıdan da yazabilirsiniz).</span>
@@ -508,7 +527,12 @@ function CografyaPaneli({ geo, yaz, tarihce }: { geo: CografyaVerisi; yaz: (g: i
         {sema.alanlar.filter((al) => al.k === "sec" || al.k === "mantik" || al.k === "sayi").map((al) => {
           if (al.k === "sec") return <Secenekler key={al.a} baslik={al.ad} deger={String(deger(al))} secenekler={al.sec} onSec={(v) => { tarihce(); ayarla(al.a, v); }} />;
           if (al.k === "mantik") return <TogglePill key={al.a} aktif={deger(al) === true} onClick={() => { tarihce(); ayarla(al.a, deger(al) !== true); }}>{al.ad}</TogglePill>;
-          if (al.k === "sayi") return <OndalikGirdisi key={al.a} etiket={al.ad} deger={Number(deger(al))} onOdak={tarihce} onDegis={(v) => v !== undefined && v >= al.min && v <= al.max && ayarla(al.a, v)} />;
+          if (al.k === "sayi") {
+            const ham = deger(al);
+            const sayisal = typeof ham === "string" ? kokluCoz(ham) ?? al.v : Number(ham);
+            return <OndalikGirdisi key={al.a} etiket={al.ad} deger={sayisal} kok={al.kok} yazi={typeof ham === "string" ? ham : undefined} onOdak={tarihce}
+              onDegis={(v, ky) => v !== undefined && v >= al.min && v <= al.max && ayarla(al.a, al.kok && ky ? ky : v)} />;
+          }
           return null;
         })}
       </div>
@@ -540,7 +564,12 @@ function KatiPaneli({ geo, yaz, tarihce }: { geo: Extract<GeometriVerisi, { tur:
       <Secenekler baslik="Cisim" deger={geo.cisim} secenekler={KATI_TURLERI.map((t) => [t.id, t.ad] as const)} onSec={(c) => { tarihce(); yaz(varsayilanKati({ cisim: c, gizliKesik: geo.gizliKesik })); }} />
       <div className="flex flex-wrap items-center gap-2">
         {tur.olcuAdlari.map((ad, i) => (
-          <OndalikGirdisi key={`${tur.id}${i}`} etiket={ad} deger={geo.olcu[i]} onOdak={tarihce} onDegis={(v) => v !== undefined && v > 0 && v <= 1000 && gunc({ olcu: dizi(geo.olcu, i, v, 1) })} />
+          <OndalikGirdisi key={`${tur.id}${i}`} etiket={ad} deger={geo.olcu[i]} kok yazi={kokYaziEs(geo.etiketler[i], geo.olcu[i])} onOdak={tarihce}
+            onDegis={(v, ky) => {
+              if (v === undefined || !(v > 0 && v <= 1000)) return;
+              const eski = kokYaziEs(geo.etiketler[i], geo.olcu[i]);
+              gunc({ olcu: dizi(geo.olcu, i, v, 1), ...(ky ? { etiketler: dizi(geo.etiketler, i, ky, "") } : eski ? { etiketler: dizi(geo.etiketler, i, "", "") } : {}) });
+            }} />
         ))}
         <TogglePill aktif={geo.gizliKesik} onClick={() => { tarihce(); gunc({ gizliKesik: !geo.gizliKesik }); }}>Arka ayrıtlar kesikli</TogglePill>
       </div>

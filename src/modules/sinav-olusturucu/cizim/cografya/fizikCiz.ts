@@ -1,14 +1,31 @@
 // Fizik şekillerinin çizimi: atış, enerji dönüşümü, çarpışma, tork, vektör toplama, serbest cisim.
 // Hepsi saf çizim: veri (ayar tablosu) → tuval. Yalnız gri/siyah kullanılır (baskı dostu).
 import { fizikMetniCiz } from "../fizik";
+import { kokluYaz } from "../kokluDeger";
 import { ayarMantik, ayarMetin, ayarSayi, ayarSayilar, ayarSec, type CografyaVerisi } from "./sema";
 
 type Kutu = { x: number; y: number; w: number; h: number };
 const D2R = Math.PI / 180;
 const GRI = "#ececec";
 
-/** 1 ondalık, virgüllü, gereksiz sıfırsız. */
-export const sayiYaz = (n: number, ond = 1) => String(Number(n.toFixed(ond))).replace(".", ",");
+/** Çizim sırasında açık: tam köklü değerler (5√2, 2√3/3) ondalık yerine √ ile yazılır. */
+let kokluModu = false;
+/** Köklü giriş yapılmışsa ("10√2") ya da "Köklü değerleri √ ile yaz" açıksa köklü yazım devrede. */
+function kokluAcikMi(v: CografyaVerisi): boolean {
+  if (ayarMantik(v, "kokYaz")) return true;
+  return Object.values(v.ayar).some((d) => typeof d === "string" && d.includes("√"));
+}
+function kokluIle<T>(v: CografyaVerisi, f: () => T): T {
+  const onceki = kokluModu;
+  kokluModu = kokluAcikMi(v);
+  try { return f(); } finally { kokluModu = onceki; }
+}
+
+/** 1 ondalık, virgüllü, gereksiz sıfırsız. Köklü kip açıksa tam köklü değer √ ile yazılır. */
+export const sayiYaz = (n: number, ond = 1) => {
+  if (kokluModu) { const k = kokluYaz(n); if (k) return k; }
+  return String(Number(n.toFixed(ond))).replace(".", ",");
+};
 
 function ok(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, s = 7) {
   const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy);
@@ -671,6 +688,9 @@ export function scdCiz(ctx: CanvasRenderingContext2D, v: CografyaVerisi, k: Kutu
 // ════════════════════════════════════════════════════════════════════════════
 
 export function fizikSekilCiz(ctx: CanvasRenderingContext2D, v: CografyaVerisi, k: Kutu) {
+  return kokluIle(v, () => fizikSekilCizIc(ctx, v, k));
+}
+function fizikSekilCizIc(ctx: CanvasRenderingContext2D, v: CografyaVerisi, k: Kutu) {
   switch (v.yapi) {
     case "atis": return atisCiz(ctx, v, k);
     case "enerji": return enerjiCiz(ctx, v, k);
@@ -683,6 +703,9 @@ export function fizikSekilCiz(ctx: CanvasRenderingContext2D, v: CografyaVerisi, 
 
 /** Öğretmene hesap özeti (panelde gösterilir; şekle yazılmaz). Hesap yoksa null. */
 export function fizikHesapOzeti(v: CografyaVerisi): string | null {
+  return kokluIle(v, () => fizikHesapOzetiIc(v));
+}
+function fizikHesapOzetiIc(v: CografyaVerisi): string | null {
   if (v.yapi === "atis") {
     const h = atisHesapla(v);
     const not = ayarSec(v, "tip") !== "egik" && ayarSayi(v, "h0") <= 0 ? ` (yükseklik 0 girildiği için h = ${sayiYaz(h.h0, 0)} m alındı)` : "";

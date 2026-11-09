@@ -5,6 +5,7 @@
 // sayıları değiştirmek (süre, ivme, genlik…). Hareket evreleri yazıldığında
 // konum, hız ve ivme grafiği AYNI evrelerden çıktığı için birbirini tutar.
 
+import { kokluCoz, kokluEtiket, kokluMu } from "../cizim/kokluDeger";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -65,41 +66,68 @@ const egriAdi = (e: GrafikEgrisi) =>
   : "Noktalar";
 
 /** Boş bırakılabilen ondalık sayı kutusu (virgül ya da nokta). Yazarken bozulmaz. */
-export function OndalikGirdisi({ etiket, deger, onDegis, onOdak, bos, genis }: {
+export function OndalikGirdisi({ etiket, deger, onDegis, onOdak, bos, genis, kok, yazi }: {
   etiket: string;
   deger: number | undefined;
-  onDegis: (v: number | undefined) => void;
+  /** İkinci bağımsız değişken yalnız köklü yazımda ("5√2") gelir: şekle yazılacak sadeleştirilmiş metin. */
+  onDegis: (v: number | undefined, kokluYazi?: string) => void;
   onOdak?: () => void;
   /** Verilirse kutu boş bırakılabilir (otomatik) ve ipucu olarak gösterilir. */
   bos?: string;
   genis?: boolean;
+  /** Köklü değer kabul eder: "5√2", "√3/2", "sqrt(8)", "3 kök 2" (yanında √ düğmesi çıkar). */
+  kok?: boolean;
+  /** Köklü giriş yapılmışsa kutuda gösterilecek yazım (sayının yerine). */
+  yazi?: string;
 }) {
-  const [metin, setMetin] = useState(deger === undefined ? "" : String(deger).replace(".", ","));
+  const bicim = (d: number | undefined) => (d === undefined ? "" : String(Math.round(d * 1e6) / 1e6).replace(".", ","));
+  const gosterilecek = (d: number | undefined) => (kok && yazi ? yazi : bicim(d));
+  const [metin, setMetin] = useState(gosterilecek(deger));
   const odakta = useRef(false);
+  const girdi = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (odakta.current) return;
-    setMetin(deger === undefined ? "" : String(Math.round(deger * 1e6) / 1e6).replace(".", ","));
-  }, [deger]);
+    setMetin(gosterilecek(deger));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deger, yazi]);
+  const degistir = (ham: string) => {
+    setMetin(ham);
+    const t = ham.trim();
+    if (!t) { if (bos !== undefined) onDegis(undefined); return; }
+    if (kok) {
+      const n = kokluCoz(t);
+      if (n !== undefined) onDegis(n, kokluMu(t) ? kokluEtiket(t) : undefined);
+      return;
+    }
+    const n = Number(t.replace(",", ".").replace("−", "-"));
+    if (Number.isFinite(n)) onDegis(n);
+  };
   return (
     <label className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600">
       {etiket}
       <input
+        ref={girdi}
         aria-label={etiket}
-        inputMode="decimal"
+        inputMode={kok ? "text" : "decimal"}
         value={metin}
-        placeholder={bos}
+        placeholder={bos ?? (kok ? "5√2" : undefined)}
         onFocus={() => { odakta.current = true; onOdak?.(); }}
-        onBlur={() => { odakta.current = false; setMetin(deger === undefined ? "" : String(Math.round(deger * 1e6) / 1e6).replace(".", ",")); }}
-        onChange={(e) => {
-          const ham = e.target.value;
-          setMetin(ham);
-          const t = ham.trim();
-          if (!t) { if (bos !== undefined) onDegis(undefined); return; }
-          const n = Number(t.replace(",", ".").replace("−", "-"));
-          if (Number.isFinite(n)) onDegis(n);
-        }}
+        onBlur={() => { odakta.current = false; setMetin(gosterilecek(deger)); }}
+        onChange={(e) => degistir(e.target.value)}
         className={`${genis ? "w-20" : "w-16"} rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[11px]`}
       />
+      {kok && (
+        <button
+          type="button"
+          aria-label={`${etiket}: kök işareti ekle`}
+          title="Kök işareti ekle (√)"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => { girdi.current?.focus(); degistir(metin + "√"); }}
+          className="-ml-0.5 rounded border border-slate-300 bg-white px-1 py-0.5 text-[11px] leading-none text-slate-700 hover:bg-slate-100"
+        >
+          √
+        </button>
+      )}
     </label>
   );
 }

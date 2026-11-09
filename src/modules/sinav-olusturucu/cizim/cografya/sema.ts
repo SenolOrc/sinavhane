@@ -7,13 +7,14 @@ export type CografyaYapi =
   | "walter" | "piramit" | "mevsim" | "aydinlanma"
   | FizikYapi;
 
+import { kokluCoz } from "../kokluDeger";
 import { FIZIK_SEMA, type FizikYapi } from "./fizikSema";
 export type AyarDegeri = number | boolean | string | number[];
 
 export type CografyaVerisi = { tur: "cografya"; yapi: CografyaYapi; ayar: Record<string, AyarDegeri> };
 
 export type Alan =
-  | { k: "sayi"; a: string; ad: string; min: number; max: number; adim?: number; v: number }
+  | { k: "sayi"; a: string; ad: string; min: number; max: number; adim?: number; v: number; /** Köklü yazım kabul eder: "10√2" */ kok?: boolean }
   | { k: "mantik"; a: string; ad: string; v: boolean }
   | { k: "sec"; a: string; ad: string; sec: readonly (readonly [string, string])[]; v: string }
   | { k: "metin"; a: string; ad: string; en: number; v: string; desen?: RegExp; ipucu?: string }
@@ -140,6 +141,7 @@ export function ayarSayi(v: CografyaVerisi, a: string): number {
   const d = v.ayar[a];
   const ok = al?.k === "sayi" ? al : null;
   if (typeof d === "number" && Number.isFinite(d) && ok) return Math.max(ok.min, Math.min(ok.max, d));
+  if (typeof d === "string" && ok?.kok) { const n = kokluCoz(d); if (n !== undefined) return Math.max(ok.min, Math.min(ok.max, n)); }
   return ok ? ok.v : 0;
 }
 export const ayarMantik = (v: CografyaVerisi, a: string): boolean => (typeof v.ayar[a] === "boolean" ? (v.ayar[a] as boolean) : !!(SEMA[v.yapi].alanlar.find((x) => x.a === a) as { v?: boolean } | undefined)?.v);
@@ -172,7 +174,10 @@ export function cografyaGecerliMi(g: Record<string, unknown>): boolean {
   for (const al of sema.alanlar) {
     const d = a[al.a];
     if (d === undefined) continue; // eksik alan varsayılanla tamamlanır
-    if (al.k === "sayi" && !(typeof d === "number" && Number.isFinite(d) && d >= al.min && d <= al.max)) return false;
+    if (al.k === "sayi") {
+      const n = typeof d === "number" ? d : typeof d === "string" && al.kok && d.length <= 24 ? kokluCoz(d) : undefined;
+      if (!(n !== undefined && Number.isFinite(n) && n >= al.min && n <= al.max)) return false;
+    }
     if (al.k === "mantik" && typeof d !== "boolean") return false;
     if (al.k === "sec" && !(typeof d === "string" && al.sec.some(([k]) => k === d))) return false;
     if (al.k === "metin" && !(typeof d === "string" && d.length <= al.en && (!al.desen || al.desen.test(d)))) return false;

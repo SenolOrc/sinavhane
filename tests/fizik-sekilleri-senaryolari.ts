@@ -10,6 +10,8 @@ import { sekilGecerliMi } from "../src/modules/sinav-olusturucu/cizim/sablon";
 import { baglantiPortlari, portluMu } from "../src/modules/sinav-olusturucu/cizim/etkilesim";
 import type { Sekil } from "../src/modules/sinav-olusturucu/cizim/tipler";
 import { fizikIcerikTutunma, icerikTuvaliAyarla } from "../src/modules/sinav-olusturucu/cizim/fizikIcerik";
+import { kokluCoz, kokluEtiket, kokluMu, kokluYaz } from "../src/modules/sinav-olusturucu/cizim/kokluDeger";
+import { UCGEN_SABLONLARI, KATI_SABLONLARI } from "../src/modules/sinav-olusturucu/cizim/geometriSekilleri";
 import { baglayiciYolu } from "../src/modules/sinav-olusturucu/cizim/geometri";
 
 function dogrula(k: unknown, m: string) { if (!k) { console.error("✗ " + m); process.exit(1); } }
@@ -160,6 +162,57 @@ senaryo("fizik şekilleri bağlayıcı için 4 port verir (kutu kenarları), geo
   }
   const cg = { id: "c", tur: "fizik", nesne: "cografyaSekil", kalinlik: 2, x: 0, y: 0, w: 300, h: 200, geo: varsayilanCografya("harita") } as Sekil;
   dogrula(!portluMu(cg), "coğrafya şekli portsuz kalmalı");
+});
+
+senaryo("köklü değer: yazı ↔ sayı (5√2, √3/2, sqrt(8), 3 kök 2), tam kök yazımı, kötü girişler reddedilir", () => {
+  const eş = (m: string, n: number) => dogrula(kokluCoz(m) !== undefined && yakin(kokluCoz(m)!, n, 1e-9), `${m} → ${kokluCoz(m)} (beklenen ${n})`);
+  eş("5√2", 5 * Math.SQRT2); eş("√3/2", Math.sqrt(3) / 2); eş("sqrt(8)", Math.sqrt(8)); eş("3 kök 2", 3 * Math.SQRT2);
+  eş("2√3/3", (2 * Math.sqrt(3)) / 3); eş("1,5", 1.5); eş("−4√5", -4 * Math.sqrt(5)); eş("2+√3", 2 + Math.sqrt(3)); eş("√(12)", Math.sqrt(12));
+  for (const kotu of ["", "abc", "x+1", "√(-1)", "5√", "1/0", "alert(1)", "2**9999999", "√".repeat(60)]) dogrula(kokluCoz(kotu) === undefined || !Number.isFinite(kokluCoz(kotu)!), `kabul edilmemeli: ${kotu}`);
+  dogrula(kokluYaz(5 * Math.SQRT2) === "5√2", "5√2 yazımı"); dogrula(kokluYaz(Math.sqrt(3)) === "√3", "√3 yazımı");
+  dogrula(kokluYaz((2 * Math.sqrt(3)) / 3) === "2√3/3", "2√3/3 yazımı"); dogrula(kokluYaz(-Math.sqrt(2)) === "−√2", "negatif");
+  dogrula(kokluYaz(7) === null && kokluYaz(2.5) === null && kokluYaz(0.35) === null && kokluYaz(0) === null, "temiz sayılar kök sayılmaz");
+  dogrula(kokluYaz(10.000000000000002) === null, "10.000000000000002 → düz sayı");
+  dogrula(kokluEtiket("√12") === "2√3" && kokluEtiket("sqrt(8)") === "2√2", "sadeleştirme");
+  dogrula(kokluMu("5√2") && kokluMu("sqrt(2)") && !kokluMu("5,5"), "kokluMu");
+});
+
+senaryo("köklü fizik: v₀ = '10√2' hesaba girer, çizim/özet √ ile yazar, doğrulama string'i kabul eder", () => {
+  const v = varsayilanCografya("atis", { tip: "egik", v0: "10√2", aci: 45, h0: 0, sonuc: true });
+  dogrula(cografyaGecerliMi(v as unknown as Record<string, unknown>), "köklü v0 geçerli olmalı");
+  const h = atisHesapla(v);
+  dogrula(yakin(h.vx, 10, 1e-9) && yakin(h.vy, 10, 1e-9) && yakin(h.R, 20, 1e-9) && yakin(h.H, 5, 1e-9), "10√2 m/s, 45°: vx=vy=10, R=20, H=5");
+  const o = fizikHesapOzeti(v)!;
+  dogrula(o.includes("menzil = 20 m") && o.includes("H = 5 m"), "özet tam sayı: " + o);
+  const v3 = varsayilanCografya("atis", { tip: "egik", v0: "20√3", aci: 30, h0: 0, kokYaz: true });
+  const o3 = fizikHesapOzeti(v3)!;
+  dogrula(o3.includes("60√3") && o3.includes("2√3"), "20√3, 30°: R = 60√3, T = 2√3 → " + o3);
+  const c = varsayilanCografya("carpisma", { tip: "yapisan", m1: 1, m2: 3, v1: "4√2", v2: 0, sonra: "hesap" });
+  dogrula(yakin(carpismaSonra(c).v1, Math.SQRT2, 1e-9) && fizikHesapOzeti(c)!.includes("√2"), "yapışan: ortak hız √2");
+  // Aralık dışı ve bozuk köklü giriş reddedilir
+  for (const kotu of ["400√2", "abc", "√", "10√2 ".repeat(8)]) dogrula(!cografyaGecerliMi(varsayilanCografya("atis", { v0: kotu }) as unknown as Record<string, unknown>), "reddedilmeli: " + kotu);
+  // Köklü alan olmayan yerde string reddedilir
+  dogrula(!cografyaGecerliMi(varsayilanCografya("atis", { aci: "45√1" }) as unknown as Record<string, unknown>), "aci köklü değil");
+  // Çizim: köklü ayarla çökmeden ve boş olmadan çizer
+  const n = olc(v3); dogrula(n.n > 200 && n.tasma === 0, "köklü atış çizimi boş/taşmış");
+  // Köklü şablonlar kütüphanede, geçerli
+  for (const id of ["f-atis-egik-kok", "f-atis-egik-kok3", "f-carpisma-kok", "f-carpisma-yapisan-kok"]) {
+    const sb = FIZIK_SABLONLARI.find((x) => x.id === id);
+    dogrula(sb && sekilGecerliMi({ id: "t", tur: "fizik", nesne: "fizikSekil", kalinlik: 2, x: 0, y: 0, w: 400, h: 240, geo: sb.olustur() } as Sekil), id + ": şablon yok/geçersiz");
+  }
+});
+
+senaryo("köklü geometri şablonları: kenar etiketleri √ ile, ölçüler tutarlı (30-60-90, 45-45-90, eşkenar yükseklik, küp)", () => {
+  const u = (id: string) => UCGEN_SABLONLARI.find((x) => x.id === id)!.olustur() as Extract<ReturnType<typeof UCGEN_SABLONLARI[0]["olustur"]>, { tur: "ucgen" }>;
+  const a = u("g-dik-30-60-90");
+  dogrula(yakin(a.olcu[1], 4 * Math.sqrt(3), 1e-9) && a.kenarlar[2] === "4√3" && a.kenarlar[0] === "8", "30-60-90");
+  const b = u("g-dik-45-45-90");
+  dogrula(b.kenarlar[0] === "5√2" && yakin(Math.hypot(b.olcu[0], b.olcu[1]), 5 * Math.SQRT2, 1e-9), "45-45-90");
+  const e = u("g-eskenar-yukseklik-kok");
+  dogrula(e.yukseklikEtiket === "3√3" && yakin(e.olcu[0] * Math.sqrt(3) / 2, 3 * Math.sqrt(3), 1e-9), "eşkenar yükseklik");
+  const k = KATI_SABLONLARI.find((x) => x.id === "k-kup-kok")!.olustur() as { olcu: number[]; etiketler: string[] };
+  dogrula(k.etiketler[0] === "2√3" && yakin(k.olcu[0], 2 * Math.sqrt(3), 1e-9), "küp a = 2√3");
+  for (const [id, g] of [["30-60-90", a], ["45-45-90", b], ["eşkenar", e]] as const) dogrula(sekilGecerliMi({ id: "t", tur: "fizik", nesne: "ucgenABC", kalinlik: 2, x: 0, y: 0, w: 300, h: 200, geo: g } as Sekil), id + " geçersiz");
 });
 
 senaryo("bağlayıcı uçları çizimin gerçek kenarında: 28 şablonda 4 port da mürekkebe ≤7 px yakın, kutu dışına taşmaz", () => {
