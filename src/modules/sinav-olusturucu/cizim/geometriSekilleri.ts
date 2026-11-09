@@ -28,7 +28,7 @@ type BenzerVerisi = Extract<GeometriVerisi, { tur: "benzer" }>;
 type CokgenVerisi = Extract<GeometriVerisi, { tur: "cokgen" }>;
 type Kutu = { x: number; y: number; w: number; h: number };
 
-export const GEOMETRI_NESNELERI = ["ucgenABC", "dikUcgen", "benzerUcgen", "cemberGeo", "cokgenAd", "dogrudaAcilar", "dortgenGeo", "katiCisim", "kagitKatlama", "cografyaSekil"] as const;
+export const GEOMETRI_NESNELERI = ["ucgenABC", "dikUcgen", "benzerUcgen", "cemberGeo", "cokgenAd", "dogrudaAcilar", "dortgenGeo", "katiCisim", "kagitKatlama", "cografyaSekil", "fizikSekil"] as const;
 export const geometriMi = (nesne: string) => (GEOMETRI_NESNELERI as readonly string[]).includes(nesne);
 /** `ek` ayarlarıyla çizilen basit işaretler. */
 export const GEOMETRI_ISARETLERI = ["aciYayi", "dikAci", "esIsaret"] as const;
@@ -840,9 +840,46 @@ export const COGRAFYA_SABLONLARI: GeometriSablonu[] = [
   cg("c-aydinlanma-ekinoks", "Aydınlanma çemberi: 21 Mart / 23 Eylül", "Her yerde gece ile gündüz eşit", "aydinlanma", { tarih: "ekinoks" }, ["aydınlanma çemberi", "ekinoks", "21 mart", "23 eylül", "gece gündüz eşit"]),
 ];
 
+const FIZIK_ALT: Record<string, string> = { atis: "Fizik – Atış", enerji: "Fizik – Enerji", carpisma: "Fizik – Momentum", tork: "Fizik – Tork", vektorToplam: "Fizik – Vektör", scd: "Fizik – Kuvvet" };
+const fz = (id: string, ad: string, ipucu: string, yapi: Parameters<typeof varsayilanCografya>[0], ek: Parameters<typeof varsayilanCografya>[1], anahtar: string[]): GeometriSablonu => ({
+  id, ad, ipucu, nesne: "fizikSekil", altBaslik: FIZIK_ALT[yapi], aramaKelimeleri: ["fizik", ...anahtar], olustur: () => varsayilanCografya(yapi, ek),
+});
+export const FIZIK_SABLONLARI: GeometriSablonu[] = [
+  fz("f-atis-yatay", "Yatay atış (yüksekten)", "Yüksek yerden yatay atılan cisim: h, x ve hız bileşenleri", "atis", { tip: "yatay", v0: 20, aci: 0, h0: 80, tepe: false, bilesen: true }, ["atış", "yatay atış", "yörünge", "parabol", "menzil", "kinematik"]),
+  fz("f-atis-egik", "Eğik atış (53°)", "v₀, açı, tepe noktası H ve menzil R", "atis", { tip: "egik", v0: 50, aci: 53, h0: 0 }, ["eğik atış", "atış", "yörünge", "parabol", "tepe", "menzil", "kinematik"]),
+  fz("f-atis-egik-sonuc", "Eğik atış (değerli: H, R)", "Verilenler ve H, R değerleri yazılı", "atis", { tip: "egik", v0: 50, aci: 53, h0: 0, sonuc: true }, ["eğik atış", "atış", "H", "R", "menzil"]),
+  fz("f-atis-yuksek-yukari", "Yüksekten eğik atış (yukarı)", "Yüksek yerden yukarı eğik atış", "atis", { tip: "yuksekEgik", v0: 40, aci: 30, h0: 45 }, ["yüksekten atış", "eğik atış", "kinematik"]),
+  fz("f-atis-yuksek-asagi", "Yüksekten eğik atış (aşağı)", "Yüksek yerden aşağı eğik atış", "atis", { tip: "yuksekEgik", v0: 20, aci: -37, h0: 60, tepe: false }, ["yüksekten atış", "aşağı atış", "kinematik"]),
+  fz("f-atis-noktalar", "Yatay atış (eş zamanlı noktalar)", "Eşit zaman aralıklarıyla konumlar", "atis", { tip: "yatay", v0: 20, aci: 0, h0: 80, noktalar: true, bilesen: false, tepe: false }, ["stroboskop", "eş zaman", "atış"]),
+  fz("f-enerji-sarkac", "Sarkaç (A–B–C)", "A'dan bırakılan sarkaç, yükseklik h", "enerji", { tur: "sarkac", aci: 60 }, ["sarkaç", "enerji", "mekanik enerji", "potansiyel", "kinetik", "korunum"]),
+  fz("f-enerji-pist", "Pist (A–E, sürtünmesiz)", "A'dan bırakılan cisim, yükseklikler 4h, h, 3h, 0, 2h", "enerji", { tur: "pist" }, ["pist", "enerji", "mekanik enerji", "sürtünmesiz", "yükseklik", "korunum"]),
+  fz("f-enerji-pist-surt", "Pist (B–C sürtünmeli)", "Bir bölgesi sürtünmeli pist", "enerji", { tur: "pist", surt: "BC" }, ["pist", "sürtünme", "enerji", "iş", "ısı"]),
+  fz("f-enerji-yay", "Yay + kütle (eğik çıkış)", "Sıkıştırılmış yay, düz zemin, h yüksekliğine çıkış", "enerji", { tur: "yay" }, ["yay", "enerji", "esneklik", "potansiyel enerji", "hooke"]),
+  fz("f-enerji-yay-surt", "Yay + kütle (sürtünmeli zemin)", "Sürtünmeli zeminde yaydan fırlatma", "enerji", { tur: "yay", surt: "AB", egikCikis: false }, ["yay", "sürtünme", "enerji", "iş"]),
+  fz("f-carpisma-esnek", "Esnek çarpışma", "İki cisim çarpışır ve ayrılır; sonra değerleri sorulur", "carpisma", { tip: "esnek", m1: 2, m2: 2, v1: 6, v2: 0 }, ["çarpışma", "esnek", "momentum", "itme", "korunum"]),
+  fz("f-carpisma-yapisan", "Yapışarak çarpışma", "Çarpışıp birlikte hareket eder", "carpisma", { tip: "yapisan", m1: 2, m2: 3, v1: 6, v2: 0 }, ["çarpışma", "yapışma", "tam esnek olmayan", "momentum"]),
+  fz("f-carpisma-zit", "Zıt yönlü çarpışma", "Birbirine doğru gelen iki cisim", "carpisma", { tip: "yapisan", m1: 2, m2: 4, v1: 6, v2: -3 }, ["çarpışma", "zıt yön", "momentum", "tek boyut"]),
+  fz("f-carpisma-ayrilma", "Ayrılma (patlama)", "Duran sistem iki parçaya ayrılır", "carpisma", { tip: "ayrilma", m1: 2, m2: 4, v1: -6, v2: 0, sonra: "hesap" }, ["patlama", "ayrılma", "momentum", "geri tepme"]),
+  fz("f-tork-denge", "Dengede çubuk (kuvvetler)", "Mesnetten eşit torklar", "tork", { mod: "kuvvet", mesnet: 5, konum: [2, 8, 0, 0], deger: [3, 3, 0, 0], adlar: "F_1, F_2, F_3, F_4" }, ["tork", "denge", "kaldıraç", "moment", "çubuk"]),
+  fz("f-tork-uc-kuvvet", "Çubuk: yukarı ve aşağı kuvvetler", "Üç kuvvet, mesnet ortada", "tork", { mod: "kuvvet", mesnet: 5, konum: [1, 3, 8, 0], deger: [3, -3, 4, 0], adlar: "F_1, F_2, F_3, F_4" }, ["tork", "kuvvet", "çubuk", "kaldıraç"]),
+  fz("f-tork-agirlik", "Asılı kütleli çubuk (denge)", "Çubuğa asılı kütleler", "tork", { mod: "agirlik", mesnet: 5, konum: [1, 3, 8, 0], deger: [3, 3, 6, 0], adlar: "3m, 3m, 6m, m" }, ["tork", "asılı kütle", "denge", "terazi", "kaldıraç"]),
+  fz("f-tork-ip", "İple asılı çubuk (kütleli)", "Ortasından iple asılı, çubuğun ağırlığı G", "tork", { mod: "agirlik", destek: "ip", mesnet: 4, konum: [1, 8, 0, 0], deger: [4, 3, 0, 0], agirlikOk: false, adlar: "2m, m, m, m" }, ["tork", "ip", "çubuk", "denge", "ağırlık merkezi"]),
+  fz("f-vektor-ucuca", "Vektör toplama (uç uca)", "A + B bileşkesi kareli düzlemde", "vektorToplam", { yontem: "ucuca" }, ["vektör", "toplama", "bileşke", "uç uca", "kareli"]),
+  fz("f-vektor-paralel", "Vektör toplama (paralelkenar)", "Aynı noktadan çıkan A ve B", "vektorToplam", { yontem: "paralel", ax: 4, ay: 1, bx: 1, by: 3 }, ["vektör", "paralelkenar", "bileşke", "kareli"]),
+  fz("f-vektor-cikarma", "Vektör çıkarma (A − B)", "İki vektörün farkı", "vektorToplam", { yontem: "cikarma", ax: 5, ay: 2, bx: 2, by: 3 }, ["vektör", "çıkarma", "fark", "kareli"]),
+  fz("f-vektor-bilesen", "Bileşke ve bileşenleri", "Bileşkenin x ve y bileşenleri", "vektorToplam", { yontem: "ucuca", ax: 3, ay: 2, bx: 1, by: 2, bilesen: true, uzunluk: true }, ["vektör", "bileşen", "bileşke", "x y"]),
+  fz("f-vektor-soru", "Bileşkeyi bul (soru)", "Bileşke gizli: öğrenci çizer", "vektorToplam", { yontem: "ucuca", bileske: false }, ["vektör", "bileşke", "soru", "kareli"]),
+  fz("f-scd-yatay", "Yatay zeminde cisim (mg, N)", "Serbest cisim diyagramı", "scd", {}, ["serbest cisim", "kuvvet", "ağırlık", "normal", "newton"]),
+  fz("f-scd-yatay-f", "Yatay zeminde F ve sürtünme", "F çeken kuvvet, f sürtünme", "scd", { dis: true, surtunme: true, disAci: 0 }, ["serbest cisim", "sürtünme", "kuvvet", "newton"]),
+  fz("f-scd-yatay-egik-f", "Eğik F kuvveti", "Yüzeyle açı yapan F", "scd", { dis: true, surtunme: true, disAci: 30 }, ["serbest cisim", "eğik kuvvet", "newton"]),
+  fz("f-scd-egik", "Eğik düzlemde cisim", "mg, N ve sürtünme", "scd", { yuzey: "egik", surtunme: true }, ["serbest cisim", "eğik düzlem", "kuvvet", "sürtünme"]),
+  fz("f-scd-egik-bilesen", "Eğik düzlem: ağırlık bileşenleri", "mg sinα ve mg cosα kesikli", "scd", { yuzey: "egik", bilesen: true }, ["serbest cisim", "bileşen", "eğik düzlem"]),
+  fz("f-scd-ip", "İple asılı cisim (mg, T)", "Tavandan ipte asılı", "scd", { yuzey: "askida", normal: false, gerilme: true }, ["serbest cisim", "gerilme", "ip", "denge"]),
+];
+
 export const GEOMETRI_KUTUPHANESI: GeometriSablonu[] = [
   ...UCGEN_SABLONLARI, ...CEMBER_SABLONLARI, ...BENZER_SABLONLARI, ...COKGEN_SABLONLARI,
-  ...DOGRU_ACI_SABLONLARI, ...DORTGEN_SABLONLARI, ...KATI_SABLONLARI, ...KATLAMA_SABLONLARI, ...COGRAFYA_SABLONLARI,
+  ...DOGRU_ACI_SABLONLARI, ...DORTGEN_SABLONLARI, ...KATI_SABLONLARI, ...KATLAMA_SABLONLARI, ...COGRAFYA_SABLONLARI, ...FIZIK_SABLONLARI,
 ];
 
 export function varsayilanGeometri(nesne: string): GeometriVerisi {
@@ -855,6 +892,7 @@ export function varsayilanGeometri(nesne: string): GeometriVerisi {
   if (nesne === "katiCisim") return varsayilanKati();
   if (nesne === "kagitKatlama") return varsayilanKatlama();
   if (nesne === "cografyaSekil") return varsayilanCografya("harita");
+  if (nesne === "fizikSekil") return varsayilanCografya("atis");
   return varsayilanUcgen();
 }
 
@@ -862,7 +900,7 @@ export function varsayilanGeometri(nesne: string): GeometriVerisi {
 export function geometriNesneyeUygun(nesne: string, v: GeometriVerisi): boolean {
   const bek: Record<string, GeometriVerisi["tur"][]> = {
     ucgenABC: ["ucgen"], dikUcgen: ["ucgen"], benzerUcgen: ["benzer"], cemberGeo: ["cember"], cokgenAd: ["cokgen"],
-    dogrudaAcilar: ["dogruAci"], dortgenGeo: ["dortgen"], katiCisim: ["kati"], kagitKatlama: ["katlama"], cografyaSekil: ["cografya"],
+    dogrudaAcilar: ["dogruAci"], dortgenGeo: ["dortgen"], katiCisim: ["kati"], kagitKatlama: ["katlama"], cografyaSekil: ["cografya"], fizikSekil: ["cografya"],
   };
   return !bek[nesne] || bek[nesne].includes(v.tur);
 }

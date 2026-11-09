@@ -76,7 +76,7 @@ export type FizikNesnesi =
   // Geometri (bkz. `geometriSekilleri.ts`): köşe adlı üçgen, çember, benzer üçgenler, çokgen, açı yayı, dik açı, eş kenar işareti.
   | "ucgenABC" | "dikUcgen" | "benzerUcgen" | "cemberGeo" | "cokgenAd" | "aciYayi" | "dikAci" | "esIsaret"
   // v1.2 geometri (bkz. `geometriEk.ts`): doğruda açılar, özel dörtgenler, 3B katı cisimler, kağıt katlama.
-  | "dogrudaAcilar" | "dortgenGeo" | "katiCisim" | "kagitKatlama" | "cografyaSekil"
+  | "dogrudaAcilar" | "dortgenGeo" | "katiCisim" | "kagitKatlama" | "cografyaSekil" | "fizikSekil"
   // Fizik ek şekilleri (bkz. `fizikEk.ts`): ışın ok, halka akım, solenoid, düz tel alanı, ⊗/⊙ alanı, girişim, enerji düzeyi, devre düğümü.
   | "isinOk" | "halkaAkim" | "solenoid" | "telAlan" | "alanNokta" | "dalgaGirisim" | "enerjiDuzeyi" | "dugum"
   // v1.2 hesaplı hazır sahneler (bkz. `fizikSahneler.ts`, `optik.ts`, `sivi.ts`): eğik düzlemde kuvvetler, asal eksenli optik düzenek, sıvı kapları.

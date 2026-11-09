@@ -316,7 +316,7 @@ export function kutuphaneGirdileri(kullaniciSablonlari: KullaniciSablonu[] = [])
     kapsananGeo.add(n);
     const t = FIZIK_TANIMLARI[n];
     liste.push({
-      id: `geo:${sb.id}`, ad: sb.ad, kategori: "geometri", altBaslik: sb.altBaslik ?? geoAltBasliklari[ornek.tur] ?? "Geometri", ipucu: sb.ipucu,
+      id: `geo:${sb.id}`, ad: sb.ad, kategori: n === "fizikSekil" ? "fizik" : "geometri", altBaslik: sb.altBaslik ?? geoAltBasliklari[ornek.tur] ?? "Geometri", ipucu: sb.ipucu,
       aramaKelimeleri: [...kayitKelimeleri(sb), ...(EK_KELIMELER[sb.id] ?? [])],
       onizleme: { tur: "sekiller", sekiller: () => [fizikOnizlemeSekli(n, { geo: sb.olustur() }, t.w, t.h)] },
       ekle: () => ({ tur: "fizik", nesne: n, ek: { geo: sb.olustur() } }),
@@ -363,7 +363,7 @@ export function kutuphaneGirdileri(kullaniciSablonlari: KullaniciSablonu[] = [])
   for (const grup of FIZIK_GRUPLARI) {
     for (const n of nesneler) {
       const t = FIZIK_TANIMLARI[n];
-      if (t.grup !== grup.id || sahneMi(n) || SABLONLU_NESNELER.includes(n)) continue;
+      if (t.grup !== grup.id || sahneMi(n) || SABLONLU_NESNELER.includes(n) || n === "fizikSekil") continue;
       if (["geometri", "kimya", "matematik", "grafik"].includes(t.grup)) continue;
       liste.push({
         id: `nesne:${n}`, ad: t.ad, kategori: "fizik", altBaslik: grup.ad, ipucu: t.ipucu,

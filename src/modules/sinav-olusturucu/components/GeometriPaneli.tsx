@@ -18,7 +18,7 @@ import {
   KATI_SABLONLARI,
   KATI_TURLERI,
   KATLAMA_SABLONLARI,
-  COGRAFYA_SABLONLARI,
+  COGRAFYA_SABLONLARI, FIZIK_SABLONLARI,
   UCGEN_SABLONLARI,
   geometriNesneyeUygun,
   geometriSablonOnizlemeCiz,
@@ -43,7 +43,7 @@ import {
 } from "../cizim/fizikEk";
 import type { FizikEk, GeoAciIsareti, GeometriVerisi, KatlamaAdimi, KatlamaKagidi, Sekil } from "../cizim/tipler";
 import { MetinGirdisi, OndalikGirdisi } from "./GrafikPaneli";
-import { COGRAFYA_BOYUTLARI, SEMA, type Alan, type CografyaVerisi } from "../cizim/cografya";
+import { COGRAFYA_BOYUTLARI, SEMA, fizikHesapOzeti, type Alan, type CografyaVerisi } from "../cizim/cografya";
 import { EnerjiTablolari } from "./EnerjiDuzeyTablosu";
 import { TogglePill } from "./ModalParcalari";
 
@@ -54,7 +54,7 @@ const SATIR = "mt-2 flex flex-wrap items-center gap-1.5";
 
 export const GEO_PANELLI_NESNELER = [
   "ucgenABC", "dikUcgen", "benzerUcgen", "cemberGeo", "cokgenAd",
-  "dogrudaAcilar", "dortgenGeo", "katiCisim", "kagitKatlama", "cografyaSekil",
+  "dogrudaAcilar", "dortgenGeo", "katiCisim", "kagitKatlama", "cografyaSekil", "fizikSekil",
   "aciYayi", "dikAci", "esIsaret",
   "isinOk", "halkaAkim", "solenoid", "telAlan", "alanNokta", "dalgaGirisim", "enerjiDuzeyi",
 ];
@@ -498,12 +498,12 @@ function SayilarGirdisi({ alan, deger, onDegis, onOdak }: { alan: Extract<Alan, 
 
 function CografyaPaneli({ geo, yaz, tarihce }: { geo: CografyaVerisi; yaz: (g: import("../cizim/tipler").GeometriVerisi) => void; tarihce: () => void }) {
   const sema = SEMA[geo.yapi];
-  const grup = COGRAFYA_SABLONLARI.filter((sb) => sb.altBaslik === sema.alt);
+  const grup = [...COGRAFYA_SABLONLARI, ...FIZIK_SABLONLARI].filter((sb) => sb.altBaslik === sema.alt);
   const ayarla = (a: string, d: CografyaVerisi["ayar"][string]) => yaz({ ...geo, ayar: { ...geo.ayar, [a]: d } });
   const deger = (al: Alan) => (geo.ayar[al.a] !== undefined ? geo.ayar[al.a] : al.v);
   return (
     <div className="flex flex-col gap-1.5" data-testid="geo-cografya">
-      <SablonSirasi ad={sema.alt.replace("Coğrafya – ", "Hazır: ")} sablonlar={grup} onSec={(i) => { tarihce(); yaz(grup[i].olustur()); }} />
+      <SablonSirasi ad={sema.alt.replace("Coğrafya – ", "Hazır: ").replace("Fizik – ", "Hazır: ")} sablonlar={grup} onSec={(i) => { tarihce(); yaz(grup[i].olustur()); }} />
       <div className="flex flex-wrap items-center gap-2">
         {sema.alanlar.filter((al) => al.k === "sec" || al.k === "mantik" || al.k === "sayi").map((al) => {
           if (al.k === "sec") return <Secenekler key={al.a} baslik={al.ad} deger={String(deger(al))} secenekler={al.sec} onSec={(v) => { tarihce(); ayarla(al.a, v); }} />;
@@ -512,6 +512,7 @@ function CografyaPaneli({ geo, yaz, tarihce }: { geo: CografyaVerisi; yaz: (g: i
           return null;
         })}
       </div>
+      {fizikHesapOzeti(geo) && <div className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-600" data-testid="fizik-hesap">{fizikHesapOzeti(geo)}</div>}
       <div className="flex flex-col gap-1.5">
         {sema.alanlar.map((al) => {
           if (al.k === "metin") return (
@@ -754,7 +755,7 @@ export function GeoEkPaneli({ sekil, guncelle, tarihceyeKaydet }: {
   const ekYaz = (yama: Partial<FizikEk>) => guncelle({ ek: { ...ek, ...yama } });
   let icerik: React.ReactNode = null;
 
-  if (["ucgenABC", "dikUcgen", "benzerUcgen", "cemberGeo", "cokgenAd", "dogrudaAcilar", "dortgenGeo", "katiCisim", "kagitKatlama", "cografyaSekil"].includes(nesne)) {
+  if (["ucgenABC", "dikUcgen", "benzerUcgen", "cemberGeo", "cokgenAd", "dogrudaAcilar", "dortgenGeo", "katiCisim", "kagitKatlama", "cografyaSekil", "fizikSekil"].includes(nesne)) {
     const geo = sekil.geo && geometriVerisiGecerliMi(sekil.geo) && geometriNesneyeUygun(nesne, sekil.geo) ? sekil.geo : varsayilanGeometri(nesne);
     const yaz = (g: GeometriVerisi) => {
       if (g.tur === "cografya") {

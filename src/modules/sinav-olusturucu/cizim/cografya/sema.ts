@@ -4,8 +4,10 @@
 
 export type CografyaYapi =
   | "harita" | "izohips" | "horstGraben" | "antiklinal" | "senklinal"
-  | "walter" | "piramit" | "mevsim" | "aydinlanma";
+  | "walter" | "piramit" | "mevsim" | "aydinlanma"
+  | FizikYapi;
 
+import { FIZIK_SEMA, type FizikYapi } from "./fizikSema";
 export type AyarDegeri = number | boolean | string | number[];
 
 export type CografyaVerisi = { tur: "cografya"; yapi: CografyaYapi; ayar: Record<string, AyarDegeri> };
@@ -20,7 +22,7 @@ export type Alan =
 const AY = ["O", "Ş", "M", "N", "M", "H", "T", "A", "E", "E", "K", "A"];
 export const AY_KISA = AY;
 
-export const SEMA: Record<CografyaYapi, { ad: string; alt: string; alanlar: Alan[] }> = {
+const COGRAFYA_SEMA: Record<Exclude<CografyaYapi, FizikYapi>, { ad: string; alt: string; alanlar: Alan[] }> = {
   harita: {
     ad: "Türkiye haritası", alt: "Coğrafya – Harita",
     alanlar: [
@@ -122,7 +124,9 @@ export const SEMA: Record<CografyaYapi, { ad: string; alt: string; alanlar: Alan
   },
 };
 
-export const COGRAFYA_YAPILARI = Object.keys(SEMA) as CografyaYapi[];
+export const SEMA: Record<CografyaYapi, { ad: string; alt: string; alanlar: Alan[] }> = { ...COGRAFYA_SEMA, ...FIZIK_SEMA };
+export const COGRAFYA_YAPILARI = Object.keys(COGRAFYA_SEMA) as Exclude<CografyaYapi, FizikYapi>[];
+export const TUM_YAPILAR = Object.keys(SEMA) as CografyaYapi[];
 
 export function varsayilanCografya(yapi: CografyaYapi, ek: Record<string, AyarDegeri> = {}): CografyaVerisi {
   const ayar: Record<string, AyarDegeri> = {};

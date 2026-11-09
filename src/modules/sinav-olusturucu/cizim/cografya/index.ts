@@ -4,9 +4,13 @@ import { piramitCiz, walterCiz } from "./grafik";
 import { haritaCiz } from "./harita";
 import { izohipsCiz } from "./izohips";
 import { horstGrabenCiz, kivrimCiz } from "./jeoloji";
+import { fizikSekilCiz } from "./fizikCiz";
+import { FIZIK_BOYUTLARI } from "./fizikSema";
 import type { CografyaVerisi } from "./sema";
 
 export * from "./sema";
+export * from "./fizikSema";
+export { fizikHesapOzeti, fizikSekilCiz, atisHesapla, carpismaSonra, torkDengesi, pistNoktalari } from "./fizikCiz";
 export type Kutu = { x: number; y: number; w: number; h: number };
 
 export function cografyaCiz(ctx: CanvasRenderingContext2D, v: CografyaVerisi, k: Kutu) {
@@ -19,11 +23,13 @@ export function cografyaCiz(ctx: CanvasRenderingContext2D, v: CografyaVerisi, k:
     case "piramit": return piramitCiz(ctx, v, k);
     case "mevsim": return mevsimCiz(ctx, v, k);
     case "aydinlanma": return aydinlanmaCiz(ctx, v, k);
+    default: return fizikSekilCiz(ctx, v, k);
   }
 }
 
 /** Her yapının önerilen kutu boyutu (px). */
 export const COGRAFYA_BOYUTLARI: Record<CografyaVerisi["yapi"], { w: number; h: number }> = {
+  ...FIZIK_BOYUTLARI,
   harita: { w: 520, h: 250 }, izohips: { w: 300, h: 260 }, horstGraben: { w: 300, h: 230 }, antiklinal: { w: 300, h: 230 }, senklinal: { w: 300, h: 230 },
   walter: { w: 340, h: 230 }, piramit: { w: 320, h: 260 }, mevsim: { w: 460, h: 260 }, aydinlanma: { w: 420, h: 260 },
 };

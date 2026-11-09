@@ -166,6 +166,15 @@ export function FizikSecimPaneli({
       </div>
     );
   }
+  // Fizik şekilleri (atış, enerji, çarpışma, tork…) tüm yazılarını kendisi çizer: etiket kutusu gösterilmez.
+  if (sekil.nesne === "fizikSekil") {
+    return (
+      <div className="mt-2 rounded-xl border border-brand-200 bg-brand-50/50 p-2" data-testid="fizik-secim-paneli">
+        <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Fizik şekli</span>
+        <GeoEkPaneli sekil={sekil} guncelle={guncelle} tarihceyeKaydet={tarihceyeKaydet} />
+      </div>
+    );
+  }
   return (
     <div className="mt-2 rounded-xl border border-brand-200 bg-brand-50/50 p-2" data-testid="fizik-secim-paneli">
       <div className="flex flex-wrap items-center gap-2">
