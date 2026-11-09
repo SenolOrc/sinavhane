@@ -8,7 +8,7 @@ export type FizikEkYapi =
   | "elektrikAlan" | "coulomb" | "levhaYuk" | "manyetikParcacik" | "iletkenCubuk" | "transformator"
   | "cembersel" | "yorunge" | "basitHarmonik" | "donme"
   | "yolYer" | "bagilHareket" | "serbestDusme" | "stroboskop" | "hareketGrafigi"
-  | "fotoelektrik" | "fotoGrafik" | "bozunma" | "basitMakine";
+  | "fotoelektrik" | "fotoGrafik" | "bozunma" | "basitMakine" | "vektorSerbest";
 
 type Sema = { ad: string; alt: string; alanlar: Alan[] };
 
@@ -418,6 +418,29 @@ export const FIZIK_EK_SEMA: Record<FizikEkYapi, Sema> = {
       { k: "mantik", a: "sonuc", ad: "Gereken kuvveti yaz (F = …)", v: false },
     ],
   },
+  // ── Serbest vektör çizimi: istediğiniz kadar vektör, istediğiniz değerler
+  vektorSerbest: {
+    ad: "Serbest vektör çizimi (1–6 vektör)", alt: "Fizik – Vektör",
+    alanlar: [
+      { k: "sayi", a: "n", ad: "Vektör sayısı", min: 1, max: 6, adim: 1, v: 3 },
+      { k: "sec", a: "yerlesim", ad: "Yerleşim", sec: [["ucuca", "Uç uca (zincir)"], ["ayni", "Aynı noktadan"]], v: "ucuca" },
+      { k: "sec", a: "mod", ad: "Değer girişi", sec: [["xy", "Bileşenlerle (x, y)"], ["boyAci", "Büyüklük ve açıyla"]], v: "xy" },
+      { k: "sayilar", a: "xs", ad: "x bileşenleri (A…F sırayla)", n: 6, min: -30, max: 30, v: [3, 1, -2, 0, 0, 0] },
+      { k: "sayilar", a: "ys", ad: "y bileşenleri (A…F sırayla)", n: 6, min: -30, max: 30, v: [1, 3, 2, 0, 0, 0] },
+      { k: "sayilar", a: "boy", ad: "Büyüklükler (A…F), açıyla girişte", n: 6, min: 0, max: 60, v: [5, 4, 3, 2, 2, 2] },
+      { k: "sayilar", a: "aci", ad: "Açılar ° (+x ekseninden, A…F)", n: 6, min: -360, max: 360, v: [30, 90, 150, 0, 0, 0] },
+      { k: "metin", a: "adlar", ad: "Vektör adları (virgülle, sırayla)", en: 40, v: "A, B, C, D, E, F" },
+      { k: "metin", a: "adR", ad: "Bileşkenin adı", en: 8, v: "R" },
+      { k: "metin", a: "birim", ad: "Birim (boş bırakılabilir)", en: 6, v: "" },
+      { k: "mantik", a: "bileske", ad: "Bileşkeyi (toplamı) göster", v: true },
+      { k: "mantik", a: "bilesen", ad: "Bileşkenin x–y bileşenleri", v: false },
+      { k: "mantik", a: "deger", ad: "Büyüklükleri yaz (A = 5 N)", v: false },
+      { k: "mantik", a: "aciYay", ad: "Bileşkenin açısını göster", v: false },
+      { k: "mantik", a: "izgara", ad: "Kare çizgileri", v: true },
+      { k: "mantik", a: "eksen", ad: "x–y eksenleri", v: false },
+      { k: "mantik", a: "kokYaz", ad: "Köklü büyüklüğü √ ile yaz", v: false },
+    ],
+  },
 };
 
 export const FIZIK_EK_BOYUT: Record<FizikEkYapi, { w: number; h: number }> = {
@@ -426,5 +449,5 @@ export const FIZIK_EK_BOYUT: Record<FizikEkYapi, { w: number; h: number }> = {
   elektrikAlan: { w: 420, h: 250 }, coulomb: { w: 440, h: 230 }, levhaYuk: { w: 420, h: 240 }, manyetikParcacik: { w: 400, h: 260 }, iletkenCubuk: { w: 440, h: 240 }, transformator: { w: 440, h: 240 },
   cembersel: { w: 380, h: 260 }, yorunge: { w: 420, h: 260 }, basitHarmonik: { w: 440, h: 250 }, donme: { w: 440, h: 260 },
   yolYer: { w: 440, h: 260 }, bagilHareket: { w: 440, h: 250 }, serbestDusme: { w: 400, h: 290 }, stroboskop: { w: 460, h: 190 }, hareketGrafigi: { w: 440, h: 260 },
-  fotoelektrik: { w: 440, h: 250 }, fotoGrafik: { w: 400, h: 260 }, bozunma: { w: 450, h: 250 }, basitMakine: { w: 420, h: 260 },
+  fotoelektrik: { w: 440, h: 250 }, fotoGrafik: { w: 400, h: 260 }, bozunma: { w: 450, h: 250 }, basitMakine: { w: 420, h: 260 }, vektorSerbest: { w: 340, h: 280 },
 };

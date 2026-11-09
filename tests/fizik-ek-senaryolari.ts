@@ -6,6 +6,7 @@ import { torricelliHesapla, hidrolikF2, manometreBasinc } from "../src/modules/s
 import { bhmHesap, cemberselHesap, donmeHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizDinamik";
 import { coulombHesap, cubukHesap, trafoHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizElektrik";
 import { yolYerHesap, bagilHesap, dusmeHesap, stroboHesap, grafikHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizHareket";
+import { vektorlerHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizVektor";
 import { fotoHesap, bozunmaHesap, makineHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizModern";
 import { atmaYuksekligi, dalgaHesap, rezonansHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizDalga";
 
@@ -251,6 +252,18 @@ senaryo("Paket 6 şekilleri uç değerlerde çökmez ve boş değildir", () => {
     ["basitMakine", {}], ["basitMakine", { l1: 10, l2: 1 }], ["basitMakine", { tip: "makara", n: 1 }], ["basitMakine", { tip: "makara", n: 6, sonuc: true }], ["basitMakine", { tip: "egimli", L: 20, h: 19, sonuc: true }], ["basitMakine", { tip: "egimli", L: 1, h: 1, veri: false }],
   ];
   for (const [y, e] of liste) dogrula(mürekkep(ayar(y, e as never)) > 300, y + " boş/çöktü " + JSON.stringify(e));
+});
+// ── Serbest vektör çizimi
+senaryo("Serbest vektör: bileşenle ve büyüklük+açıyla giriş, bileşke", () => {
+  const h = vektorlerHesap(ayar("vektorSerbest", { n: 2, xs: [3, 1, 0, 0, 0, 0], ys: [4, -2, 0, 0, 0, 0] }));
+  dogrula(yakin(h.R.x, 4) && yakin(h.R.y, 2) && yakin(h.buy[0], 5), "x–y bileşenleri toplanır");
+  const g = vektorlerHesap(ayar("vektorSerbest", { mod: "boyAci", n: 3, boy: [10, 10, 10, 0, 0, 0], aci: [0, 120, 240, 0, 0, 0] }));
+  dogrula(yakin(g.buyR, 0, 1e-9), "120° aralıklı üç eşit kuvvetin bileşkesi 0");
+  const d = vektorlerHesap(ayar("vektorSerbest", { mod: "boyAci", n: 1, boy: [10, 0, 0, 0, 0, 0], aci: [90, 0, 0, 0, 0, 0] }));
+  dogrula(d.vek[0].x === 0 && yakin(d.vek[0].y, 10), "90° → x tam sıfır");
+  dogrula(fizikHesapOzeti(ayar("vektorSerbest", { n: 2, xs: [3, 0, 0, 0, 0, 0], ys: [0, 4, 0, 0, 0, 0], adR: "F" }))?.includes("= 5"), "özet bileşke büyüklüğü");
+  for (const e of [{ n: 1 }, { n: 6, xs: [30, -30, 30, -30, 30, -30], ys: [30, 30, -30, -30, 0, 0] }, { yerlesim: "ayni", n: 6 }, { n: 3, bileske: false, izgara: false }, { n: 4, xs: [1, -1, 0, 0, 0, 0], ys: [0, 0, 0, 0, 0, 0] }, { mod: "boyAci", n: 6, aciYay: true, eksen: true, deger: true, birim: "N" }])
+    dogrula(mürekkep(ayar("vektorSerbest", e as never)) > 100, "vektorSerbest boş/çöktü " + JSON.stringify(e));
 });
 // <<PAKET-EK-TEST>>
 

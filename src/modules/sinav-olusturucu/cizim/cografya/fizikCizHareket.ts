@@ -76,11 +76,11 @@ function yolYerCiz(ctx: Ctx, v: CografyaVerisi, k: Kutu) {
     const ox = k.x + (k.w - sx * c) / 2 - mnx * c, oy = k.y + (k.h - (deger ? 12 : 0) - sy * c) / 2 + mxy * c + (deger ? 0 : 0);
     const X = (x: number) => ox + x * c, Y = (y: number) => oy - y * c;
     if (izgara) {
-      ctx.save(); ctx.strokeStyle = "#c8c8c8"; ctx.lineWidth = 0.6;
+      const sk = ctx.strokeStyle; ctx.save(); ctx.strokeStyle = "#c8c8c8"; ctx.lineWidth = 0.6;
       const gx0 = Math.floor(mnx) - 1, gx1 = Math.ceil(mxx) + 1, gy0 = Math.floor(mny) - 1, gy1 = Math.ceil(mxy) + 1;
       for (let x = gx0; x <= gx1; x++) cizgi(ctx, X(x), Y(gy0), X(x), Y(gy1));
       for (let y = gy0; y <= gy1; y++) cizgi(ctx, X(gx0), Y(y), X(gx1), Y(y));
-      ctx.restore();
+      ctx.restore(); ctx.strokeStyle = sk;
     }
     for (let i = 1; i < pts.length; i++) { ctx.save(); ctx.lineWidth = Math.max(1.4, kal * 1.1); ok(ctx, X(pts[i - 1].x), Y(pts[i - 1].y), X(pts[i].x), Y(pts[i].y), 7); ctx.restore(); }
     const son = pts[pts.length - 1];

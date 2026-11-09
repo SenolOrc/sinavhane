@@ -855,7 +855,7 @@ const FIZIK_ALT: Record<string, string> = { atis: "Fizik – Atış", enerji: "F
   elektrikAlan: "Fizik – Elektrik", coulomb: "Fizik – Elektrik", levhaYuk: "Fizik – Elektrik", manyetikParcacik: "Fizik – Manyetizma", iletkenCubuk: "Fizik – Manyetizma", transformator: "Fizik – Manyetizma",
   cembersel: "Fizik – Çembersel hareket", yorunge: "Fizik – Çekim", basitHarmonik: "Fizik – Salınım", donme: "Fizik – Dönme",
   yolYer: "Fizik – Hareket", bagilHareket: "Fizik – Hareket", serbestDusme: "Fizik – Hareket", stroboskop: "Fizik – Hareket", hareketGrafigi: "Fizik – Hareket",
-  fotoelektrik: "Fizik – Modern fizik", fotoGrafik: "Fizik – Modern fizik", bozunma: "Fizik – Modern fizik", basitMakine: "Fizik – Basit makineler" };
+  fotoelektrik: "Fizik – Modern fizik", fotoGrafik: "Fizik – Modern fizik", bozunma: "Fizik – Modern fizik", basitMakine: "Fizik – Basit makineler", vektorSerbest: "Fizik – Vektör" };
 const fz = (id: string, ad: string, ipucu: string, yapi: Parameters<typeof varsayilanCografya>[0], ek: Parameters<typeof varsayilanCografya>[1], anahtar: string[]): GeometriSablonu => ({
   id, ad, ipucu, nesne: "fizikSekil", altBaslik: FIZIK_ALT[yapi], aramaKelimeleri: ["fizik", ...anahtar], olustur: () => varsayilanCografya(yapi, ek),
 });
@@ -995,6 +995,11 @@ export const FIZIK_SABLONLARI: GeometriSablonu[] = [
   fz("f-makine-makara", "Makara sistemi", "n ip: F = G/n", "basitMakine", { tip: "makara", sonuc: true }, ["makara", "palanga", "basit makine", "ip"]),
   fz("f-makine-sabit-makara", "Sabit makara", "F = G, yön değiştirir", "basitMakine", { tip: "makara", n: 1 }, ["sabit makara", "basit makine"]),
   fz("f-makine-egimli", "Eğik düzlem", "F = G·h/L", "basitMakine", { tip: "egimli", sonuc: true }, ["eğik düzlem", "basit makine", "iş kazancı"]),
+  fz("f-vserbest-uc", "Serbest vektörler (uç uca)", "3 vektör, büyüklükleri ve bileşke", "vektorSerbest", { deger: true }, ["vektör", "bileşke", "serbest", "uç uca"]),
+  fz("f-vserbest-bilesen", "İki vektörün bileşkesi ve bileşenleri", "R_x ve R_y gösterilir", "vektorSerbest", { n: 2, xs: [4, 2, 0, 0, 0, 0], ys: [1, 3, 0, 0, 0, 0], bilesen: true, aciYay: true }, ["vektör", "bileşen", "bileşke", "açı"]),
+  fz("f-vserbest-ayni", "Aynı noktadan çıkan vektörler", "Kuvvetler, +x'ten açıyla", "vektorSerbest", { yerlesim: "ayni", mod: "boyAci", n: 3, eksen: true, izgara: false, deger: true, birim: "N" }, ["vektör", "kuvvet", "açı", "bileşke", "eksen"]),
+  fz("f-vserbest-soru", "Vektörlerin bileşkesini bul (soru)", "Bileşke gizli", "vektorSerbest", { n: 4, xs: [2, -1, 3, -2, 0, 0], ys: [1, 2, -2, 1, 0, 0], bileske: false }, ["vektör", "bileşke", "soru", "serbest"]),
+  fz("f-vserbest-yatay", "Kuvvet bileşkesi (açıyla)", "F₁, F₂, F₃ ve R", "vektorSerbest", { yerlesim: "ayni", mod: "boyAci", n: 3, boy: [10, 10, 10, 2, 2, 2], aci: [0, 120, 240, 0, 0, 0], adlar: "F_1, F_2, F_3", adR: "R", aciYay: true, izgara: false, eksen: true }, ["vektör", "kuvvet", "bileşke", "açı", "120 derece"]),
   // <<PAKET-EK-SABLON>>
 ];
 
