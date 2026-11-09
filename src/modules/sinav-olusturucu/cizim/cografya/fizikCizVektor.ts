@@ -119,3 +119,30 @@ export function vektorSerbestOzet(v: CografyaVerisi): string {
     return `Bileşke ${adR}: ${adR}_x = ${es(h.R.x, 2)}, ${adR}_y = ${es(h.R.y, 2)} · |${adR}| = √(${adR}_x² + ${adR}_y²) = ${sayiYaz(h.buyR, 2)}${b} · +x ekseniyle ${es(h.aciR, 1)}°`;
   });
 }
+
+/** Öğrenci cevap alanı: 1–3 adet boş kareli alan (başlıklı). */
+export function kareliAlanCiz(ctx: Ctx, v: CografyaVerisi, k: Kutu) {
+  const n = Math.round(ayarSayi(v, "adet")), yan = ayarSec(v, "yon") === "yan", su = Math.round(ayarSayi(v, "sutun")), sa = Math.round(ayarSayi(v, "satir"));
+  const bas = bol(ayarMetin(v, "baslik")), kal = ctx.lineWidth, punto = Math.max(10, Math.min(13, k.w / 40)), gap = 14, bh = bas.some((b) => b) ? punto + 8 : 0;
+  const pw = yan ? (k.w - gap * (n - 1)) / n : k.w, ph = yan ? k.h : (k.h - gap * (n - 1)) / n;
+  const c = Math.max(4, Math.min((pw - 2) / su, (ph - bh - 2) / sa));
+  ctx.save(); ctx.lineJoin = "round";
+  for (let i = 0; i < n; i++) {
+    const px = yan ? k.x + i * (pw + gap) : k.x, py = yan ? k.y : k.y + i * (ph + gap);
+    const gx = px + (pw - su * c) / 2, gy = py + bh + 2;
+    if (bas[i]) fizikMetniCiz(ctx, bas[i], gx + (su * c) / 2, py + punto * 0.6, punto * 0.92);
+    if (ayarMantik(v, "cizgi")) {
+      ctx.save(); ctx.strokeStyle = "#c8c8c8"; ctx.lineWidth = 0.6;
+      for (let x = 1; x < su; x++) cizgi(ctx, gx + x * c, gy, gx + x * c, gy + sa * c);
+      for (let y = 1; y < sa; y++) cizgi(ctx, gx, gy + y * c, gx + su * c, gy + y * c);
+      ctx.restore();
+    }
+    ctx.save(); ctx.lineWidth = Math.max(1.2, kal); ctx.strokeRect(gx, gy, su * c, sa * c); ctx.restore();
+    if (ayarMantik(v, "eksen")) {
+      ctx.save(); ctx.lineWidth = Math.max(1, kal * 0.8);
+      const ox = gx + Math.round(su / 2) * c, oy = gy + Math.round(sa / 2) * c;
+      ok(ctx, gx, oy, gx + su * c, oy, 6); ok(ctx, ox, gy + sa * c, ox, gy, 6); ctx.restore();
+    }
+  }
+  ctx.restore();
+}

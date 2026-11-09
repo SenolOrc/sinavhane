@@ -8,7 +8,7 @@ export type FizikEkYapi =
   | "elektrikAlan" | "coulomb" | "levhaYuk" | "manyetikParcacik" | "iletkenCubuk" | "transformator"
   | "cembersel" | "yorunge" | "basitHarmonik" | "donme"
   | "yolYer" | "bagilHareket" | "serbestDusme" | "stroboskop" | "hareketGrafigi"
-  | "fotoelektrik" | "fotoGrafik" | "bozunma" | "basitMakine" | "vektorSerbest";
+  | "fotoelektrik" | "fotoGrafik" | "bozunma" | "basitMakine" | "vektorSerbest" | "kareliAlan";
 
 type Sema = { ad: string; alt: string; alanlar: Alan[] };
 
@@ -443,6 +443,19 @@ export const FIZIK_EK_SEMA: Record<FizikEkYapi, Sema> = {
       { k: "mantik", a: "kokYaz", ad: "Köklü büyüklüğü √ ile yaz", v: false },
     ],
   },
+  // ── Öğrenci cevap alanı: boş kareli alanlar
+  kareliAlan: {
+    ad: "Boş kareli alan (cevap/çizim alanı, 1–3 adet)", alt: "Fizik – Vektör",
+    alanlar: [
+      { k: "sayi", a: "adet", ad: "Alan sayısı", min: 1, max: 3, adim: 1, v: 3 },
+      { k: "sec", a: "yon", ad: "Dizilim", sec: [["yan", "Yan yana"], ["alt", "Alt alta"]], v: "yan" },
+      { k: "sayi", a: "sutun", ad: "Yatay kare sayısı", min: 3, max: 20, adim: 1, v: 8 },
+      { k: "sayi", a: "satir", ad: "Düşey kare sayısı", min: 3, max: 16, adim: 1, v: 6 },
+      { k: "metin", a: "baslik", ad: "Alan başlıkları (virgülle)", en: 90, v: "1. Yöntem: Uç uca, 2. Yöntem: Paralelkenar, 3. Yöntem: Bileşenler" },
+      { k: "mantik", a: "cizgi", ad: "Kare çizgileri", v: true },
+      { k: "mantik", a: "eksen", ad: "Her alanda x–y eksenleri", v: false },
+    ],
+  },
 };
 
 export const FIZIK_EK_BOYUT: Record<FizikEkYapi, { w: number; h: number }> = {
@@ -451,5 +464,5 @@ export const FIZIK_EK_BOYUT: Record<FizikEkYapi, { w: number; h: number }> = {
   elektrikAlan: { w: 420, h: 250 }, coulomb: { w: 440, h: 230 }, levhaYuk: { w: 420, h: 240 }, manyetikParcacik: { w: 400, h: 260 }, iletkenCubuk: { w: 440, h: 240 }, transformator: { w: 440, h: 240 },
   cembersel: { w: 380, h: 260 }, yorunge: { w: 420, h: 260 }, basitHarmonik: { w: 440, h: 250 }, donme: { w: 440, h: 260 },
   yolYer: { w: 440, h: 260 }, bagilHareket: { w: 440, h: 250 }, serbestDusme: { w: 400, h: 290 }, stroboskop: { w: 460, h: 190 }, hareketGrafigi: { w: 440, h: 260 },
-  fotoelektrik: { w: 440, h: 250 }, fotoGrafik: { w: 400, h: 260 }, bozunma: { w: 450, h: 250 }, basitMakine: { w: 420, h: 260 }, vektorSerbest: { w: 340, h: 280 },
+  fotoelektrik: { w: 440, h: 250 }, fotoGrafik: { w: 400, h: 260 }, bozunma: { w: 450, h: 250 }, basitMakine: { w: 420, h: 260 }, vektorSerbest: { w: 340, h: 280 }, kareliAlan: { w: 540, h: 190 },
 };

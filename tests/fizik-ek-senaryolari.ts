@@ -265,6 +265,11 @@ senaryo("Serbest vektör: bileşenle ve büyüklük+açıyla giriş, bileşke", 
   for (const e of [{ yerlesim: "serbest", n: 6, bx0: [0, 5, -5, 3, -3, 1], by0: [0, 5, -5, 3, -3, 1], bileske: true, bilesen: true }, { yerlesim: "serbest", n: 2, aciYay: true, deger: true }, { yerlesim: "paralel", n: 5 }, { yerlesim: "bilesenler", n: 3, mod: "boyAci" }, { n: 1 }, { n: 6, xs: [30, -30, 30, -30, 30, -30], ys: [30, 30, -30, -30, 0, 0] }, { yerlesim: "ayni", n: 6 }, { n: 3, bileske: false, izgara: false }, { n: 4, xs: [1, -1, 0, 0, 0, 0], ys: [0, 0, 0, 0, 0, 0] }, { mod: "boyAci", n: 6, aciYay: true, eksen: true, deger: true, birim: "N" }])
     dogrula(mürekkep(ayar("vektorSerbest", e as never)) > 100, "vektorSerbest boş/çöktü " + JSON.stringify(e));
 });
+senaryo("Boş kareli cevap alanı: 1–3 alan, yan yana/alt alta, çizgisiz ve eksenli", () => {
+  for (const e of [{}, { adet: 1 }, { adet: 2, yon: "alt" }, { adet: 3, yon: "alt", sutun: 20, satir: 16 }, { cizgi: false }, { eksen: true, sutun: 3, satir: 3 }, { baslik: "" }])
+    dogrula(mürekkep(ayar("kareliAlan", e as never)) > 300, "kareliAlan boş/çöktü " + JSON.stringify(e));
+  dogrula(cografyaGecerliMi(ayar("kareliAlan", { adet: 3 })), "geçerli");
+});
 // <<PAKET-EK-TEST>>
 
 console.log("Tüm fizik ek paket senaryoları geçti.");

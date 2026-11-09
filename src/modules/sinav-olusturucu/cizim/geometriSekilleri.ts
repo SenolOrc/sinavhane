@@ -855,7 +855,7 @@ const FIZIK_ALT: Record<string, string> = { atis: "Fizik – Atış", enerji: "F
   elektrikAlan: "Fizik – Elektrik", coulomb: "Fizik – Elektrik", levhaYuk: "Fizik – Elektrik", manyetikParcacik: "Fizik – Manyetizma", iletkenCubuk: "Fizik – Manyetizma", transformator: "Fizik – Manyetizma",
   cembersel: "Fizik – Çembersel hareket", yorunge: "Fizik – Çekim", basitHarmonik: "Fizik – Salınım", donme: "Fizik – Dönme",
   yolYer: "Fizik – Hareket", bagilHareket: "Fizik – Hareket", serbestDusme: "Fizik – Hareket", stroboskop: "Fizik – Hareket", hareketGrafigi: "Fizik – Hareket",
-  fotoelektrik: "Fizik – Modern fizik", fotoGrafik: "Fizik – Modern fizik", bozunma: "Fizik – Modern fizik", basitMakine: "Fizik – Basit makineler", vektorSerbest: "Fizik – Vektör" };
+  fotoelektrik: "Fizik – Modern fizik", fotoGrafik: "Fizik – Modern fizik", bozunma: "Fizik – Modern fizik", basitMakine: "Fizik – Basit makineler", vektorSerbest: "Fizik – Vektör", kareliAlan: "Fizik – Vektör" };
 const fz = (id: string, ad: string, ipucu: string, yapi: Parameters<typeof varsayilanCografya>[0], ek: Parameters<typeof varsayilanCografya>[1], anahtar: string[]): GeometriSablonu => ({
   id, ad, ipucu, nesne: "fizikSekil", altBaslik: FIZIK_ALT[yapi], aramaKelimeleri: ["fizik", ...anahtar], olustur: () => varsayilanCografya(yapi, ek),
 });
@@ -1005,6 +1005,9 @@ export const FIZIK_SABLONLARI: GeometriSablonu[] = [
   fz("f-vserbest-ayristir-iki", "İki vektörü bileşenlerine ayırma", "Farklı bölgelerde A ve B", "vektorSerbest", { n: 2, yerlesim: "bilesenler", bileske: false, xs: [4, -3, 0, 0, 0, 0], ys: [3, 2, 0, 0, 0, 0], deger: true }, ["vektör", "bileşen", "ayırma", "x y"]),
   fz("f-vserbest-ayri-4", "Kareli düzlemde ayrı ayrı vektörler (K, L, M, N)", "Her vektör kendi yerinde, soru için", "vektorSerbest", { n: 4, yerlesim: "serbest", bileske: false, adlar: "K, L, M, N", bx0: [0, 4, 1, 6, 0, 0], by0: [0, 0, 5, 4, 0, 0], xs: [3, 0, 4, -1, 0, 0], ys: [2, 3, -1, -3, 0, 0] }, ["vektör", "kareli", "ayrı", "K L M N", "soru"]),
   fz("f-vserbest-ayri-3", "Kareli düzlemde üç ayrı vektör (X, Y, Z)", "Bileşkesi sorulabilir", "vektorSerbest", { n: 3, yerlesim: "serbest", bileske: false, adlar: "X, Y, Z", bx0: [0, 5, 0, 0, 0, 0], by0: [1, 0, 4, 0, 0, 0], xs: [4, -1, 3, 0, 0, 0], ys: [0, 4, -2, 0, 0, 0] }, ["vektör", "kareli", "ayrı", "X Y Z", "soru"]),
+  fz("f-cevap-3", "Cevap alanı: 3 ayrı kareli alan (3 yöntem)", "Uç uca, paralelkenar, bileşenler", "kareliAlan", {}, ["cevap", "kareli", "alan", "yöntem", "çizim"]),
+  fz("f-cevap-1", "Cevap alanı: tek kareli alan", "Öğrencinin çizeceği boş kareli alan", "kareliAlan", { adet: 1, baslik: "Cevap alanı", sutun: 12, satir: 8 }, ["cevap", "kareli", "alan", "boş"]),
+  fz("f-cevap-2", "Cevap alanı: 2 kareli alan", "Yan yana iki boş alan", "kareliAlan", { adet: 2, baslik: "1. Yöntem, 2. Yöntem", sutun: 10, satir: 7 }, ["cevap", "kareli", "alan", "boş"]),
   // <<PAKET-EK-SABLON>>
 ];
 
