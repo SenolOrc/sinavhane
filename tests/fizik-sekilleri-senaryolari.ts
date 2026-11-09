@@ -29,13 +29,13 @@ function olc(v: V) {
   ctx.strokeStyle = "#0f172a"; ctx.fillStyle = "#0f172a"; ctx.lineWidth = 2;
   cografyaCiz(ctx, v, { x: PAY, y: PAY, w, h });
   const d = ctx.getImageData(0, 0, W, H).data;
-  let n = 0, tasma = 0;
+  let n = 0, tasma = 0, tx0 = 1e9, tx1 = -1e9, ty0 = 1e9, ty1 = -1e9;
   const ic = 36; // kutunun 44 px dışına kadar yazı/ok payı normal; daha ötesi taşmadır
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    if (d[(y * W + x) * 4] < 200) { n++; if (x < PAY - 44 || x > PAY + w + 44 || y < PAY - 44 || y > PAY + h + 44) tasma++; }
+    if (d[(y * W + x) * 4] < 200) { n++; if (x < PAY - 44 || x > PAY + w + 44 || y < PAY - 44 || y > PAY + h + 44) { tasma++; tx0 = Math.min(tx0, x - PAY); tx1 = Math.max(tx1, x - PAY); ty0 = Math.min(ty0, y - PAY); ty1 = Math.max(ty1, y - PAY); } }
   }
   void ic;
-  return { n, tasma };
+  return { n, tasma, yer: tasma ? `kutu ${w}×${h}, taşan x ${tx0}…${tx1}, y ${ty0}…${ty1}, yazı tipi ${ctx.font}` : "" };
 }
 
 console.log("Fizik şekilleri senaryoları");
@@ -106,7 +106,7 @@ senaryo("her şablon geçerli, kütüphanede, çizimi boş değil, kutudan taşm
     dogrula(cografyaGecerliMi(g as unknown as Record<string, unknown>), sb.id + ": geçersiz");
     const o = olc(g);
     dogrula(o.n > 400, sb.id + ": çizim boş (" + o.n + ")");
-    dogrula(o.tasma === 0, sb.id + ": kutudan taşıyor (" + o.tasma + " px)");
+    dogrula(o.tasma === 0, sb.id + ": kutudan taşıyor (" + o.tasma + " px; " + o.yer + ")");
     const b = COGRAFYA_BOYUTLARI[g.yapi];
     const s: Sekil = { id: "t", tur: "fizik", nesne: "fizikSekil", kalinlik: 2, x: 0, y: 0, w: b.w, h: b.h, geo: g } as Sekil;
     dogrula(sekilGecerliMi(s), sb.id + ": sekilGecerliMi");
