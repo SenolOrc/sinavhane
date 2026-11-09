@@ -850,7 +850,8 @@ export const COGRAFYA_SABLONLARI: GeometriSablonu[] = [
 ];
 
 const FIZIK_ALT: Record<string, string> = { atis: "Fizik – Atış", enerji: "Fizik – Enerji", carpisma: "Fizik – Momentum", tork: "Fizik – Tork", vektorToplam: "Fizik – Vektör", scd: "Fizik – Kuvvet",
-  torricelli: "Fizik – Akışkanlar", bernoulli: "Fizik – Akışkanlar", hidrolik: "Fizik – Akışkanlar", manometre: "Fizik – Akışkanlar" };
+  torricelli: "Fizik – Akışkanlar", bernoulli: "Fizik – Akışkanlar", hidrolik: "Fizik – Akışkanlar", manometre: "Fizik – Akışkanlar",
+  atma: "Fizik – Dalgalar", dalga: "Fizik – Dalgalar", rezonans: "Fizik – Dalgalar", doppler: "Fizik – Dalgalar", kirinim: "Fizik – Dalgalar" };
 const fz = (id: string, ad: string, ipucu: string, yapi: Parameters<typeof varsayilanCografya>[0], ek: Parameters<typeof varsayilanCografya>[1], anahtar: string[]): GeometriSablonu => ({
   id, ad, ipucu, nesne: "fizikSekil", altBaslik: FIZIK_ALT[yapi], aramaKelimeleri: ["fizik", ...anahtar], olustur: () => varsayilanCografya(yapi, ek),
 });
@@ -902,6 +903,24 @@ export const FIZIK_SABLONLARI: GeometriSablonu[] = [
   fz("f-manometre-acik", "Açık uçlu manometre", "Gaz basıncı P = P₀ + ρgh", "manometre", {}, ["manometre", "u borusu", "açık hava basıncı", "gaz basıncı", "civa"]),
   fz("f-manometre-kapali", "Kapalı uçlu manometre", "Kapalı uç boşluk: P = ρgh", "manometre", { tip: "kapali", fark: 12 }, ["manometre", "kapalı uçlu", "barometre", "civa", "boşluk"]),
   fz("f-manometre-iki", "İki gaz arası manometre", "İki kap arasındaki basınç farkı", "manometre", { tip: "ikiGaz", fark: 6, adlar: "A, B, sıvı" }, ["manometre", "iki gaz", "basınç farkı", "u borusu"]),
+  // ── Paket 2: Dalgalar
+  fz("f-atma-sabit", "Atma: sabit uçtan yansıma", "Atma sabit uçta ters dönerek yansır; t süre sonraki şekil", "atma", { tip: "sabit", t: 16 }, ["atma", "yay dalgası", "yansıma", "sabit uç", "ters"]),
+  fz("f-atma-serbest", "Atma: serbest uçtan yansıma", "Serbest uçta atma aynı yönde yansır", "atma", { tip: "serbest", t: 16 }, ["atma", "yay dalgası", "yansıma", "serbest uç"]),
+  fz("f-atma-yapici", "Atma girişimi: yapıcı (tepe + tepe)", "Karşılaşma anında genlikler toplanır", "atma", { tip: "yapici", t: 5, k1: 3, k2: 13, a1: 2, a2: 2 }, ["atma", "girişim", "yapıcı", "süperpozisyon", "bileşke"]),
+  fz("f-atma-yikici", "Atma girişimi: yıkıcı (tepe + çukur)", "Zıt atmalar karşılaşınca genlikler çıkarılır", "atma", { tip: "yikici", t: 5, k1: 3, k2: 13, a1: 3, a2: 2 }, ["atma", "girişim", "yıkıcı", "süperpozisyon", "bileşke"]),
+  fz("f-atma-tek", "Atma ilerlemesi (kareli)", "Tek atma, hız 1 kare/s", "atma", { tip: "tek", t: 6 }, ["atma", "ilerleme", "yay dalgası", "hız"]),
+  fz("f-dalga-enine", "Enine dalga (λ, A)", "Dalga boyu, genlik, tepe ve çukur", "dalga", {}, ["dalga", "enine dalga", "dalga boyu", "genlik", "periyot", "tepe", "çukur"]),
+  fz("f-dalga-enine-deger", "Enine dalga (değerli, v = λ/T)", "λ = 40 cm, A = 20 cm, T = 2 s", "dalga", { veri: true, noktalar: true }, ["dalga", "dalga denklemi", "v = λf", "frekans", "periyot"]),
+  fz("f-dalga-boyuna", "Boyuna dalga (sıkışma–genleşme)", "Ses dalgası modeli: S ve G bölgeleri", "dalga", { tip: "boyuna", sayi: 2 }, ["boyuna dalga", "ses dalgası", "sıkışma", "genleşme", "dalga boyu"]),
+  fz("f-rezonans-kapali", "Kapalı boru: duran dalga", "Kapalı uçta düğüm, açık uçta karın; L = (2n−1)λ/4", "rezonans", {}, ["rezonans", "kapalı boru", "duran dalga", "düğüm", "karın", "harmonik", "ses"]),
+  fz("f-rezonans-acik", "Açık boru: duran dalga", "İki uçta karın; L = nλ/2", "rezonans", { tip: "acik", n: 2 }, ["rezonans", "açık boru", "duran dalga", "düğüm", "karın", "harmonik"]),
+  fz("f-rezonans-tel", "Gergin tel: duran dalga", "İki ucu sabit tel; L = nλ/2", "rezonans", { tip: "tel", n: 3, lamYaz: true }, ["duran dalga", "tel", "gergin tel", "düğüm", "karın", "harmonik", "rezonans"]),
+  fz("f-doppler-yavas", "Doppler olayı (hareketli kaynak)", "Önde sıklaşan, arkada seyrekleşen cepheler", "doppler", { fYaz: true }, ["doppler", "frekans", "ses", "hareketli kaynak", "dalga cephesi"]),
+  fz("f-doppler-mach", "Mach konisi (süpersonik)", "Kaynak sesten hızlı: koni oluşur", "doppler", { oran: 1.5, n: 6 }, ["doppler", "mach", "süpersonik", "ses duvarı", "şok dalgası"]),
+  fz("f-su-yansima", "Su dalgası: yansıma", "Gelme açısı = yansıma açısı", "kirinim", { tip: "yansima" }, ["su dalgası", "yansıma", "dalga leğeni", "normal", "yansıma kanunu"]),
+  fz("f-su-kirilma", "Su dalgası: kırılma (derin → sığ)", "Sığda λ ve v azalır, ışın normale yaklaşır", "kirinim", { tip: "kirilma" }, ["su dalgası", "kırılma", "dalga leğeni", "derin", "sığ", "snell"]),
+  fz("f-su-kirinim", "Su dalgası: kırınım (dar aralık)", "Aralık λ ile kıyaslanabilir: daireselleşir", "kirinim", { tip: "kirinim" }, ["su dalgası", "kırınım", "aralık", "dalga leğeni", "engel"]),
+  fz("f-su-girisim", "Su dalgası: iki kaynaklı girişim", "Düğüm ve karın çizgileri", "kirinim", { tip: "girisim" }, ["su dalgası", "girişim", "çift kaynak", "düğüm çizgisi", "karın çizgisi", "young"]),
   // <<PAKET-EK-SABLON>>
 ];
 

@@ -3,6 +3,7 @@
 import { createCanvas } from "@napi-rs/canvas";
 import { cografyaCiz, cografyaGecerliMi, fizikHesapOzeti, varsayilanCografya, COGRAFYA_BOYUTLARI } from "../src/modules/sinav-olusturucu/cizim/cografya";
 import { torricelliHesapla, hidrolikF2, manometreBasinc } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizEk";
+import { atmaYuksekligi, dalgaHesap, rezonansHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizDalga";
 
 function dogrula(k: unknown, m: string) { if (!k) { console.error("✗ " + m); process.exit(1); } }
 function senaryo(ad: string, f: () => void) { f(); console.log("  ✓ " + ad); }
@@ -54,6 +55,40 @@ senaryo("Akışkan şekilleri uç değerlerde çökmez ve boş değildir", () =>
   for (const [y, e] of [["torricelli", { h: 1, d1: 0.5, d2: 20, d3: 0 }], ["torricelli", { h: 20, d1: 10, d2: 0, d3: 0, gaz: true }], ["bernoulli", { a1: 1, a2: 100 }], ["bernoulli", { tip: "yukseklik", dh: 10, a1: 100, a2: 1 }], ["hidrolik", { a1: 1, a2: 400, yol: true }], ["manometre", { fark: 20, tip: "kapali" }], ["manometre", { fark: 0 }]] as const) {
     dogrula(mürekkep(ayar(y, e as never)) > 300, y + " boş/çöktü " + JSON.stringify(e));
   }
+});
+// ── Paket 2: Dalgalar
+senaryo("Atma: sabit uç ters, serbest uç düz yansır; yapıcı toplar, yıkıcı çıkarır", () => {
+  // k1=3, gen=2, hız 1: t=16'da merkez 19 → görüntü merkezi 2·16−19 = 13
+  const sabit = ayar("atma", { tip: "sabit", t: 16 }), serbest = ayar("atma", { tip: "serbest", t: 16 });
+  dogrula(yakin(atmaYuksekligi(sabit, 13, 16), -2) && yakin(atmaYuksekligi(serbest, 13, 16), 2), "yansıyan atma yönü");
+  const y = ayar("atma", { tip: "yapici", t: 5, k1: 3, k2: 13, a1: 2, a2: 3 }), z = ayar("atma", { tip: "yikici", t: 5, k1: 3, k2: 13, a1: 3, a2: 2 });
+  dogrula(yakin(atmaYuksekligi(y, 8, 5), 5), "yapıcı: 2 + 3");
+  dogrula(yakin(atmaYuksekligi(z, 8, 5), 1), "yıkıcı: 3 − 2");
+  const o = fizikHesapOzeti(z); dogrula(o && o.includes("1 kare"), "özet: " + o);
+  dogrula(!cografyaGecerliMi({ tur: "cografya", yapi: "atma", ayar: { a1: 9 } }), "genlik sınırı");
+});
+senaryo("Dalga: v = λ/T, f = 1/T; duran dalga λ ve f (boru/tel)", () => {
+  const h = dalgaHesap(ayar("dalga", { lam: 4, kareBoy: 10, T: 2 }));
+  dogrula(yakin(h.lamCm, 40) && yakin(h.v, 0.2) && yakin(h.f, 0.5), "dalga hesabı");
+  dogrula(yakin(rezonansHesap(ayar("rezonans", { tip: "kapali", n: 2, L: 1 })).lam, 4 / 3), "kapalı boru n=2: λ=4L/3");
+  dogrula(yakin(rezonansHesap(ayar("rezonans", { tip: "acik", n: 3, L: 1 })).lam, 2 / 3), "açık boru n=3: λ=2L/3");
+  const t = rezonansHesap(ayar("rezonans", { tip: "tel", n: 3, L: 1, hiz: 340 }));
+  dogrula(yakin(t.f, 510), "tel f = 510 Hz");
+});
+senaryo("Doppler ve su dalgası özetleri", () => {
+  const d = fizikHesapOzeti(ayar("doppler", { oran: 0.5 })); dogrula(d && d.includes("2·f") && d.includes("0,67"), "doppler: " + d);
+  dogrula(fizikHesapOzeti(ayar("doppler", { oran: 1.5 }))?.includes("Mach"), "mach");
+  const k = fizikHesapOzeti(ayar("kirinim", { tip: "kirilma", aci: 30, oran: 2 })); dogrula(k && k.includes("14,5"), "kırılma açısı: " + k);
+  dogrula(fizikHesapOzeti(ayar("kirinim", { tip: "yansima", aci: 40 }))?.includes("40°"), "yansıma");
+});
+senaryo("Dalga şekilleri uç değerlerde çökmez ve boş değildir", () => {
+  const liste: [Parameters<typeof varsayilanCografya>[0], Record<string, unknown>][] = [
+    ["atma", { tip: "yapici", a1: 4, a2: 4, gen: 6, t: 20 }], ["atma", { tip: "sabit", t: 0 }], ["atma", { tip: "serbest", gen: 1, a1: 1, yon: "alt", t: 20 }],
+    ["dalga", { lam: 8, sayi: 4, genlik: 3 }], ["dalga", { tip: "boyuna", lam: 2, sayi: 4 }], ["rezonans", { tip: "kapali", n: 6, L: 10 }], ["rezonans", { tip: "acik", n: 6 }], ["rezonans", { tip: "tel", n: 1 }],
+    ["doppler", { oran: 0 }], ["doppler", { oran: 1.6, n: 8, yon: "sol" }], ["kirinim", { tip: "yansima", aci: 80 }], ["kirinim", { tip: "kirilma", aci: 80, oran: 3 }],
+    ["kirinim", { tip: "kirinim", yarik: 6, lam: 30 }], ["kirinim", { tip: "girisim", ara: 6, lam: 8 }], ["kirinim", { tip: "girisim", ara: 1 }],
+  ];
+  for (const [y, e] of liste) dogrula(mürekkep(ayar(y, e as never)) > 300, y + " boş/çöktü " + JSON.stringify(e));
 });
 // <<PAKET-EK-TEST>>
 

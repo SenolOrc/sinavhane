@@ -2,18 +2,10 @@
 // hareket kavramları, madde ve doğası). Saf çizim: veri (ayar tablosu) → tuval. Yalnız gri/siyah.
 import { fizikMetniCiz } from "../fizik";
 import { ayarMantik, ayarMetin, ayarSayi, ayarSec, type CografyaVerisi } from "./sema";
-import { GRI, bol, cizgi, kesik, ok, puntoOlc, sayiYaz, zemin, type Kutu } from "./fizikYardim";
+import { bol, cizgi, dolgu, duzgun, kesik, ok, olcuOku, puntoOlc, sayiYaz, zemin, type Kutu } from "./fizikYardim";
+import { dalgaCiz, dalgaOzet } from "./fizikCizDalga";
 
 type Ctx = CanvasRenderingContext2D;
-const duzgun = (t: number) => { const u = Math.max(0, Math.min(1, t)); return u * u * (3 - 2 * u); };
-/** İki başlık arası çift uçlu ölçü oku. */
-function olcuOku(ctx: Ctx, x0: number, y0: number, x1: number, y1: number, s = 5) {
-  const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
-  ctx.save(); ctx.lineWidth = Math.max(0.8, ctx.lineWidth * 0.55);
-  ok(ctx, mx, my, x0, y0, s); ok(ctx, mx, my, x1, y1, s);
-  ctx.restore();
-}
-function dolgu(ctx: Ctx, f: () => void, renk = GRI) { ctx.save(); ctx.fillStyle = renk; f(); ctx.restore(); }
 
 // ════════════════════════════════════════════════════════════════════════════
 // PAKET 1 — AKIŞKANLAR
@@ -337,6 +329,7 @@ function manometreCiz(ctx: Ctx, v: CografyaVerisi, k: Kutu) {
 // ════════════════════════════════════════════════════════════════════════════
 
 export function fizikEkCiz(ctx: Ctx, v: CografyaVerisi, k: Kutu): boolean {
+  if (dalgaCiz(ctx, v, k)) return true;
   switch (v.yapi) {
     case "torricelli": torricelliCiz(ctx, v, k); return true;
     case "bernoulli": bernoulliCiz(ctx, v, k); return true;
@@ -348,6 +341,8 @@ export function fizikEkCiz(ctx: Ctx, v: CografyaVerisi, k: Kutu): boolean {
 
 /** Öğretmene hesap özeti (panelde gösterilir; şekle yazılmaz). */
 export function fizikEkHesapOzeti(v: CografyaVerisi): string | null | undefined {
+  const d = dalgaOzet(v);
+  if (d !== undefined) return d;
   switch (v.yapi) {
     case "torricelli": {
       const g = ayarSayi(v, "g"), h = ayarSayi(v, "h");

@@ -58,3 +58,16 @@ export const vecAd = (a: string) => (a.includes("vec(") || a.includes("\\") ? a 
 export const bol = (m: string) => m.split(",").map((t) => t.trim());
 export function puntoOlc(k: Kutu, taban = 14) { return Math.max(11, Math.min(taban + 1, k.w / 24)); }
 
+
+type Ctx = CanvasRenderingContext2D;
+
+export const duzgun = (t: number) => { const u = Math.max(0, Math.min(1, t)); return u * u * (3 - 2 * u); };
+/** İki başlık arası çift uçlu ölçü oku. */
+export function olcuOku(ctx: Ctx, x0: number, y0: number, x1: number, y1: number, s = 5) {
+  const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+  ctx.save(); ctx.lineWidth = Math.max(0.8, ctx.lineWidth * 0.55);
+  ok(ctx, mx, my, x0, y0, s); ok(ctx, mx, my, x1, y1, s);
+  ctx.restore();
+}
+export function dolgu(ctx: Ctx, f: () => void, renk = GRI) { ctx.save(); ctx.fillStyle = renk; f(); ctx.restore(); }
+
