@@ -5,7 +5,8 @@ import type { Alan } from "./sema";
 export type FizikEkYapi =
   | "torricelli" | "bernoulli" | "hidrolik" | "manometre"
   | "atma" | "dalga" | "rezonans" | "doppler" | "kirinim"
-  | "elektrikAlan" | "coulomb" | "levhaYuk" | "manyetikParcacik" | "iletkenCubuk" | "transformator";
+  | "elektrikAlan" | "coulomb" | "levhaYuk" | "manyetikParcacik" | "iletkenCubuk" | "transformator"
+  | "cembersel" | "yorunge" | "basitHarmonik" | "donme";
 
 type Sema = { ad: string; alt: string; alanlar: Alan[] };
 
@@ -231,10 +232,73 @@ export const FIZIK_EK_SEMA: Record<FizikEkYapi, Sema> = {
       { k: "mantik", a: "cekirdek", ad: "Demir çekirdek yazısı", v: true },
     ],
   },
+  // ── Paket 4: Çembersel hareket, çekim, basit harmonik hareket, dönme
+  cembersel: {
+    ad: "Düzgün çembersel hareket (merkezcil kuvvet)", alt: "Fizik – Çembersel hareket",
+    alanlar: [
+      { k: "sec", a: "tip", ad: "Düzenek", sec: [["yatay", "Yatay düzlemde (üstten görünüm)"], ["dusey", "Düşey çember (iple)"], ["konik", "Konik sarkaç"], ["egimli", "Eğimli viraj (önden görünüm)"]], v: "yatay" },
+      { k: "sayi", a: "konum", ad: "Cismin konumu (°)", min: 0, max: 360, adim: 15, v: 30 },
+      { k: "sayi", a: "aci", ad: "İp / yol eğimi θ (°)", min: 10, max: 70, adim: 1, v: 30 },
+      { k: "sayi", a: "v", ad: "Hız v (m/s)", min: 0.5, max: 50, adim: 0.5, v: 4, kok: true },
+      { k: "sayi", a: "r", ad: "Yarıçap r (m)", min: 0.5, max: 50, adim: 0.5, v: 2, kok: true },
+      { k: "sayi", a: "m", ad: "Kütle m (kg)", min: 0.1, max: 100, adim: 0.1, v: 1, kok: true },
+      { k: "mantik", a: "vOk", ad: "Hız oku (v)", v: true },
+      { k: "mantik", a: "aOk", ad: "Merkezcil ivme oku", v: true },
+      { k: "mantik", a: "fOk", ad: "Kuvvetler (mg, T, N, F)", v: false },
+      { k: "mantik", a: "rYaz", ad: "Yarıçap (r) ve merkez (O)", v: true },
+      { k: "mantik", a: "veri", ad: "v, r, m değerlerini yaz", v: false },
+      { k: "mantik", a: "kokYaz", ad: "Köklü değerleri √ ile yaz", v: false },
+    ],
+  },
+  yorunge: {
+    ad: "Çekim: yörünge ve Kepler yasaları", alt: "Fizik – Çekim",
+    alanlar: [
+      { k: "sec", a: "tip", ad: "Şekil", sec: [["cember", "Dairesel yörünge (uydu)"], ["elips", "Eliptik yörünge (günberi–günöte)"], ["kepler", "Kepler 2. yasa (eşit alanlar)"]], v: "elips" },
+      { k: "sayi", a: "e", ad: "Basıklık (e)", min: 0.1, max: 0.8, adim: 0.1, v: 0.5 },
+      { k: "sayi", a: "konum", ad: "Gezegenin konumu (°)", min: 0, max: 360, adim: 15, v: 60 },
+      { k: "mantik", a: "kuvvet", ad: "Çekim kuvveti (F)", v: true },
+      { k: "mantik", a: "hizOk", ad: "Hız oku (v)", v: true },
+      { k: "mantik", a: "olcu", ad: "Uzaklıklar (r₁, r₂) ve ad etiketleri", v: true },
+      { k: "mantik", a: "adlar", ad: "Cisim adları (M, m)", v: true },
+    ],
+  },
+  basitHarmonik: {
+    ad: "Basit harmonik hareket (yay, sarkaç, grafik)", alt: "Fizik – Salınım",
+    alanlar: [
+      { k: "sec", a: "tip", ad: "Düzenek", sec: [["yay", "Yay–kütle (denge ve uçlar)"], ["sarkac", "Basit sarkaç"], ["grafik", "Konum / hız / ivme – zaman grafiği"]], v: "yay" },
+      { k: "sec", a: "grafik", ad: "Grafik büyüklüğü", sec: [["x", "Konum x–t"], ["v", "Hız v–t"], ["a", "İvme a–t"]], v: "x" },
+      { k: "sayi", a: "m", ad: "Kütle m (kg)", min: 0.1, max: 50, adim: 0.1, v: 0.5, kok: true },
+      { k: "sayi", a: "ks", ad: "Yay sabiti k (N/m)", min: 1, max: 1000, adim: 1, v: 50, kok: true },
+      { k: "sayi", a: "A", ad: "Genlik A (cm)", min: 1, max: 50, adim: 1, v: 10 },
+      { k: "sayi", a: "L", ad: "Sarkaç boyu L (m)", min: 0.1, max: 10, adim: 0.1, v: 1 },
+      { k: "sayi", a: "aci", ad: "Sarkaç genliği (°)", min: 5, max: 40, adim: 1, v: 15 },
+      { k: "mantik", a: "etiket", ad: "Yazılar (−A, 0, +A, F, v)", v: true },
+      { k: "mantik", a: "noktalar", ad: "Grafikte özel noktalar", v: true },
+      { k: "mantik", a: "veri", ad: "Değerleri yaz (m, k, A, L)", v: false },
+    ],
+  },
+  donme: {
+    ad: "Dönme dinamiği (makara, yuvarlanma, açısal momentum)", alt: "Fizik – Dönme",
+    alanlar: [
+      { k: "sec", a: "tip", ad: "Düzenek", sec: [["makara", "Kütleli makara (Atwood)"], ["tekerlek", "Eğik düzlemde yuvarlanma"], ["aciSal", "Açısal momentum korunumu"]], v: "makara" },
+      { k: "sayi", a: "m1", ad: "m₁ (kg)", min: 1, max: 20, adim: 1, v: 4 },
+      { k: "sayi", a: "m2", ad: "m₂ (kg)", min: 1, max: 20, adim: 1, v: 2 },
+      { k: "sayi", a: "M", ad: "Makara kütlesi M (kg, 0 = ideal)", min: 0, max: 20, adim: 1, v: 2 },
+      { k: "sec", a: "sekil", ad: "Yuvarlanan cisim", sec: [["silindir", "Dolu silindir"], ["halka", "Halka"], ["kure", "Dolu küre"]], v: "silindir" },
+      { k: "sayi", a: "aci", ad: "Eğim açısı (°)", min: 10, max: 60, adim: 1, v: 30 },
+      { k: "sayi", a: "r1", ad: "İlk yarıçap r₁ (m)", min: 0.5, max: 5, adim: 0.5, v: 2 },
+      { k: "sayi", a: "r2", ad: "Son yarıçap r₂ (m)", min: 0.5, max: 5, adim: 0.5, v: 1 },
+      { k: "sayi", a: "w1", ad: "İlk açısal hız ω₁ (rad/s)", min: 1, max: 20, adim: 1, v: 2 },
+      { k: "mantik", a: "kuvvet", ad: "Kuvvetler (T, mg, f, N)", v: true },
+      { k: "mantik", a: "hizOk", ad: "İvme / hız okları", v: true },
+      { k: "mantik", a: "veri", ad: "Değerleri yaz", v: true },
+    ],
+  },
 };
 
 export const FIZIK_EK_BOYUT: Record<FizikEkYapi, { w: number; h: number }> = {
   torricelli: { w: 420, h: 260 }, bernoulli: { w: 420, h: 220 }, hidrolik: { w: 380, h: 230 }, manometre: { w: 320, h: 240 },
   atma: { w: 440, h: 210 }, dalga: { w: 440, h: 210 }, rezonans: { w: 420, h: 200 }, doppler: { w: 440, h: 230 }, kirinim: { w: 440, h: 270 },
   elektrikAlan: { w: 420, h: 250 }, coulomb: { w: 440, h: 230 }, levhaYuk: { w: 420, h: 240 }, manyetikParcacik: { w: 400, h: 260 }, iletkenCubuk: { w: 440, h: 240 }, transformator: { w: 440, h: 240 },
+  cembersel: { w: 380, h: 260 }, yorunge: { w: 420, h: 260 }, basitHarmonik: { w: 440, h: 250 }, donme: { w: 440, h: 260 },
 };

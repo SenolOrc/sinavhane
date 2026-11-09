@@ -852,7 +852,8 @@ export const COGRAFYA_SABLONLARI: GeometriSablonu[] = [
 const FIZIK_ALT: Record<string, string> = { atis: "Fizik – Atış", enerji: "Fizik – Enerji", carpisma: "Fizik – Momentum", tork: "Fizik – Tork", vektorToplam: "Fizik – Vektör", scd: "Fizik – Kuvvet",
   torricelli: "Fizik – Akışkanlar", bernoulli: "Fizik – Akışkanlar", hidrolik: "Fizik – Akışkanlar", manometre: "Fizik – Akışkanlar",
   atma: "Fizik – Dalgalar", dalga: "Fizik – Dalgalar", rezonans: "Fizik – Dalgalar", doppler: "Fizik – Dalgalar", kirinim: "Fizik – Dalgalar",
-  elektrikAlan: "Fizik – Elektrik", coulomb: "Fizik – Elektrik", levhaYuk: "Fizik – Elektrik", manyetikParcacik: "Fizik – Manyetizma", iletkenCubuk: "Fizik – Manyetizma", transformator: "Fizik – Manyetizma" };
+  elektrikAlan: "Fizik – Elektrik", coulomb: "Fizik – Elektrik", levhaYuk: "Fizik – Elektrik", manyetikParcacik: "Fizik – Manyetizma", iletkenCubuk: "Fizik – Manyetizma", transformator: "Fizik – Manyetizma",
+  cembersel: "Fizik – Çembersel hareket", yorunge: "Fizik – Çekim", basitHarmonik: "Fizik – Salınım", donme: "Fizik – Dönme" };
 const fz = (id: string, ad: string, ipucu: string, yapi: Parameters<typeof varsayilanCografya>[0], ek: Parameters<typeof varsayilanCografya>[1], anahtar: string[]): GeometriSablonu => ({
   id, ad, ipucu, nesne: "fizikSekil", altBaslik: FIZIK_ALT[yapi], aramaKelimeleri: ["fizik", ...anahtar], olustur: () => varsayilanCografya(yapi, ek),
 });
@@ -945,6 +946,25 @@ export const FIZIK_SABLONLARI: GeometriSablonu[] = [
   fz("f-cubuk-kok", "İletken çubuk (köklü değerler)", "B = √3 T, L = 1 m, v = 4 m/s: ε = 4√3 V", "iletkenCubuk", { B: "√3", L: 1, v: 4, R: 2, kokYaz: true }, ["indüksiyon", "emk", "köklü", "√3", "iletken çubuk"]),
   fz("f-trafo-yukselten", "Transformatör: gerilim yükselten", "N₂ = 4N₁, V₂ sorulur", "transformator", {}, ["transformatör", "gerilim yükselten", "sarım sayısı", "indüksiyon", "primer", "sekonder"]),
   fz("f-trafo-dusuren", "Transformatör: gerilim düşüren", "N₂ < N₁", "transformator", { n1: 400, n2: 100, v1: 200, r: 10, sonuc: "deger", akim: true }, ["transformatör", "gerilim düşüren", "akım", "güç"]),
+  // ── Paket 4: Çembersel hareket, çekim, salınım, dönme
+  fz("f-cember-yatay", "Düzgün çembersel hareket (üstten)", "v teğet, a_m merkeze doğru", "cembersel", {}, ["çembersel hareket", "merkezcil", "merkezcil ivme", "teğetsel hız", "düzgün çembersel"]),
+  fz("f-cember-yatay-f", "Çembersel hareket: değerli (a, ω, T, F)", "v = 4 m/s, r = 2 m, m = 1 kg", "cembersel", { fOk: true, veri: true, aOk: false }, ["çembersel hareket", "merkezcil kuvvet", "periyot", "açısal hız"]),
+  fz("f-cember-dusey-ust", "Düşey çember: en üst nokta", "T ve mg aşağı", "cembersel", { tip: "dusey", konum: 90, fOk: true }, ["düşey çember", "ip gerilmesi", "en üst nokta", "merkezcil kuvvet"]),
+  fz("f-cember-dusey-alt", "Düşey çember: en alt nokta", "T yukarı, mg aşağı", "cembersel", { tip: "dusey", konum: 270, fOk: true }, ["düşey çember", "ip gerilmesi", "en alt nokta"]),
+  fz("f-cember-konik", "Konik sarkaç", "T ve mg'nin bileşkesi merkezcil kuvvet", "cembersel", { tip: "konik", fOk: true, aOk: false }, ["konik sarkaç", "merkezcil kuvvet", "ip", "açı"]),
+  fz("f-cember-viraj", "Eğimli virajda araç", "N ve mg'nin bileşkesi merkezcil", "cembersel", { tip: "egimli", fOk: true, aOk: false, aci: 20 }, ["viraj", "eğimli yol", "merkezcil kuvvet", "normal kuvvet", "sürtünmesiz"]),
+  fz("f-yorunge-uydu", "Uydunun dairesel yörüngesi", "F_g merkezcil kuvvet, v teğet", "yorunge", { tip: "cember", hizOk: true }, ["uydu", "yörünge", "kütle çekimi", "evrensel çekim", "dairesel yörünge"]),
+  fz("f-yorunge-elips", "Eliptik yörünge (günberi–günöte)", "Günberide hız büyük", "yorunge", { tip: "elips" }, ["kepler", "elips", "yörünge", "günberi", "günöte", "gezegen"]),
+  fz("f-yorunge-kepler", "Kepler 2. yasa: eşit alanlar", "Eşit sürede eşit alan", "yorunge", { tip: "kepler", e: 0.6 }, ["kepler", "eşit alanlar", "2. yasa", "alan", "yörünge"]),
+  fz("f-bhm-yay", "Yay–kütle: −A, 0, +A", "Denge ve uç noktalar, F ve v", "basitHarmonik", { tip: "yay" }, ["basit harmonik hareket", "yay", "salınım", "genlik", "geri çağırıcı kuvvet"]),
+  fz("f-bhm-sarkac", "Basit sarkaç (A–O–C)", "Küçük açılı salınım", "basitHarmonik", { tip: "sarkac" }, ["sarkaç", "basit harmonik", "periyot", "salınım"]),
+  fz("f-bhm-konum", "Konum–zaman grafiği (cos)", "x = A·cos(ωt), T ve A", "basitHarmonik", { tip: "grafik", grafik: "x" }, ["basit harmonik hareket", "konum zaman grafiği", "genlik", "periyot", "salınım"]),
+  fz("f-bhm-hiz", "Hız–zaman grafiği", "v = −Aω·sin(ωt)", "basitHarmonik", { tip: "grafik", grafik: "v" }, ["basit harmonik hareket", "hız zaman grafiği", "maksimum hız"]),
+  fz("f-bhm-ivme", "İvme–zaman grafiği", "a = −ω²x: konumla ters işaretli", "basitHarmonik", { tip: "grafik", grafik: "a" }, ["basit harmonik hareket", "ivme zaman grafiği", "geri çağırıcı"]),
+  fz("f-donme-makara", "Kütleli makara (Atwood)", "m₁ > m₂, makaranın eylemsizliği", "donme", { tip: "makara" }, ["makara", "atwood", "eylemsizlik momenti", "ip gerilmesi", "tork"]),
+  fz("f-donme-tekerlek", "Eğik düzlemde yuvarlanma", "Dolu silindir, f sürtünme", "donme", { tip: "tekerlek" }, ["yuvarlanma", "eğik düzlem", "eylemsizlik momenti", "dönme", "açısal ivme"]),
+  fz("f-donme-halka", "Eğik düzlemde halka", "I = mR²: daha yavaş yuvarlanır", "donme", { tip: "tekerlek", sekil: "halka" }, ["halka", "yuvarlanma", "eğik düzlem", "eylemsizlik momenti"]),
+  fz("f-donme-acisal", "Açısal momentum korunumu", "r küçülünce ω artar", "donme", { tip: "aciSal" }, ["açısal momentum", "korunum", "eylemsizlik momenti", "buz patencisi", "dönme"]),
   // <<PAKET-EK-SABLON>>
 ];
 

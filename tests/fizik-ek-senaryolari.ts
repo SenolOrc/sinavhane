@@ -3,6 +3,7 @@
 import { createCanvas } from "@napi-rs/canvas";
 import { cografyaCiz, cografyaGecerliMi, fizikHesapOzeti, varsayilanCografya, COGRAFYA_BOYUTLARI } from "../src/modules/sinav-olusturucu/cizim/cografya";
 import { torricelliHesapla, hidrolikF2, manometreBasinc } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizEk";
+import { bhmHesap, cemberselHesap, donmeHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizDinamik";
 import { coulombHesap, cubukHesap, trafoHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizElektrik";
 import { atmaYuksekligi, dalgaHesap, rezonansHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizDalga";
 
@@ -129,6 +130,45 @@ senaryo("Elektrik–manyetizma şekilleri uç değerlerde çökmez ve boş deği
     ["manyetikParcacik", { tip: "sapma", r: 100 }], ["manyetikParcacik", { tip: "sapma", r: 15, isaret: "-", alan: "disari" }], ["manyetikParcacik", { tip: "cember", r: 100 }], ["manyetikParcacik", { tip: "secici", isaret: "-" }],
     ["iletkenCubuk", { yon: "sol", alan: "disari", kuvvet: true }], ["iletkenCubuk", { B: 10, L: 5, v: 50, R: 0.1 }],
     ["transformator", { n1: 5000, n2: 10, sonuc: "deger", akim: true }], ["transformator", { n1: 10, n2: 5000 }],
+  ];
+  for (const [y, e] of liste) dogrula(mürekkep(ayar(y, e as never)) > 300, y + " boş/çöktü " + JSON.stringify(e));
+});
+// ── Paket 4: Çembersel hareket, çekim, salınım, dönme
+senaryo("Çembersel hareket: a = v²/r, ω = v/r, T = 2πr/v, F = mv²/r (köklü giriş dahil)", () => {
+  const h = cemberselHesap(ayar("cembersel", { v: 4, r: 2, m: 1 }));
+  dogrula(yakin(h.ac, 8) && yakin(h.w, 2) && yakin(h.T, Math.PI) && yakin(h.Fc, 8), "değerler");
+  const k = ayar("cembersel", { v: "4√2", r: 4, m: 2, kokYaz: true });
+  dogrula(cografyaGecerliMi(k as never), "köklü kabul");
+  const o = fizikHesapOzeti(k); dogrula(o && o.includes("8 m/s²") && o.includes("16 N"), "köklü özet: " + o);
+  const v = cemberselHesap(ayar("cembersel", { tip: "egimli", r: 10, aci: 45 }));
+  dogrula(yakin(v.vViraj, Math.sqrt(100)), "viraj hızı √(g r tanθ)");
+});
+senaryo("Basit harmonik: ω = √(k/m), T = 2π√(m/k), v_max = Aω, E = ½kA²; sarkaç T = 2π√(L/g)", () => {
+  const h = bhmHesap(ayar("basitHarmonik", { m: 0.5, ks: 50, A: 10, L: 1 }));
+  dogrula(yakin(h.w, 10) && yakin(h.T, Math.PI / 5) && yakin(h.vMax, 1) && yakin(h.aMax, 10) && yakin(h.E, 0.25), "yay değerleri");
+  dogrula(yakin(h.Tsark, 2 * Math.PI * Math.sqrt(0.1)), "sarkaç");
+});
+senaryo("Dönme: Atwood makarası, yuvarlanma ivmesi, açısal momentum korunumu", () => {
+  const h = donmeHesap(ayar("donme", { m1: 4, m2: 2, M: 2 }));
+  dogrula(yakin(h.a, (2 * 10) / (4 + 2 + 1)), "a = (m1−m2)g/(m1+m2+M/2)");
+  dogrula(yakin(h.T1, 4 * (10 - h.a)) && yakin(h.T2, 2 * (10 + h.a)) && h.T1 > h.T2, "gerilmeler farklı");
+  dogrula(yakin(donmeHesap(ayar("donme", { m1: 3, m2: 3, M: 0 })).a, 0), "eşit kütle");
+  dogrula(yakin(donmeHesap(ayar("donme", { tip: "tekerlek", aci: 30, sekil: "silindir" })).aTek, (10 * 0.5) / 1.5), "silindir a = g sinθ /1,5");
+  dogrula(donmeHesap(ayar("donme", { tip: "tekerlek", sekil: "halka" })).aTek < donmeHesap(ayar("donme", { tip: "tekerlek", sekil: "kure" })).aTek, "halka küreden yavaş");
+  dogrula(yakin(donmeHesap(ayar("donme", { r1: 2, r2: 1, w1: 2 })).w2, 8), "ω₂ = ω₁(r₁/r₂)²");
+});
+senaryo("Yörünge özetleri", () => {
+  dogrula(fizikHesapOzeti(ayar("yorunge", { tip: "kepler" }))?.includes("A₁ = A₂"), "kepler");
+  dogrula(fizikHesapOzeti(ayar("yorunge", { tip: "cember" }))?.includes("√(GM/r)"), "uydu");
+});
+senaryo("Paket 4 şekilleri uç değerlerde çökmez ve boş değildir", () => {
+  const liste: [Parameters<typeof varsayilanCografya>[0], Record<string, unknown>][] = [
+    ["cembersel", { tip: "yatay", konum: 0 }], ["cembersel", { tip: "yatay", konum: 360, fOk: true, veri: true }], ["cembersel", { tip: "dusey", konum: 90, fOk: true }], ["cembersel", { tip: "dusey", konum: 270, fOk: true, veri: true }],
+    ["cembersel", { tip: "konik", aci: 70, fOk: true }], ["cembersel", { tip: "konik", aci: 10 }], ["cembersel", { tip: "egimli", aci: 70, fOk: true, veri: true }], ["cembersel", { tip: "egimli", aci: 10 }],
+    ["yorunge", { tip: "cember", konum: 0 }], ["yorunge", { tip: "elips", e: 0.8, konum: 180 }], ["yorunge", { tip: "kepler", e: 0.1 }], ["yorunge", { tip: "kepler", e: 0.8 }],
+    ["basitHarmonik", { tip: "yay", veri: true }], ["basitHarmonik", { tip: "sarkac", aci: 40, veri: true }], ["basitHarmonik", { tip: "grafik", grafik: "v" }], ["basitHarmonik", { tip: "grafik", grafik: "a", noktalar: false }],
+    ["donme", { tip: "makara", m1: 1, m2: 20, M: 0 }], ["donme", { tip: "makara", m1: 20, m2: 20, M: 20, kuvvet: true }], ["donme", { tip: "tekerlek", sekil: "kure", aci: 60, kuvvet: true }], ["donme", { tip: "tekerlek", sekil: "halka", aci: 10 }],
+    ["donme", { tip: "aciSal", r1: 5, r2: 0.5 }], ["donme", { tip: "aciSal", r1: 0.5, r2: 5 }],
   ];
   for (const [y, e] of liste) dogrula(mürekkep(ayar(y, e as never)) > 300, y + " boş/çöktü " + JSON.stringify(e));
 });

@@ -5,6 +5,7 @@ import { ayarMantik, ayarMetin, ayarSayi, ayarSec, type CografyaVerisi } from ".
 import { bol, cizgi, dolgu, duzgun, kesik, ok, olcuOku, puntoOlc, sayiYaz, zemin, type Kutu } from "./fizikYardim";
 import { dalgaCiz, dalgaOzet } from "./fizikCizDalga";
 import { elektrikCiz, elektrikOzet } from "./fizikCizElektrik";
+import { dinamikCiz, dinamikOzet } from "./fizikCizDinamik";
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -330,7 +331,7 @@ function manometreCiz(ctx: Ctx, v: CografyaVerisi, k: Kutu) {
 // ════════════════════════════════════════════════════════════════════════════
 
 export function fizikEkCiz(ctx: Ctx, v: CografyaVerisi, k: Kutu): boolean {
-  if (dalgaCiz(ctx, v, k) || elektrikCiz(ctx, v, k)) return true;
+  if (dalgaCiz(ctx, v, k) || elektrikCiz(ctx, v, k) || dinamikCiz(ctx, v, k)) return true;
   switch (v.yapi) {
     case "torricelli": torricelliCiz(ctx, v, k); return true;
     case "bernoulli": bernoulliCiz(ctx, v, k); return true;
@@ -342,7 +343,7 @@ export function fizikEkCiz(ctx: Ctx, v: CografyaVerisi, k: Kutu): boolean {
 
 /** Öğretmene hesap özeti (panelde gösterilir; şekle yazılmaz). */
 export function fizikEkHesapOzeti(v: CografyaVerisi): string | null | undefined {
-  const d = dalgaOzet(v) ?? elektrikOzet(v);
+  const d = dalgaOzet(v) ?? elektrikOzet(v) ?? dinamikOzet(v);
   if (d !== undefined) return d;
   switch (v.yapi) {
     case "torricelli": {
