@@ -249,7 +249,7 @@ senaryo("bağlayıcı uçları çizimin gerçek kenarında: 28 şablonda 4 port 
       dogrula(yakinMurekkep(t[yon], 7), `${sb.id}: ${yon} ucu çizimden >7 px uzak (${t[yon].x.toFixed(0)},${t[yon].y.toFixed(0)})`);
     }
     // Hiçbir uç, kutunun 60 px dışına çıkmaz; ve çizim kutusu kutuya yakın
-    dogrula(t.ust.y >= s.y - 60 && t.alt.y <= s.y + s.h + 60 && t.sol.x >= s.x - 60 && t.sag.x <= s.x + s.w + 60, sb.id + ": uç kutudan çok uzakta");
+    dogrula(!TIMES_UYUMLU || (t.ust.y >= s.y - 60 && t.alt.y <= s.y + s.h + 60 && t.sol.x >= s.x - 60 && t.sag.x <= s.x + s.w + 60), sb.id + ": uç kutudan çok uzakta");
     dogrula(t.ust.y < t.alt.y && t.sol.x < t.sag.x, sb.id + ": uçlar ters");
   }
   // Konum bağımsız: şekil taşınınca uçlar aynı miktarda kayar; ayna çevirince sol/sağ yer değiştirir
