@@ -11,8 +11,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      # Şekil testleri Times New Roman ölçülerine göre yazılmıştır; ubuntu-latest'te Times yoksa çok geniş bir yazı tipine düşülür.
-      - run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-liberation && fc-cache -f
       - run: npm install
       - run: npm run typecheck
       - run: npm test

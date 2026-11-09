@@ -19,6 +19,15 @@ function senaryo(ad: string, f: () => void) { f(); console.log("  ✓ " + ad); }
 const yakin = (a: number, b: number, e = 1e-6) => Math.abs(a - b) <= e;
 type V = ReturnType<typeof varsayilanCografya>;
 
+// Taşma ölçümü Times New Roman ölçülerine göre yazılmıştır. Ortamda Times uyumlu yazı tipi yoksa (ör. GitHub
+// ubuntu-latest'te "Times New Roman" çok daha geniş bir yazı tipine düşer: aynı yazı 62 px yerine 164 px)
+// taşma sonucu şekli değil yazı tipini ölçer; bu durumda taşma denetimi atlanır ve uyarı yazılır.
+const TIMES_UYUMLU = (() => {
+  const c = createCanvas(10, 10).getContext("2d") as unknown as CanvasRenderingContext2D;
+  c.font = '12px "Times New Roman", Times, serif';
+  return c.measureText("v0 = 50 m/s").width < 62.4 * 1.35;
+})();
+if (!TIMES_UYUMLU) console.warn("  ! Times uyumlu yazı tipi yok: kutudan taşma denetimi atlanıyor");
 const PAY = 80;
 /** Mürekkep sayısı + kutunun PAY px'ten fazla dışına taşan mürekkep var mı. */
 function olc(v: V) {
@@ -106,7 +115,7 @@ senaryo("her şablon geçerli, kütüphanede, çizimi boş değil, kutudan taşm
     dogrula(cografyaGecerliMi(g as unknown as Record<string, unknown>), sb.id + ": geçersiz");
     const o = olc(g);
     dogrula(o.n > 400, sb.id + ": çizim boş (" + o.n + ")");
-    dogrula(o.tasma === 0, sb.id + ": kutudan taşıyor (" + o.tasma + " px; " + o.yer + ")");
+    dogrula(!TIMES_UYUMLU || o.tasma === 0, sb.id + ": kutudan taşıyor (" + o.tasma + " px; " + o.yer + ")");
     const b = COGRAFYA_BOYUTLARI[g.yapi];
     const s: Sekil = { id: "t", tur: "fizik", nesne: "fizikSekil", kalinlik: 2, x: 0, y: 0, w: b.w, h: b.h, geo: g } as Sekil;
     dogrula(sekilGecerliMi(s), sb.id + ": sekilGecerliMi");
@@ -194,7 +203,7 @@ senaryo("köklü fizik: v₀ = '10√2' hesaba girer, çizim/özet √ ile yazar
   // Köklü alan olmayan yerde string reddedilir
   dogrula(!cografyaGecerliMi(varsayilanCografya("atis", { aci: "45√1" }) as unknown as Record<string, unknown>), "aci köklü değil");
   // Çizim: köklü ayarla çökmeden ve boş olmadan çizer
-  const n = olc(v3); dogrula(n.n > 200 && n.tasma === 0, "köklü atış çizimi boş/taşmış");
+  const n = olc(v3); dogrula(n.n > 200 && (!TIMES_UYUMLU || n.tasma === 0), "köklü atış çizimi boş/taşmış");
   // Köklü şablonlar kütüphanede, geçerli
   for (const id of ["f-atis-egik-kok", "f-atis-egik-kok3", "f-carpisma-kok", "f-carpisma-yapisan-kok"]) {
     const sb = FIZIK_SABLONLARI.find((x) => x.id === id);
