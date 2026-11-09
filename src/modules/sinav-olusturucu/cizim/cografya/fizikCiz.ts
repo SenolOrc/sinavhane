@@ -128,8 +128,9 @@ export function atisCiz(ctx: CanvasRenderingContext2D, v: CografyaVerisi, k: Kut
   ctx.lineWidth = Math.max(1.2, kal);
   ok(ctx, sx, sy, sx + ca * L0, sy - sa * L0, 7);
   const v0Yazi = veri ? `vec(v)_0 = ${sayiYaz(v0, 0)} m/s` : "vec(v)_0";
-  if (aci > 5) fizikMetniCiz(ctx, v0Yazi, sx + ca * L0 - 4, sy - sa * L0 - 8, punto, "sag");
-  else fizikMetniCiz(ctx, v0Yazi, sx + ca * L0 + 6, sy - 14, punto, "sol");
+  // Yazı tipi farkı (Times yoksa daha geniş bir yazı tipine düşülür) kutudan taşırmasın: sığmazsa küçülür/kısalır.
+  if (aci > 5) fizikMetniCiz(ctx, v0Yazi, sx + ca * L0 - 4, sy - sa * L0 - 8, punto, "sag", undefined, Math.max(30, sx + ca * L0 - 4 - k.x - 2));
+  else fizikMetniCiz(ctx, v0Yazi, sx + ca * L0 + 6, sy - 14, punto, "sol", undefined, Math.max(30, k.x + k.w - (sx + ca * L0 + 6) - 2));
   if (aci !== 0) {
     ctx.save(); ctx.lineWidth = Math.max(0.8, kal * 0.5);
     kesik(ctx, sx, sy, sx + 44, sy, [3, 3]);

@@ -1,6 +1,6 @@
 // Fizik şekilleri (atış, enerji, çarpışma, tork, vektör toplama, serbest cisim): hesap doğruluğu,
 // şema/doğrulama, şablonlar, çizim (boş değil, kutudan fazla taşmaz), aşırı değerlerde çökmeme.
-import { createCanvas } from "@napi-rs/canvas";
+import { GlobalFonts, createCanvas } from "@napi-rs/canvas";
 import {
   COGRAFYA_BOYUTLARI, FIZIK_SEMA, FIZIK_YAPILARI, SEMA, atisHesapla, carpismaSonra, cografyaCiz, cografyaGecerliMi,
   fizikHesapOzeti, torkDengesi, varsayilanCografya,
@@ -35,7 +35,7 @@ function olc(v: V) {
     if (d[(y * W + x) * 4] < 200) { n++; if (x < PAY - 44 || x > PAY + w + 44 || y < PAY - 44 || y > PAY + h + 44) { tasma++; tx0 = Math.min(tx0, x - PAY); tx1 = Math.max(tx1, x - PAY); ty0 = Math.min(ty0, y - PAY); ty1 = Math.max(ty1, y - PAY); } }
   }
   void ic;
-  return { n, tasma, yer: tasma ? `kutu ${w}×${h}, taşan x ${tx0}…${tx1}, y ${ty0}…${ty1}, yazı tipi ${ctx.font}` : "" };
+  return { n, tasma, yer: tasma ? `kutu ${w}×${h}, taşan x ${tx0}…${tx1}, y ${ty0}…${ty1}, yazı tipi ${ctx.font}; ölçü: ${(() => { ctx.font = "12px \"Times New Roman\", Times, serif"; return ctx.measureText("v0 = 50 m/s").width.toFixed(1); })()} px; yazı tipi ailesi sayısı ${GlobalFonts.families.length}` : "" };
 }
 
 console.log("Fizik şekilleri senaryoları");
