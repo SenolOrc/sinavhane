@@ -13,4 +13,8 @@ jobs:
           node-version: 20
       - run: npm install
       - run: npm run typecheck
+      - name: Yazı tipi teşhisi
+        run: |
+          fc-match "Times New Roman"; fc-match serif; fc-match sans-serif; fc-list | wc -l
+          node -e 'const {createCanvas,GlobalFonts}=require("@napi-rs/canvas");const x=createCanvas(10,10).getContext("2d");for(const f=["12px \"Times New Roman\", Times, serif","12px serif","12px sans-serif","12px \"Liberation Serif\"","12px \"DejaVu Serif\""],i=0;i<f.length;i++){x.font=f[i];console.log(f[i],x.measureText("v0 = 50 m/s").width,x.font)};console.log(GlobalFonts.families.map(a=>a.family).join(", "))'
       - run: npm test
