@@ -7,7 +7,8 @@ export type FizikEkYapi =
   | "atma" | "dalga" | "rezonans" | "doppler" | "kirinim"
   | "elektrikAlan" | "coulomb" | "levhaYuk" | "manyetikParcacik" | "iletkenCubuk" | "transformator"
   | "cembersel" | "yorunge" | "basitHarmonik" | "donme"
-  | "yolYer" | "bagilHareket" | "serbestDusme" | "stroboskop" | "hareketGrafigi";
+  | "yolYer" | "bagilHareket" | "serbestDusme" | "stroboskop" | "hareketGrafigi"
+  | "fotoelektrik" | "fotoGrafik" | "bozunma" | "basitMakine";
 
 type Sema = { ad: string; alt: string; alanlar: Alan[] };
 
@@ -365,6 +366,58 @@ export const FIZIK_EK_SEMA: Record<FizikEkYapi, Sema> = {
       { k: "mantik", a: "sayi", ad: "Eksen sayıları", v: true },
     ],
   },
+  // ── Paket 6: Madde ve doğası, basit makineler
+  fotoelektrik: {
+    ad: "Fotoelektrik olay", alt: "Fizik – Modern fizik",
+    alanlar: [
+      { k: "sec", a: "tip", ad: "Gösterim", sec: [["duzenek", "Düzenek (foton ve elektron)"], ["enerji", "Enerji dağılımı (hf = W + E_k)"], ["grafik", "E_k – hf grafiği"]], v: "duzenek" },
+      { k: "sayi", a: "hf", ad: "Foton enerjisi hf (eV)", min: 0.5, max: 12, adim: 0.5, v: 5 },
+      { k: "sayi", a: "W", ad: "Bağlanma (eşik) enerjisi W (eV)", min: 0.5, max: 8, adim: 0.5, v: 3 },
+      { k: "sayi", a: "W2", ad: "Grafikte 2. metalin W değeri (0 = yok)", min: 0, max: 8, adim: 0.5, v: 0 },
+      { k: "sayi", a: "yogun", ad: "Işık şiddeti (foton sayısı)", min: 1, max: 4, adim: 1, v: 2 },
+      { k: "mantik", a: "veri", ad: "Değerleri yaz", v: true },
+    ],
+  },
+  fotoGrafik: {
+    ad: "Fotoelektrik akım–gerilim grafiği", alt: "Fizik – Modern fizik",
+    alanlar: [
+      { k: "sec", a: "tip", ad: "Karşılaştırma", sec: [["yogunluk", "Farklı ışık şiddeti (aynı frekans)"], ["frekans", "Farklı frekans (aynı şiddet)"]], v: "yogunluk" },
+      { k: "sayi", a: "v0", ad: "Kesme gerilimi V₀ (V)", min: 1, max: 10, adim: 1, v: 3 },
+      { k: "sayi", a: "v02", ad: "2. frekansta kesme gerilimi (V)", min: 1, max: 12, adim: 1, v: 5 },
+      { k: "sayi", a: "i1", ad: "Doyma akımı I₁ (µA)", min: 1, max: 10, adim: 1, v: 4 },
+      { k: "sayi", a: "i2", ad: "2. ışık şiddetinde doyma akımı (µA)", min: 1, max: 10, adim: 1, v: 8 },
+      { k: "mantik", a: "veri", ad: "Değerleri yaz", v: true },
+    ],
+  },
+  bozunma: {
+    ad: "Radyoaktif bozunma", alt: "Fizik – Modern fizik",
+    alanlar: [
+      { k: "sec", a: "tip", ad: "Gösterim", sec: [["grafik", "N – t grafiği (yarı ömür)"], ["izgara", "Çekirdek modeli (sayılabilir)"], ["tepkime", "Bozunma denklemi (α, β, γ)"]], v: "grafik" },
+      { k: "sayi", a: "n", ad: "Yarı ömür sayısı", min: 1, max: 4, adim: 1, v: 3 },
+      { k: "sayi", a: "N0", ad: "Başlangıçta çekirdek sayısı N₀", min: 8, max: 4000, adim: 8, v: 80 },
+      { k: "sayi", a: "T", ad: "Yarı ömür (gün)", min: 1, max: 1000, adim: 1, v: 4 },
+      { k: "sec", a: "bozun", ad: "Bozunma türü", sec: [["alfa", "Alfa (α)"], ["beta", "Beta (β⁻)"], ["gama", "Gama (γ)"]], v: "alfa" },
+      { k: "sayi", a: "A", ad: "Kütle numarası A", min: 4, max: 300, adim: 1, v: 238 },
+      { k: "sayi", a: "Z", ad: "Atom numarası Z", min: 2, max: 120, adim: 1, v: 92 },
+      { k: "metin", a: "x", ad: "Ana çekirdek sembolü", en: 3, v: "X" },
+      { k: "metin", a: "y", ad: "Yavru çekirdek sembolü", en: 3, v: "Y" },
+      { k: "mantik", a: "veri", ad: "Değerleri yaz", v: true },
+    ],
+  },
+  basitMakine: {
+    ad: "Basit makineler", alt: "Fizik – Basit makineler",
+    alanlar: [
+      { k: "sec", a: "tip", ad: "Makine", sec: [["kaldirac", "Kaldıraç"], ["makara", "Makara sistemi"], ["egimli", "Eğik düzlem"]], v: "kaldirac" },
+      { k: "sayi", a: "G", ad: "Yükün ağırlığı G (N)", min: 10, max: 2000, adim: 10, v: 120 },
+      { k: "sayi", a: "l1", ad: "Kaldıraç: yük kolu (m)", min: 1, max: 10, adim: 1, v: 1 },
+      { k: "sayi", a: "l2", ad: "Kaldıraç: kuvvet kolu (m)", min: 1, max: 10, adim: 1, v: 3 },
+      { k: "sayi", a: "n", ad: "Makara: yükü taşıyan ip sayısı", min: 1, max: 6, adim: 1, v: 2 },
+      { k: "sayi", a: "L", ad: "Eğik düzlem boyu (m)", min: 1, max: 20, adim: 1, v: 5 },
+      { k: "sayi", a: "h", ad: "Eğik düzlem yüksekliği (m)", min: 1, max: 19, adim: 1, v: 3 },
+      { k: "mantik", a: "veri", ad: "Değerleri yaz", v: true },
+      { k: "mantik", a: "sonuc", ad: "Gereken kuvveti yaz (F = …)", v: false },
+    ],
+  },
 };
 
 export const FIZIK_EK_BOYUT: Record<FizikEkYapi, { w: number; h: number }> = {
@@ -373,4 +426,5 @@ export const FIZIK_EK_BOYUT: Record<FizikEkYapi, { w: number; h: number }> = {
   elektrikAlan: { w: 420, h: 250 }, coulomb: { w: 440, h: 230 }, levhaYuk: { w: 420, h: 240 }, manyetikParcacik: { w: 400, h: 260 }, iletkenCubuk: { w: 440, h: 240 }, transformator: { w: 440, h: 240 },
   cembersel: { w: 380, h: 260 }, yorunge: { w: 420, h: 260 }, basitHarmonik: { w: 440, h: 250 }, donme: { w: 440, h: 260 },
   yolYer: { w: 440, h: 260 }, bagilHareket: { w: 440, h: 250 }, serbestDusme: { w: 400, h: 290 }, stroboskop: { w: 460, h: 190 }, hareketGrafigi: { w: 440, h: 260 },
+  fotoelektrik: { w: 440, h: 250 }, fotoGrafik: { w: 400, h: 260 }, bozunma: { w: 450, h: 250 }, basitMakine: { w: 420, h: 260 },
 };

@@ -854,7 +854,8 @@ const FIZIK_ALT: Record<string, string> = { atis: "Fizik – Atış", enerji: "F
   atma: "Fizik – Dalgalar", dalga: "Fizik – Dalgalar", rezonans: "Fizik – Dalgalar", doppler: "Fizik – Dalgalar", kirinim: "Fizik – Dalgalar",
   elektrikAlan: "Fizik – Elektrik", coulomb: "Fizik – Elektrik", levhaYuk: "Fizik – Elektrik", manyetikParcacik: "Fizik – Manyetizma", iletkenCubuk: "Fizik – Manyetizma", transformator: "Fizik – Manyetizma",
   cembersel: "Fizik – Çembersel hareket", yorunge: "Fizik – Çekim", basitHarmonik: "Fizik – Salınım", donme: "Fizik – Dönme",
-  yolYer: "Fizik – Hareket", bagilHareket: "Fizik – Hareket", serbestDusme: "Fizik – Hareket", stroboskop: "Fizik – Hareket", hareketGrafigi: "Fizik – Hareket" };
+  yolYer: "Fizik – Hareket", bagilHareket: "Fizik – Hareket", serbestDusme: "Fizik – Hareket", stroboskop: "Fizik – Hareket", hareketGrafigi: "Fizik – Hareket",
+  fotoelektrik: "Fizik – Modern fizik", fotoGrafik: "Fizik – Modern fizik", bozunma: "Fizik – Modern fizik", basitMakine: "Fizik – Basit makineler" };
 const fz = (id: string, ad: string, ipucu: string, yapi: Parameters<typeof varsayilanCografya>[0], ek: Parameters<typeof varsayilanCografya>[1], anahtar: string[]): GeometriSablonu => ({
   id, ad, ipucu, nesne: "fizikSekil", altBaslik: FIZIK_ALT[yapi], aramaKelimeleri: ["fizik", ...anahtar], olustur: () => varsayilanCografya(yapi, ek),
 });
@@ -979,6 +980,21 @@ export const FIZIK_SABLONLARI: GeometriSablonu[] = [
   fz("f-strobo-yavas", "Stroboskop: yavaşlayan hareket", "Aralıklar azalıyor", "stroboskop", { tip: "yavaslayan" }, ["stroboskop", "yavaşlayan", "düzgün yavaşlayan"]),
   fz("f-grafik-vt", "Hız–zaman grafiği", "Alan = yer değiştirme, eğim = ivme", "hareketGrafigi", {}, ["v-t", "hız zaman", "grafik", "alan", "ivme"]),
   fz("f-grafik-xt", "Konum–zaman grafiği", "Eğim = hız", "hareketGrafigi", { tip: "xt" }, ["x-t", "konum zaman", "grafik", "eğim", "hız"]),
+  fz("f-foto-duzenek", "Fotoelektrik olay düzeneği", "hf > W: elektron sökülür", "fotoelektrik", {}, ["fotoelektrik", "foton", "elektron", "eşik enerjisi"]),
+  fz("f-foto-esik-alti", "Fotoelektrik: eşik altı", "hf < W: elektron çıkmaz", "fotoelektrik", { hf: 2, W: 3 }, ["fotoelektrik", "eşik", "foton"]),
+  fz("f-foto-enerji", "Fotoelektrik enerji dağılımı", "hf = W + E_k", "fotoelektrik", { tip: "enerji" }, ["fotoelektrik", "enerji", "bağlanma enerjisi", "kinetik enerji"]),
+  fz("f-foto-ekf", "Fotoelektrik E_k–f grafiği", "Eğim h, kesişim −W", "fotoelektrik", { tip: "grafik", W2: 5 }, ["fotoelektrik", "grafik", "planck", "eşik frekansı"]),
+  fz("f-foto-iv-siddet", "Fotoelektrik I–V (şiddet)", "Aynı V₀, farklı doyma akımı", "fotoGrafik", {}, ["fotoelektrik", "akım gerilim", "kesme gerilimi", "şiddet"]),
+  fz("f-foto-iv-frekans", "Fotoelektrik I–V (frekans)", "Farklı V₀, aynı doyma akımı", "fotoGrafik", { tip: "frekans" }, ["fotoelektrik", "akım gerilim", "kesme gerilimi", "frekans"]),
+  fz("f-bozunma-grafik", "Radyoaktif bozunma N–t grafiği", "Yarı ömür ve kalan çekirdek", "bozunma", {}, ["radyoaktif", "yarı ömür", "bozunma", "N-t"]),
+  fz("f-bozunma-izgara", "Çekirdek modeli ile yarı ömür", "Her T'de yarısı bozunur", "bozunma", { tip: "izgara", n: 3 }, ["radyoaktif", "yarı ömür", "çekirdek", "bozunma"]),
+  fz("f-bozunma-alfa", "Alfa bozunması", "A−4, Z−2", "bozunma", { tip: "tepkime" }, ["alfa bozunması", "çekirdek tepkimesi", "radyoaktif"]),
+  fz("f-bozunma-beta", "Beta bozunması", "Z + 1", "bozunma", { tip: "tepkime", bozun: "beta", A: 14, Z: 6 }, ["beta bozunması", "çekirdek tepkimesi", "radyoaktif"]),
+  fz("f-bozunma-gama", "Gama bozunması", "A ve Z değişmez", "bozunma", { tip: "tepkime", bozun: "gama", A: 60, Z: 28 }, ["gama", "çekirdek tepkimesi", "radyoaktif"]),
+  fz("f-makine-kaldirac", "Kaldıraç", "F·l₂ = G·l₁", "basitMakine", { sonuc: true }, ["kaldıraç", "basit makine", "tork", "kuvvet kolu"]),
+  fz("f-makine-makara", "Makara sistemi", "n ip: F = G/n", "basitMakine", { tip: "makara", sonuc: true }, ["makara", "palanga", "basit makine", "ip"]),
+  fz("f-makine-sabit-makara", "Sabit makara", "F = G, yön değiştirir", "basitMakine", { tip: "makara", n: 1 }, ["sabit makara", "basit makine"]),
+  fz("f-makine-egimli", "Eğik düzlem", "F = G·h/L", "basitMakine", { tip: "egimli", sonuc: true }, ["eğik düzlem", "basit makine", "iş kazancı"]),
   // <<PAKET-EK-SABLON>>
 ];
 

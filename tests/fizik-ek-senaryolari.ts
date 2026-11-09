@@ -6,6 +6,7 @@ import { torricelliHesapla, hidrolikF2, manometreBasinc } from "../src/modules/s
 import { bhmHesap, cemberselHesap, donmeHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizDinamik";
 import { coulombHesap, cubukHesap, trafoHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizElektrik";
 import { yolYerHesap, bagilHesap, dusmeHesap, stroboHesap, grafikHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizHareket";
+import { fotoHesap, bozunmaHesap, makineHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizModern";
 import { atmaYuksekligi, dalgaHesap, rezonansHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizDalga";
 
 function dogrula(k: unknown, m: string) { if (!k) { console.error("✗ " + m); process.exit(1); } }
@@ -213,6 +214,41 @@ senaryo("Paket 5 şekilleri uç değerlerde çökmez ve boş değildir", () => {
     ["serbestDusme", { n: 2 }], ["serbestDusme", { n: 5, g: 15 }], ["serbestDusme", { tip: "yukari", v0: 5, n: 5 }], ["serbestDusme", { tip: "yukari", v0: 60, g: 5, n: 5, hiz: false }],
     ["stroboskop", { n: 4, tip: "duzgun" }], ["stroboskop", { n: 8, tip: "hizlanan", nesne: "araba" }], ["stroboskop", { n: 8, tip: "yavaslayan", cetvel: false }],
     ["hareketGrafigi", { vdeg: [0, 0, 0, 0, 0] }], ["hareketGrafigi", { vdeg: [-20, 20, -20, 20, -20] }], ["hareketGrafigi", { tip: "xt", xdeg: [40, -40, 40, -40, 40] }],
+  ];
+  for (const [y, e] of liste) dogrula(mürekkep(ayar(y, e as never)) > 300, y + " boş/çöktü " + JSON.stringify(e));
+});
+// ── Paket 6: Madde ve doğası, basit makineler
+senaryo("Fotoelektrik: E_k = hf − W, eşik altında elektron yok", () => {
+  const h = fotoHesap(ayar("fotoelektrik", { hf: 5, W: 3 }));
+  dogrula(h.kopar && yakin(h.Ek, 2), "E_k = 2 eV");
+  const a = fotoHesap(ayar("fotoelektrik", { hf: 2, W: 3 }));
+  dogrula(!a.kopar && yakin(a.Ek, 0), "eşik altı");
+  dogrula(fizikHesapOzeti(ayar("fotoelektrik", { hf: 2, W: 3 }))?.includes("sökülmez"), "eşik altı özeti");
+  dogrula(fizikHesapOzeti(ayar("fotoGrafik", {}))?.includes("doyma akımı"), "I–V özeti");
+});
+senaryo("Radyoaktif bozunma: N = N₀/2ⁿ ve α/β/γ tepkimeleri", () => {
+  const h = bozunmaHesap(ayar("bozunma", { n: 3, N0: 80, T: 4 }));
+  dogrula(yakin(h.kalan, 10) && yakin(h.bozunan, 70) && yakin(h.sure, 12), "3 yarı ömür");
+  const al = bozunmaHesap(ayar("bozunma", { A: 238, Z: 92, bozun: "alfa" }));
+  dogrula(al.A2 === 234 && al.Z2 === 90, "alfa: A−4, Z−2");
+  const be = bozunmaHesap(ayar("bozunma", { A: 14, Z: 6, bozun: "beta" }));
+  dogrula(be.A2 === 14 && be.Z2 === 7, "beta: Z+1");
+  const ga = bozunmaHesap(ayar("bozunma", { A: 60, Z: 28, bozun: "gama" }));
+  dogrula(ga.A2 === 60 && ga.Z2 === 28, "gama: değişmez");
+});
+senaryo("Basit makineler: kaldıraç, makara, eğik düzlem", () => {
+  dogrula(yakin(makineHesap(ayar("basitMakine", { G: 120, l1: 1, l2: 3 })).F, 40), "F = G·l1/l2");
+  dogrula(yakin(makineHesap(ayar("basitMakine", { tip: "makara", G: 120, n: 2 })).F, 60), "F = G/n");
+  const e = makineHesap(ayar("basitMakine", { tip: "egimli", G: 120, L: 5, h: 3 }));
+  dogrula(yakin(e.F, 72) && yakin(e.kazanc, 120 / 72), "F = G·h/L");
+  dogrula(makineHesap(ayar("basitMakine", { tip: "egimli", L: 2, h: 19 })).h < 2, "h ≥ L ise sınırlanır");
+});
+senaryo("Paket 6 şekilleri uç değerlerde çökmez ve boş değildir", () => {
+  const liste: [Parameters<typeof varsayilanCografya>[0], Record<string, unknown>][] = [
+    ["fotoelektrik", {}], ["fotoelektrik", { hf: 0.5, W: 8 }], ["fotoelektrik", { tip: "enerji", hf: 12, W: 0.5 }], ["fotoelektrik", { tip: "enerji", hf: 1, W: 8 }], ["fotoelektrik", { tip: "grafik", W2: 8, W: 0.5, hf: 12 }], ["fotoelektrik", { tip: "grafik", hf: 0.5, W: 8, veri: false }], ["fotoelektrik", { yogun: 4, veri: false }],
+    ["fotoGrafik", {}], ["fotoGrafik", { tip: "frekans", v0: 1, v02: 12 }], ["fotoGrafik", { i1: 10, i2: 1 }], ["fotoGrafik", { i1: 5, i2: 5, veri: false }],
+    ["bozunma", {}], ["bozunma", { n: 4, N0: 4000 }], ["bozunma", { tip: "izgara", n: 4 }], ["bozunma", { tip: "izgara", n: 1, veri: false }], ["bozunma", { tip: "tepkime", veri: false }], ["bozunma", { tip: "tepkime", bozun: "beta" }], ["bozunma", { tip: "tepkime", bozun: "gama", A: 300, Z: 120 }],
+    ["basitMakine", {}], ["basitMakine", { l1: 10, l2: 1 }], ["basitMakine", { tip: "makara", n: 1 }], ["basitMakine", { tip: "makara", n: 6, sonuc: true }], ["basitMakine", { tip: "egimli", L: 20, h: 19, sonuc: true }], ["basitMakine", { tip: "egimli", L: 1, h: 1, veri: false }],
   ];
   for (const [y, e] of liste) dogrula(mürekkep(ayar(y, e as never)) > 300, y + " boş/çöktü " + JSON.stringify(e));
 });
