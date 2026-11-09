@@ -851,7 +851,8 @@ export const COGRAFYA_SABLONLARI: GeometriSablonu[] = [
 
 const FIZIK_ALT: Record<string, string> = { atis: "Fizik – Atış", enerji: "Fizik – Enerji", carpisma: "Fizik – Momentum", tork: "Fizik – Tork", vektorToplam: "Fizik – Vektör", scd: "Fizik – Kuvvet",
   torricelli: "Fizik – Akışkanlar", bernoulli: "Fizik – Akışkanlar", hidrolik: "Fizik – Akışkanlar", manometre: "Fizik – Akışkanlar",
-  atma: "Fizik – Dalgalar", dalga: "Fizik – Dalgalar", rezonans: "Fizik – Dalgalar", doppler: "Fizik – Dalgalar", kirinim: "Fizik – Dalgalar" };
+  atma: "Fizik – Dalgalar", dalga: "Fizik – Dalgalar", rezonans: "Fizik – Dalgalar", doppler: "Fizik – Dalgalar", kirinim: "Fizik – Dalgalar",
+  elektrikAlan: "Fizik – Elektrik", coulomb: "Fizik – Elektrik", levhaYuk: "Fizik – Elektrik", manyetikParcacik: "Fizik – Manyetizma", iletkenCubuk: "Fizik – Manyetizma", transformator: "Fizik – Manyetizma" };
 const fz = (id: string, ad: string, ipucu: string, yapi: Parameters<typeof varsayilanCografya>[0], ek: Parameters<typeof varsayilanCografya>[1], anahtar: string[]): GeometriSablonu => ({
   id, ad, ipucu, nesne: "fizikSekil", altBaslik: FIZIK_ALT[yapi], aramaKelimeleri: ["fizik", ...anahtar], olustur: () => varsayilanCografya(yapi, ek),
 });
@@ -921,6 +922,29 @@ export const FIZIK_SABLONLARI: GeometriSablonu[] = [
   fz("f-su-kirilma", "Su dalgası: kırılma (derin → sığ)", "Sığda λ ve v azalır, ışın normale yaklaşır", "kirinim", { tip: "kirilma" }, ["su dalgası", "kırılma", "dalga leğeni", "derin", "sığ", "snell"]),
   fz("f-su-kirinim", "Su dalgası: kırınım (dar aralık)", "Aralık λ ile kıyaslanabilir: daireselleşir", "kirinim", { tip: "kirinim" }, ["su dalgası", "kırınım", "aralık", "dalga leğeni", "engel"]),
   fz("f-su-girisim", "Su dalgası: iki kaynaklı girişim", "Düğüm ve karın çizgileri", "kirinim", { tip: "girisim" }, ["su dalgası", "girişim", "çift kaynak", "düğüm çizgisi", "karın çizgisi", "young"]),
+  // ── Paket 3: Elektrik – manyetizma
+  fz("f-ealan-tek-pozitif", "Elektrik alan: pozitif yük", "Çizgiler yükten dışarı çıkar", "elektrikAlan", { tip: "tek", isaret: "+" }, ["elektrik alan", "alan çizgileri", "pozitif yük", "nokta yük"]),
+  fz("f-ealan-tek-negatif", "Elektrik alan: negatif yük", "Çizgiler yüke girer", "elektrikAlan", { tip: "tek", isaret: "-", es: true }, ["elektrik alan", "alan çizgileri", "negatif yük", "eş potansiyel"]),
+  fz("f-ealan-dipol", "Elektrik alan: zıt yükler (+ −)", "Pozitiften negatife çizgiler", "elektrikAlan", { tip: "dipol" }, ["elektrik alan", "dipol", "zıt yük", "alan çizgileri"]),
+  fz("f-ealan-dipol-2q", "Elektrik alan: +2q ve −q", "Çizgi sayısı yükle orantılı", "elektrikAlan", { tip: "dipol", oran: 2, cizgi: 6 }, ["elektrik alan", "yük büyüklüğü", "çizgi sayısı", "alan çizgileri"]),
+  fz("f-ealan-ayni", "Elektrik alan: aynı işaretli yükler", "İtme: ortada çizgi yok", "elektrikAlan", { tip: "ayni" }, ["elektrik alan", "aynı yük", "itme", "alan çizgileri"]),
+  fz("f-ealan-test", "Elektrik alan: P noktasında kuvvet", "Deneme yüküne etki eden kuvvet", "elektrikAlan", { tip: "dipol", test: true }, ["elektrik alan", "kuvvet", "deneme yükü", "alan şiddeti"]),
+  fz("f-coulomb-uc", "Coulomb: üç yük, q₃ üzerindeki kuvvet", "q₁ ve q₂'nin q₃'e kuvvetleri", "coulomb", {}, ["coulomb", "elektriksel kuvvet", "yük", "net kuvvet", "doğrusal"]),
+  fz("f-coulomb-net", "Coulomb: net kuvvet (q₂ üzerinde)", "İki yük arasında kalan yük", "coulomb", { x1: 0, x2: 2, x3: 6, q1: 2, q2: 1, q3: -3, hedef: "2", net: true }, ["coulomb", "net kuvvet", "denge", "yük"]),
+  fz("f-coulomb-iki", "Coulomb: iki yük", "Çekme / itme kuvveti", "coulomb", { x1: 0, x2: 4, x3: 8, q1: 2, q2: -2, q3: 0, hedef: "1" }, ["coulomb", "çekme", "itme", "iki yük"]),
+  fz("f-levha-pozitif", "Paralel levhalar: pozitif yük sapar", "Üst levha +, yük aşağı sapar", "levhaYuk", { tip: "yorunge", isaret: "+" }, ["paralel levha", "elektrik alan", "yüklü parçacık", "sapma", "düzgün alan"]),
+  fz("f-levha-negatif", "Paralel levhalar: negatif yük sapar", "Elektron yukarı (+ levhaya) sapar", "levhaYuk", { tip: "yorunge", isaret: "-" }, ["paralel levha", "elektron", "sapma", "düzgün alan"]),
+  fz("f-kondansator", "Kondansatör (üreteçli)", "V, d, E = V/d", "levhaYuk", { tip: "kondansator" }, ["kondansatör", "sığa", "levha", "üreteç", "potansiyel farkı"]),
+  fz("f-kondansator-dielektrik", "Kondansatör: yalıtkan levha", "Araya konan yalıtkan sığayı artırır", "levhaYuk", { tip: "kondansator", dielektrik: true }, ["kondansatör", "dielektrik", "yalıtkan", "sığa"]),
+  fz("f-manyetik-sapma", "Manyetik alana giren pozitif yük", "Alana dik girer, yarım çember çizer", "manyetikParcacik", { tip: "sapma" }, ["manyetik alan", "yüklü parçacık", "lorentz", "sapma", "çembersel hareket"]),
+  fz("f-manyetik-negatif", "Manyetik alana giren negatif yük (dışa)", "İşaret ve alan yönü değişince sapma yönü değişir", "manyetikParcacik", { tip: "sapma", isaret: "-", alan: "disari" }, ["manyetik alan", "negatif yük", "elektron", "sağ el kuralı"]),
+  fz("f-manyetik-cember", "Düzgün manyetik alanda çembersel yörünge", "F = qvB merkezcil kuvvet", "manyetikParcacik", { tip: "cember", r: 55 }, ["manyetik alan", "çembersel hareket", "merkezcil kuvvet", "yarıçap", "periyot"]),
+  fz("f-manyetik-secici", "Hız seçici (E ve B)", "qE = qvB → v = E/B", "manyetikParcacik", { tip: "secici" }, ["hız seçici", "elektrik ve manyetik alan", "lorentz", "kütle spektrometresi"]),
+  fz("f-cubuk-emk", "Hareketli iletken çubuk (EMK)", "ε = BLv, indüksiyon akımı yönü", "iletkenCubuk", {}, ["indüksiyon", "emk", "lenz", "iletken çubuk", "faraday", "hareketsel emk"]),
+  fz("f-cubuk-kuvvet", "İletken çubuk: manyetik kuvvet", "Harekete zıt F = BIL", "iletkenCubuk", { kuvvet: true, alan: "disari", yon: "sag" }, ["indüksiyon", "lenz", "manyetik kuvvet", "iletken çubuk"]),
+  fz("f-cubuk-kok", "İletken çubuk (köklü değerler)", "B = √3 T, L = 1 m, v = 4 m/s: ε = 4√3 V", "iletkenCubuk", { B: "√3", L: 1, v: 4, R: 2, kokYaz: true }, ["indüksiyon", "emk", "köklü", "√3", "iletken çubuk"]),
+  fz("f-trafo-yukselten", "Transformatör: gerilim yükselten", "N₂ = 4N₁, V₂ sorulur", "transformator", {}, ["transformatör", "gerilim yükselten", "sarım sayısı", "indüksiyon", "primer", "sekonder"]),
+  fz("f-trafo-dusuren", "Transformatör: gerilim düşüren", "N₂ < N₁", "transformator", { n1: 400, n2: 100, v1: 200, r: 10, sonuc: "deger", akim: true }, ["transformatör", "gerilim düşüren", "akım", "güç"]),
   // <<PAKET-EK-SABLON>>
 ];
 

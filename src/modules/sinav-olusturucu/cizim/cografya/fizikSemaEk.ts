@@ -4,7 +4,8 @@ import type { Alan } from "./sema";
 
 export type FizikEkYapi =
   | "torricelli" | "bernoulli" | "hidrolik" | "manometre"
-  | "atma" | "dalga" | "rezonans" | "doppler" | "kirinim";
+  | "atma" | "dalga" | "rezonans" | "doppler" | "kirinim"
+  | "elektrikAlan" | "coulomb" | "levhaYuk" | "manyetikParcacik" | "iletkenCubuk" | "transformator";
 
 type Sema = { ad: string; alt: string; alanlar: Alan[] };
 
@@ -145,9 +146,95 @@ export const FIZIK_EK_SEMA: Record<FizikEkYapi, Sema> = {
     ],
   },
   // <<PAKET-EK-SEMA>>
+  // ── Paket 3: Elektrik – manyetizma
+  elektrikAlan: {
+    ad: "Elektrik alan çizgileri (nokta yükler)", alt: "Fizik – Elektrik",
+    alanlar: [
+      { k: "sec", a: "tip", ad: "Yük düzeni", sec: [["tek", "Tek nokta yük"], ["dipol", "Zıt işaretli iki yük"], ["ayni", "Aynı işaretli iki yük"]], v: "dipol" },
+      { k: "sec", a: "isaret", ad: "1. yükün işareti", sec: [["+", "Pozitif (+)"], ["-", "Negatif (−)"]], v: "+" },
+      { k: "sayi", a: "oran", ad: "|q₂| / |q₁|", min: 1, max: 4, adim: 1, v: 1 },
+      { k: "sayi", a: "ara", ad: "Yükler arası uzaklık (%)", min: 15, max: 60, adim: 1, v: 36 },
+      { k: "sayi", a: "cizgi", ad: "q₁ için çizgi sayısı", min: 4, max: 16, adim: 2, v: 8 },
+      { k: "mantik", a: "yaz", ad: "Yük yazıları (q, 2q)", v: true },
+      { k: "mantik", a: "ok", ad: "Yön okları", v: true },
+      { k: "mantik", a: "es", ad: "Eş potansiyel çizgileri (tek yük)", v: false },
+      { k: "mantik", a: "test", ad: "P noktası: deneme yükü ve kuvvet", v: false },
+    ],
+  },
+  coulomb: {
+    ad: "Coulomb kuvveti (doğru üzerinde yükler)", alt: "Fizik – Elektrik",
+    alanlar: [
+      { k: "sayi", a: "x1", ad: "q₁ konumu (birim)", min: 0, max: 12, adim: 1, v: 0 },
+      { k: "sayi", a: "x2", ad: "q₂ konumu (birim)", min: 0, max: 12, adim: 1, v: 3 },
+      { k: "sayi", a: "x3", ad: "q₃ konumu (birim)", min: 0, max: 12, adim: 1, v: 5 },
+      { k: "sayi", a: "q1", ad: "q₁ (q cinsinden, 0 = yok)", min: -4, max: 4, adim: 1, v: 4 },
+      { k: "sayi", a: "q2", ad: "q₂ (q cinsinden, 0 = yok)", min: -4, max: 4, adim: 1, v: -1 },
+      { k: "sayi", a: "q3", ad: "q₃ (q cinsinden, 0 = yok)", min: -4, max: 4, adim: 1, v: 1 },
+      { k: "sec", a: "hedef", ad: "Kuvveti bulunacak yük", sec: [["1", "q₁"], ["2", "q₂"], ["3", "q₃"]], v: "3" },
+      { k: "mantik", a: "bilesen", ad: "Diğer yüklerin kuvvetleri", v: true },
+      { k: "mantik", a: "net", ad: "Net kuvvet", v: false },
+      { k: "mantik", a: "olcu", ad: "Uzaklık ölçüleri (d)", v: true },
+      { k: "mantik", a: "deger", ad: "Yük değerlerini yaz", v: true },
+    ],
+  },
+  levhaYuk: {
+    ad: "Paralel levhalar (parçacık / kondansatör)", alt: "Fizik – Elektrik",
+    alanlar: [
+      { k: "sec", a: "tip", ad: "Düzenek", sec: [["yorunge", "Yüklü parçacığın sapması"], ["kondansator", "Kondansatör (üreteçli)"]], v: "yorunge" },
+      { k: "sec", a: "isaret", ad: "Parçacığın yükü", sec: [["+", "Pozitif"], ["-", "Negatif"]], v: "+" },
+      { k: "sayi", a: "V", ad: "Potansiyel farkı V (volt)", min: 1, max: 1000, adim: 1, v: 100 },
+      { k: "sayi", a: "d", ad: "Levha aralığı d (cm)", min: 1, max: 50, adim: 1, v: 5 },
+      { k: "mantik", a: "alan", ad: "Elektrik alan çizgileri", v: true },
+      { k: "mantik", a: "yuk", ad: "Levha yükleri (+ / −)", v: true },
+      { k: "mantik", a: "veri", ad: "V ve d değerlerini yaz", v: true },
+      { k: "mantik", a: "yazi", ad: "E, F, v₀ yazıları", v: true },
+      { k: "mantik", a: "dielektrik", ad: "Kondansatör: yalıtkan levha", v: false },
+    ],
+  },
+  manyetikParcacik: {
+    ad: "Manyetik alanda yüklü parçacık", alt: "Fizik – Manyetizma",
+    alanlar: [
+      { k: "sec", a: "tip", ad: "Durum", sec: [["sapma", "Alana girip sapma"], ["cember", "Çembersel yörünge"], ["secici", "Hız seçici (E ve B)"]], v: "sapma" },
+      { k: "sec", a: "alan", ad: "Manyetik alan yönü", sec: [["iceri", "Sayfaya dik içe (×)"], ["disari", "Sayfadan dışa (•)"]], v: "iceri" },
+      { k: "sec", a: "isaret", ad: "Parçacığın yükü", sec: [["+", "Pozitif"], ["-", "Negatif"]], v: "+" },
+      { k: "sayi", a: "r", ad: "Yörünge yarıçapı (kutu yüksekliğinin %'si)", min: 15, max: 100, adim: 1, v: 40 },
+      { k: "mantik", a: "vf", ad: "Hız (v) ve kuvvet (F) okları", v: true },
+      { k: "mantik", a: "merkez", ad: "Merkez ve yarıçap (r)", v: true },
+      { k: "mantik", a: "yaz", ad: "B, q yazıları", v: true },
+    ],
+  },
+  iletkenCubuk: {
+    ad: "Manyetik alanda hareket eden iletken çubuk", alt: "Fizik – Manyetizma",
+    alanlar: [
+      { k: "sec", a: "alan", ad: "Manyetik alan yönü", sec: [["iceri", "Sayfaya dik içe (×)"], ["disari", "Sayfadan dışa (•)"]], v: "iceri" },
+      { k: "sec", a: "yon", ad: "Çubuğun hareketi", sec: [["sag", "Sağa"], ["sol", "Sola"]], v: "sag" },
+      { k: "sayi", a: "B", ad: "B (T)", min: 0.1, max: 10, adim: 0.1, v: 2, kok: true },
+      { k: "sayi", a: "L", ad: "Çubuk boyu L (m)", min: 0.1, max: 5, adim: 0.1, v: 0.5, kok: true },
+      { k: "sayi", a: "v", ad: "Hız v (m/s)", min: 0.5, max: 50, adim: 0.5, v: 4, kok: true },
+      { k: "sayi", a: "R", ad: "Direnç R (Ω)", min: 0.1, max: 100, adim: 0.1, v: 2, kok: true },
+      { k: "mantik", a: "veri", ad: "B, L, v, R değerlerini yaz", v: true },
+      { k: "mantik", a: "akim", ad: "İndüksiyon akımı yönü", v: true },
+      { k: "mantik", a: "kuvvet", ad: "Manyetik kuvvet (harekete zıt)", v: false },
+      { k: "mantik", a: "kokYaz", ad: "Köklü değerleri √ ile yaz", v: false },
+    ],
+  },
+  transformator: {
+    ad: "Transformatör (ideal)", alt: "Fizik – Manyetizma",
+    alanlar: [
+      { k: "sayi", a: "n1", ad: "Primer sarım N₁", min: 10, max: 5000, adim: 10, v: 100 },
+      { k: "sayi", a: "n2", ad: "Sekonder sarım N₂", min: 10, max: 5000, adim: 10, v: 400 },
+      { k: "sayi", a: "v1", ad: "Primer gerilim V₁ (V)", min: 1, max: 1000, adim: 1, v: 50 },
+      { k: "sayi", a: "r", ad: "Yük direnci R (Ω)", min: 1, max: 1000, adim: 1, v: 20 },
+      { k: "sec", a: "sonuc", ad: "V₂ yazısı", sec: [["soru", "Soru işareti"], ["deger", "Değer"], ["ad", "Yalnız V₂"]], v: "soru" },
+      { k: "mantik", a: "veri", ad: "N, V₁ ve R değerlerini yaz", v: true },
+      { k: "mantik", a: "akim", ad: "Akım okları (I₁, I₂)", v: false },
+      { k: "mantik", a: "cekirdek", ad: "Demir çekirdek yazısı", v: true },
+    ],
+  },
 };
 
 export const FIZIK_EK_BOYUT: Record<FizikEkYapi, { w: number; h: number }> = {
   torricelli: { w: 420, h: 260 }, bernoulli: { w: 420, h: 220 }, hidrolik: { w: 380, h: 230 }, manometre: { w: 320, h: 240 },
   atma: { w: 440, h: 210 }, dalga: { w: 440, h: 210 }, rezonans: { w: 420, h: 200 }, doppler: { w: 440, h: 230 }, kirinim: { w: 440, h: 270 },
+  elektrikAlan: { w: 420, h: 250 }, coulomb: { w: 440, h: 230 }, levhaYuk: { w: 420, h: 240 }, manyetikParcacik: { w: 400, h: 260 }, iletkenCubuk: { w: 440, h: 240 }, transformator: { w: 440, h: 240 },
 };

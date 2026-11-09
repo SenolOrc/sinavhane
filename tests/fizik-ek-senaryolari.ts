@@ -3,6 +3,7 @@
 import { createCanvas } from "@napi-rs/canvas";
 import { cografyaCiz, cografyaGecerliMi, fizikHesapOzeti, varsayilanCografya, COGRAFYA_BOYUTLARI } from "../src/modules/sinav-olusturucu/cizim/cografya";
 import { torricelliHesapla, hidrolikF2, manometreBasinc } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizEk";
+import { coulombHesap, cubukHesap, trafoHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizElektrik";
 import { atmaYuksekligi, dalgaHesap, rezonansHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizDalga";
 
 function dogrula(k: unknown, m: string) { if (!k) { console.error("✗ " + m); process.exit(1); } }
@@ -87,6 +88,47 @@ senaryo("Dalga şekilleri uç değerlerde çökmez ve boş değildir", () => {
     ["dalga", { lam: 8, sayi: 4, genlik: 3 }], ["dalga", { tip: "boyuna", lam: 2, sayi: 4 }], ["rezonans", { tip: "kapali", n: 6, L: 10 }], ["rezonans", { tip: "acik", n: 6 }], ["rezonans", { tip: "tel", n: 1 }],
     ["doppler", { oran: 0 }], ["doppler", { oran: 1.6, n: 8, yon: "sol" }], ["kirinim", { tip: "yansima", aci: 80 }], ["kirinim", { tip: "kirilma", aci: 80, oran: 3 }],
     ["kirinim", { tip: "kirinim", yarik: 6, lam: 30 }], ["kirinim", { tip: "girisim", ara: 6, lam: 8 }], ["kirinim", { tip: "girisim", ara: 1 }],
+  ];
+  for (const [y, e] of liste) dogrula(mürekkep(ayar(y, e as never)) > 300, y + " boş/çöktü " + JSON.stringify(e));
+});
+// ── Paket 3: Elektrik – manyetizma
+senaryo("Coulomb: işaretli bileşenler ve net kuvvet (k·q²/d² biriminde)", () => {
+  // q1=+4 (x=0), q2=−1 (x=3), q3=+1 (x=5); hedef q3: F13 = 4/25 sağa, F23 = −1·1 çekim → sola 1/4
+  const h = coulombHesap(ayar("coulomb", {}));
+  dogrula(h.bilesen.length === 2, "iki bileşen");
+  dogrula(yakin(h.bilesen[0].f, 4 / 25) && yakin(h.bilesen[1].f, -1 / 4), "bileşenler: " + JSON.stringify(h.bilesen));
+  dogrula(yakin(h.net, 4 / 25 - 1 / 4), "net");
+  const o = coulombHesap(ayar("coulomb", { x1: 0, x2: 2, x3: 6, q1: 2, q2: 1, q3: -3, hedef: "2" }));
+  // q2 iki yükün arasında: q1 (+2) onu sağa iter (2/4), q3 (−3) onu sağa çeker (3/16) → 0,6875
+  dogrula(yakin(o.net, 2 / 4 + 3 / 16), "arada kalan yük net kuvveti: " + o.net);
+  dogrula(coulombHesap(ayar("coulomb", { q3: 0, hedef: "1" })).bilesen.length === 1, "q=0 yük kuvvet vermez");
+});
+senaryo("İletken çubuk: ε = BLv, I = ε/R, F = BIL, P = εI (köklü giriş dahil)", () => {
+  const h = cubukHesap(ayar("iletkenCubuk", { B: 2, L: 0.5, v: 4, R: 2 }));
+  dogrula(yakin(h.emk, 4) && yakin(h.I, 2) && yakin(h.F, 2) && yakin(h.P, 8), "değerler");
+  const k = ayar("iletkenCubuk", { B: "√3", L: 1, v: 4, R: 2, kokYaz: true });
+  dogrula(cografyaGecerliMi(k as never), "köklü kabul");
+  const o = fizikHesapOzeti(k); dogrula(o && o.includes("4√3"), "köklü özet: " + o);
+});
+senaryo("Transformatör: V₂ = V₁N₂/N₁, güç korunumu", () => {
+  const h = trafoHesap(ayar("transformator", { n1: 100, n2: 400, v1: 50, r: 20 }));
+  dogrula(yakin(h.v2, 200) && yakin(h.i2, 10) && yakin(h.i1, 40) && yakin(h.p, 2000), "değerler");
+  dogrula(yakin(h.v1 * h.i1, h.v2 * h.i2), "P1 = P2");
+  const o = fizikHesapOzeti(ayar("transformator", {})); dogrula(o && o.includes("yükselten"), "özet: " + o);
+});
+senaryo("Levha ve elektrik alan özetleri", () => {
+  const o = fizikHesapOzeti(ayar("levhaYuk", { V: 100, d: 5 })); dogrula(o && o.includes("2000 V/m"), "E=V/d: " + o);
+  dogrula(fizikHesapOzeti(ayar("manyetikParcacik", { tip: "secici" }))?.includes("v = E/B"), "hız seçici");
+  dogrula(fizikHesapOzeti(ayar("elektrikAlan", { tip: "ayni" }))?.includes("itme"), "aynı yük");
+});
+senaryo("Elektrik–manyetizma şekilleri uç değerlerde çökmez ve boş değildir", () => {
+  const liste: [Parameters<typeof varsayilanCografya>[0], Record<string, unknown>][] = [
+    ["elektrikAlan", { tip: "tek", isaret: "-", es: true, cizgi: 16 }], ["elektrikAlan", { tip: "dipol", oran: 4, cizgi: 16, test: true }], ["elektrikAlan", { tip: "ayni", oran: 3, ara: 60 }], ["elektrikAlan", { tip: "dipol", ara: 15, cizgi: 4 }],
+    ["coulomb", { x1: 0, x2: 0, x3: 0 }], ["coulomb", { q1: 0, q2: 0, q3: 0 }], ["coulomb", { x1: 12, x2: 0, x3: 6, hedef: "1", net: true }],
+    ["levhaYuk", { tip: "yorunge", isaret: "-", d: 50, V: 1000 }], ["levhaYuk", { tip: "kondansator", dielektrik: true }],
+    ["manyetikParcacik", { tip: "sapma", r: 100 }], ["manyetikParcacik", { tip: "sapma", r: 15, isaret: "-", alan: "disari" }], ["manyetikParcacik", { tip: "cember", r: 100 }], ["manyetikParcacik", { tip: "secici", isaret: "-" }],
+    ["iletkenCubuk", { yon: "sol", alan: "disari", kuvvet: true }], ["iletkenCubuk", { B: 10, L: 5, v: 50, R: 0.1 }],
+    ["transformator", { n1: 5000, n2: 10, sonuc: "deger", akim: true }], ["transformator", { n1: 10, n2: 5000 }],
   ];
   for (const [y, e] of liste) dogrula(mürekkep(ayar(y, e as never)) > 300, y + " boş/çöktü " + JSON.stringify(e));
 });
