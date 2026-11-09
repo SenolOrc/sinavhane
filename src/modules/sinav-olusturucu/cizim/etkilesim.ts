@@ -114,6 +114,8 @@ const PORTSUZ = ["kareliAlan", "egikKuvvet", "optikDuzenek", "siviKabi", "grafik
 export function portluMu(s: Sekil): boolean {
   if (s.tur === "akis") return true;
   if (s.tur !== "fizik") return false;
+  // Fizik şekilleri (atış, enerji, çarpışma, tork…) `geo` taşır ama birbirine bağlanabilir: kutu kenarlarından.
+  if (s.nesne === "fizikSekil") return true;
   if (PORTSUZ.includes(s.nesne) || FIZIK_TANIMLARI[s.nesne]?.grup === "geometri") return false;
   // Geometri ailesine yeni eklenen nesneler (veri `geo`) de portsuz.
   return !s.geo;

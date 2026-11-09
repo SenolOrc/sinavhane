@@ -7,6 +7,7 @@ import {
 } from "../src/modules/sinav-olusturucu/cizim/cografya";
 import { FIZIK_SABLONLARI, GEOMETRI_KUTUPHANESI } from "../src/modules/sinav-olusturucu/cizim/geometriSekilleri";
 import { sekilGecerliMi } from "../src/modules/sinav-olusturucu/cizim/sablon";
+import { baglantiPortlari, portluMu } from "../src/modules/sinav-olusturucu/cizim/etkilesim";
 import type { Sekil } from "../src/modules/sinav-olusturucu/cizim/tipler";
 
 function dogrula(k: unknown, m: string) { if (!k) { console.error("✗ " + m); process.exit(1); } }
@@ -144,6 +145,19 @@ senaryo("uç değerlerde çökmez, sonlu çizer", () => {
     // Bozuk ayar: çizim yine de çökmemeli
     try { olc(varsayilanCografya(y, { v0: NaN, aci: 1e9, yuk: [] as number[], konum: [] as number[], deger: "x" as unknown as number })); } catch (e) { dogrula(false, y + ": bozuk ayarda çöktü " + e); }
   }
+});
+
+senaryo("fizik şekilleri bağlayıcı için 4 port verir (kutu kenarları), geometri portsuz kalır", () => {
+  for (const y of FIZIK_YAPILARI) {
+    const b = COGRAFYA_BOYUTLARI[y];
+    const s = { id: "p", tur: "fizik", nesne: "fizikSekil", kalinlik: 2, x: 10, y: 20, w: b.w, h: b.h, geo: varsayilanCografya(y) } as Sekil;
+    dogrula(portluMu(s), y + ": portlu değil");
+    const p = baglantiPortlari(s);
+    dogrula(p.length === 4, y + ": port sayısı");
+    dogrula(p.some((q) => q.yon === "sag" && Math.abs(q.x - (10 + b.w)) < 1e-6 && Math.abs(q.y - (20 + b.h / 2)) < 1e-6), y + ": sağ port yeri");
+  }
+  const cg = { id: "c", tur: "fizik", nesne: "cografyaSekil", kalinlik: 2, x: 0, y: 0, w: 300, h: 200, geo: varsayilanCografya("harita") } as Sekil;
+  dogrula(!portluMu(cg), "coğrafya şekli portsuz kalmalı");
 });
 
 console.log("TÜM FİZİK ŞEKİLLERİ SENARYOLARI BAŞARILI");
