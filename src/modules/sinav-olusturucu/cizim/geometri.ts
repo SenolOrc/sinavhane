@@ -8,6 +8,7 @@
 // geçmişteki kaydı da sessizce değiştirir ve Ctrl+Z eski hâle dönemez.
 
 import type { AkisSekli, BaglayiciUcu, CizilenTaslak, Nokta, Sekil, TutamacId } from "./tipler";
+import { fizikIcerikTutunma } from "./fizikIcerik";
 import { ASGARI_CIZIM_PX, BAGLAYICI_CIKIS, VARSAYILAN_TUVAL } from "./sabitler";
 import type { TuvalOlcusu } from "./sabitler";
 
@@ -487,6 +488,11 @@ export function yonDondur(yon: "ust" | "sag" | "alt" | "sol", derece: number): "
 }
 
 function tutunmaNoktasiYerel(sekil: Sekil, yon: "ust" | "sag" | "alt" | "sol"): Nokta {
+  // Fizik şekli: ok kutu kenarında değil, ÇİZİMİN gerçek kenarında başlasın/bitsin.
+  if (sekil.tur === "fizik" && sekil.nesne === "fizikSekil") {
+    const t = fizikIcerikTutunma(sekil);
+    if (t) return t[yon];
+  }
   const k = tutunmaKutusu(sekil);
   const merkez = { x: k.x + k.w / 2, y: k.y + k.h / 2 };
   const kaba: Nokta =

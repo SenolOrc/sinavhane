@@ -11,6 +11,7 @@
 import { COGRAFYA_BOYUTLARI, varsayilanCografya } from "./cografya";
 import type { FizikEk, GeoAciIsareti, GeometriVerisi, Nokta, Sekil } from "./tipler";
 import { MUREKKEP } from "./sabitler";
+import { icerikCizicisiKaydet } from "./fizikIcerik";
 import { FIZIK_TANIMLARI, fizikMetniCiz, fizikMetniOlcu } from "./fizik";
 import { aciNormu, aciYayiCiz, dikAciIsaretiCiz, dilimTara, dogru, ince, koseAdi, noktaCiz, tirtikCiz } from "./geometriYardimci";
 import {
@@ -1008,3 +1009,6 @@ export function geometriDisPayi(ctx: CanvasRenderingContext2D, s: FizikSekli) {
 
 /** Panel/simge için tür adları (kütüphane, önizleme). */
 export { DORTGEN_TIPLERI, KATI_TURLERI };
+
+// Bağlayıcı tutunma noktaları için fizik şeklinin gerçek çizim sınırı bu çiziciyle ölçülür.
+icerikCizicisiKaydet((ctx, s) => geometriCiz(ctx, s));

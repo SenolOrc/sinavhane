@@ -9,6 +9,8 @@ import { FIZIK_SABLONLARI, GEOMETRI_KUTUPHANESI } from "../src/modules/sinav-olu
 import { sekilGecerliMi } from "../src/modules/sinav-olusturucu/cizim/sablon";
 import { baglantiPortlari, portluMu } from "../src/modules/sinav-olusturucu/cizim/etkilesim";
 import type { Sekil } from "../src/modules/sinav-olusturucu/cizim/tipler";
+import { fizikIcerikTutunma, icerikTuvaliAyarla } from "../src/modules/sinav-olusturucu/cizim/fizikIcerik";
+import { baglayiciYolu } from "../src/modules/sinav-olusturucu/cizim/geometri";
 
 function dogrula(k: unknown, m: string) { if (!k) { console.error("✗ " + m); process.exit(1); } }
 function senaryo(ad: string, f: () => void) { f(); console.log("  ✓ " + ad); }
@@ -158,6 +160,50 @@ senaryo("fizik şekilleri bağlayıcı için 4 port verir (kutu kenarları), geo
   }
   const cg = { id: "c", tur: "fizik", nesne: "cografyaSekil", kalinlik: 2, x: 0, y: 0, w: 300, h: 200, geo: varsayilanCografya("harita") } as Sekil;
   dogrula(!portluMu(cg), "coğrafya şekli portsuz kalmalı");
+});
+
+senaryo("bağlayıcı uçları çizimin gerçek kenarında: 28 şablonda 4 port da mürekkebe ≤7 px yakın, kutu dışına taşmaz", () => {
+  icerikTuvaliAyarla((w, h) => createCanvas(w, h) as unknown as HTMLCanvasElement);
+  for (const sb of FIZIK_SABLONLARI) {
+    const geo = sb.olustur();
+    if (geo.tur !== "cografya") continue;
+    const b = COGRAFYA_BOYUTLARI[geo.yapi];
+    const s = { id: "t", tur: "fizik", nesne: "fizikSekil", kalinlik: 2, x: 30, y: 40, w: b.w, h: b.h, geo } as Extract<Sekil, { tur: "fizik" }>;
+    const t = fizikIcerikTutunma(s);
+    dogrula(t, sb.id + ": tutunma ölçülemedi");
+    if (!t) continue;
+    // Bağımsız referans çizim: ink'i kendimiz tara
+    const W = b.w + 2 * PAY + 60, H = b.h + 2 * PAY + 60;
+    const c = createCanvas(W, H); const ctx = c.getContext("2d") as unknown as CanvasRenderingContext2D;
+    ctx.strokeStyle = "#0f172a"; ctx.fillStyle = "#0f172a"; ctx.lineWidth = 2;
+    cografyaCiz(ctx, geo, { x: 30, y: 40, w: b.w, h: b.h });
+    const d = ctx.getImageData(0, 0, W, H).data;
+    const yakinMurekkep = (p: { x: number; y: number }, r: number) => {
+      for (let yy = Math.floor(p.y - r); yy <= p.y + r; yy++) for (let xx = Math.floor(p.x - r); xx <= p.x + r; xx++)
+        if (xx >= 0 && yy >= 0 && xx < W && yy < H && d[(yy * W + xx) * 4 + 3] > 40) return true;
+      return false;
+    };
+    for (const yon of ["ust", "sag", "alt", "sol"] as const) {
+      dogrula(yakinMurekkep(t[yon], 7), `${sb.id}: ${yon} ucu çizimden >7 px uzak (${t[yon].x.toFixed(0)},${t[yon].y.toFixed(0)})`);
+    }
+    // Hiçbir uç, kutunun 60 px dışına çıkmaz; ve çizim kutusu kutuya yakın
+    dogrula(t.ust.y >= s.y - 60 && t.alt.y <= s.y + s.h + 60 && t.sol.x >= s.x - 60 && t.sag.x <= s.x + s.w + 60, sb.id + ": uç kutudan çok uzakta");
+    dogrula(t.ust.y < t.alt.y && t.sol.x < t.sag.x, sb.id + ": uçlar ters");
+  }
+  // Konum bağımsız: şekil taşınınca uçlar aynı miktarda kayar; ayna çevirince sol/sağ yer değiştirir
+  const geo = varsayilanCografya("carpisma");
+  const b = COGRAFYA_BOYUTLARI.carpisma;
+  const a = { id: "a", tur: "fizik", nesne: "fizikSekil", kalinlik: 2, x: 0, y: 0, w: b.w, h: b.h, geo } as Extract<Sekil, { tur: "fizik" }>;
+  const t0 = fizikIcerikTutunma(a)!, t1 = fizikIcerikTutunma({ ...a, x: 100, y: 50 })!;
+  dogrula(yakin(t1.sag.x - t0.sag.x, 100, 1e-6) && yakin(t1.ust.y - t0.ust.y, 50, 1e-6), "taşınınca uç kaymadı");
+  const m = fizikIcerikTutunma({ ...a, ayna: true })!;
+  dogrula(yakin(m.sag.x, b.w - t0.sol.x, 1e-6), "ayna: sağ uç, solun yansıması olmalı");
+  // Bağlayıcı yolu kutu kenarında değil, çizim kenarında bitiyor
+  const hedef = { ...a, id: "h", x: 0, y: 300 };
+  const ba = { id: "k", tur: "baglayici", kalinlik: 2, okUcu: "son", kaynak: { sekilId: "a", yon: "alt" }, hedef: { sekilId: "h", yon: "ust" } } as Extract<Sekil, { tur: "baglayici" }>;
+  const yol = baglayiciYolu([a, hedef, ba], ba)!;
+  dogrula(yakin(yol[0].y, t0.alt.y, 1e-6), "bağlayıcı kaynak ucu çizim kenarında değil");
+  dogrula(yol[0].y !== a.y + a.h || t0.alt.y === a.y + a.h, "bağlayıcı hâlâ kutu kenarında");
 });
 
 console.log("TÜM FİZİK ŞEKİLLERİ SENARYOLARI BAŞARILI");

@@ -10,6 +10,7 @@
 import type { BaglayiciYonu, GrafikVerisi, Nokta, Sekil } from "./tipler";
 import { grafikDuzeni, type GrafikDuzeni } from "./grafik";
 import { FIZIK_TANIMLARI } from "./fizik";
+import { tutunmaNoktasi } from "./geometri";
 
 type FizikSekli = Extract<Sekil, { tur: "fizik" }>;
 const RAD = Math.PI / 180;
@@ -127,6 +128,15 @@ export type BaglantiPortu = { yon: Exclude<BaglayiciYonu, "oto">; x: number; y: 
 export function baglantiPortlari(s: Sekil): BaglantiPortu[] {
   if (!portluMu(s) || (s.tur !== "akis" && s.tur !== "fizik")) return [];
   const m = { x: s.x + s.w / 2, y: s.y + s.h / 2 };
+  // Fizik şeklinde noktalar çizimin gerçek kenarından gelir (tutunmaNoktasi zaten döndürür).
+  if (s.tur === "fizik" && s.nesne === "fizikSekil") {
+    return (["ust", "sag", "alt", "sol"] as const).map((y0) => {
+      const d = tutunmaNoktasi(s, y0);
+      const aci = Math.atan2(d.y - m.y, d.x - m.x) / RAD;
+      const yon: BaglantiPortu["yon"] = aci >= -45 && aci < 45 ? "sag" : aci >= 45 && aci < 135 ? "alt" : aci >= -135 && aci < -45 ? "ust" : "sol";
+      return { yon, x: d.x, y: d.y };
+    });
+  }
   const yerel = [
     { x: m.x, y: s.y }, { x: s.x + s.w, y: m.y }, { x: m.x, y: s.y + s.h }, { x: s.x, y: m.y },
   ];
