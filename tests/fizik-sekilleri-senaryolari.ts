@@ -50,7 +50,7 @@ function olc(v: V) {
 console.log("Fizik şekilleri senaryoları");
 
 senaryo("altı yapı, şema ve varsayılanlar geçerli", () => {
-  dogrula(FIZIK_YAPILARI.length === 6, "6 yapı bekleniyordu");
+  dogrula(FIZIK_YAPILARI.length >= 6, "en az 6 yapı bekleniyordu");
   for (const y of FIZIK_YAPILARI) {
     dogrula(SEMA[y].alanlar.length > 3, y + ": alan yok");
     dogrula(FIZIK_SEMA[y].alt.startsWith("Fizik – "), y + ": alt başlık");

@@ -849,7 +849,8 @@ export const COGRAFYA_SABLONLARI: GeometriSablonu[] = [
   cg("c-aydinlanma-ekinoks", "Aydınlanma çemberi: 21 Mart / 23 Eylül", "Her yerde gece ile gündüz eşit", "aydinlanma", { tarih: "ekinoks" }, ["aydınlanma çemberi", "ekinoks", "21 mart", "23 eylül", "gece gündüz eşit"]),
 ];
 
-const FIZIK_ALT: Record<string, string> = { atis: "Fizik – Atış", enerji: "Fizik – Enerji", carpisma: "Fizik – Momentum", tork: "Fizik – Tork", vektorToplam: "Fizik – Vektör", scd: "Fizik – Kuvvet" };
+const FIZIK_ALT: Record<string, string> = { atis: "Fizik – Atış", enerji: "Fizik – Enerji", carpisma: "Fizik – Momentum", tork: "Fizik – Tork", vektorToplam: "Fizik – Vektör", scd: "Fizik – Kuvvet",
+  torricelli: "Fizik – Akışkanlar", bernoulli: "Fizik – Akışkanlar", hidrolik: "Fizik – Akışkanlar", manometre: "Fizik – Akışkanlar" };
 const fz = (id: string, ad: string, ipucu: string, yapi: Parameters<typeof varsayilanCografya>[0], ek: Parameters<typeof varsayilanCografya>[1], anahtar: string[]): GeometriSablonu => ({
   id, ad, ipucu, nesne: "fizikSekil", altBaslik: FIZIK_ALT[yapi], aramaKelimeleri: ["fizik", ...anahtar], olustur: () => varsayilanCografya(yapi, ek),
 });
@@ -888,6 +889,20 @@ export const FIZIK_SABLONLARI: GeometriSablonu[] = [
   fz("f-scd-egik", "Eğik düzlemde cisim", "mg, N ve sürtünme", "scd", { yuzey: "egik", surtunme: true }, ["serbest cisim", "eğik düzlem", "kuvvet", "sürtünme"]),
   fz("f-scd-egik-bilesen", "Eğik düzlem: ağırlık bileşenleri", "mg sinα ve mg cosα kesikli", "scd", { yuzey: "egik", bilesen: true }, ["serbest cisim", "bileşen", "eğik düzlem"]),
   fz("f-scd-ip", "İple asılı cisim (mg, T)", "Tavandan ipte asılı", "scd", { yuzey: "askida", normal: false, gerilme: true }, ["serbest cisim", "gerilme", "ip", "denge"]),
+  // ── Paket 1: Akışkanlar
+  fz("f-torricelli", "Torricelli: üç delikli kap", "Delik derinlikleri d₁, d₂, d₃; jetlerin menzili", "torricelli", {}, ["torricelli", "akışkan", "delikli kap", "sıvı basıncı", "menzil", "jet"]),
+  fz("f-torricelli-tek", "Torricelli: tek delik (değerli)", "d = 2 m, h = 8 m: x = 4√3 m", "torricelli", { d1: 2, d2: 0, d3: 0, deger: true, kokYaz: true, hizOk: true }, ["torricelli", "köklü", "√3", "akışkan", "çıkış hızı"]),
+  fz("f-torricelli-orta", "Torricelli: en uzak menzil (d = h/2)", "Ortadaki delik en uzağa atar", "torricelli", { h: 8, d1: 2, d2: 4, d3: 6, veri: true, menzil: true }, ["torricelli", "en uzak menzil", "h/2", "akışkan"]),
+  fz("f-torricelli-gaz", "Torricelli: kapalı kap (gaz basıncı)", "Üstte gaz basıncı P olan kapalı kap", "torricelli", { d1: 3, d2: 0, d3: 0, gaz: true }, ["torricelli", "gaz basıncı", "kapalı kap", "akışkan"]),
+  fz("f-bernoulli-venturi", "Venturi borusu (manometreli)", "Daralan kesitte basınç düşer: manometre farkı", "bernoulli", { tip: "venturi" }, ["bernoulli", "venturi", "süreklilik", "manometre", "akışkan", "basınç"]),
+  fz("f-bernoulli-kesit", "Kesiti değişen boru (süreklilik)", "A₁v₁ = A₂v₂; v₂ sorulur", "bernoulli", { tip: "kademe", a1: 40, a2: 10, v1: 2 }, ["süreklilik denklemi", "kesit", "debi", "bernoulli", "akışkan"]),
+  fz("f-bernoulli-yukseklik", "Bernoulli: yükseklik farklı boru", "Yükselen ve daralan boru, P₁ − P₂", "bernoulli", { tip: "yukseklik", dh: 3, a1: 30, a2: 10, v1: 2 }, ["bernoulli", "yükseklik", "basınç farkı", "akışkan"]),
+  fz("f-hidrolik-pres", "Hidrolik pres (F₂ sorulur)", "A₂ = 5A₁: kuvvet 5 katına çıkar", "hidrolik", {}, ["hidrolik", "pascal", "pres", "kaldıraç", "basınç", "piston"]),
+  fz("f-hidrolik-yol", "Hidrolik pres: piston yolları", "x₁·A₁ = x₂·A₂ (iş korunumu)", "hidrolik", { yol: true, sonuc: "deger", a1: 20, a2: 100, f1: 50 }, ["hidrolik", "piston", "yol", "iş", "pascal"]),
+  fz("f-manometre-acik", "Açık uçlu manometre", "Gaz basıncı P = P₀ + ρgh", "manometre", {}, ["manometre", "u borusu", "açık hava basıncı", "gaz basıncı", "civa"]),
+  fz("f-manometre-kapali", "Kapalı uçlu manometre", "Kapalı uç boşluk: P = ρgh", "manometre", { tip: "kapali", fark: 12 }, ["manometre", "kapalı uçlu", "barometre", "civa", "boşluk"]),
+  fz("f-manometre-iki", "İki gaz arası manometre", "İki kap arasındaki basınç farkı", "manometre", { tip: "ikiGaz", fark: 6, adlar: "A, B, sıvı" }, ["manometre", "iki gaz", "basınç farkı", "u borusu"]),
+  // <<PAKET-EK-SABLON>>
 ];
 
 export const GEOMETRI_KUTUPHANESI: GeometriSablonu[] = [

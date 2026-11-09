@@ -1,10 +1,12 @@
 // Fizik şekilleri (9–11. sınıf): atış, enerji dönüşümü, çarpışma, tork, vektör toplama, serbest cisim.
 // Coğrafya şekilleriyle AYNI ayar tablosu düzenini kullanır (varsayılanlar + doğrulama + otomatik panel).
 import type { Alan } from "./sema";
+import { FIZIK_EK_BOYUT, FIZIK_EK_SEMA, type FizikEkYapi } from "./fizikSemaEk";
 
-export type FizikYapi = "atis" | "enerji" | "carpisma" | "tork" | "vektorToplam" | "scd";
+export type FizikTemelYapi = "atis" | "enerji" | "carpisma" | "tork" | "vektorToplam" | "scd";
+export type FizikYapi = FizikTemelYapi | FizikEkYapi;
 
-export const FIZIK_SEMA: Record<FizikYapi, { ad: string; alt: string; alanlar: Alan[] }> = {
+const TEMEL_SEMA: Record<FizikTemelYapi, { ad: string; alt: string; alanlar: Alan[] }> = {
   atis: {
     ad: "Atış hareketi (yörünge)", alt: "Fizik – Atış",
     alanlar: [
@@ -101,9 +103,11 @@ export const FIZIK_SEMA: Record<FizikYapi, { ad: string; alt: string; alanlar: A
   },
 };
 
+export const FIZIK_SEMA: Record<FizikYapi, { ad: string; alt: string; alanlar: Alan[] }> = { ...TEMEL_SEMA, ...FIZIK_EK_SEMA };
 export const FIZIK_YAPILARI = Object.keys(FIZIK_SEMA) as FizikYapi[];
 
 export const FIZIK_BOYUTLARI: Record<FizikYapi, { w: number; h: number }> = {
+  ...FIZIK_EK_BOYUT,
   atis: { w: 420, h: 240 }, enerji: { w: 380, h: 240 }, carpisma: { w: 420, h: 230 },
   tork: { w: 400, h: 220 }, vektorToplam: { w: 300, h: 240 }, scd: { w: 300, h: 230 },
 };
