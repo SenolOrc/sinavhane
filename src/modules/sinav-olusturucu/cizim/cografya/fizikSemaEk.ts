@@ -423,7 +423,7 @@ export const FIZIK_EK_SEMA: Record<FizikEkYapi, Sema> = {
     ad: "Serbest vektör çizimi (1–6 vektör)", alt: "Fizik – Vektör",
     alanlar: [
       { k: "sayi", a: "n", ad: "Vektör sayısı", min: 1, max: 6, adim: 1, v: 3 },
-      { k: "sec", a: "yerlesim", ad: "Yerleşim", sec: [["ucuca", "Uç uca (zincir)"], ["ayni", "Aynı noktadan"]], v: "ucuca" },
+      { k: "sec", a: "yerlesim", ad: "Gösterim / işlem", sec: [["ayni", "Aynı noktadan (yalnız vektörler)"], ["ucuca", "Toplama: uç uca"], ["paralel", "Toplama: paralelkenar (ilk 2 vektör)"], ["bilesenler", "Bileşenlerine ayır (x ve y)"]], v: "ucuca" },
       { k: "sec", a: "mod", ad: "Değer girişi", sec: [["xy", "Bileşenlerle (x, y)"], ["boyAci", "Büyüklük ve açıyla"]], v: "xy" },
       { k: "sayilar", a: "xs", ad: "x bileşenleri (A…F sırayla)", n: 6, min: -30, max: 30, v: [3, 1, -2, 0, 0, 0] },
       { k: "sayilar", a: "ys", ad: "y bileşenleri (A…F sırayla)", n: 6, min: -30, max: 30, v: [1, 3, 2, 0, 0, 0] },

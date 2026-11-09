@@ -8,7 +8,7 @@ const D2R = Math.PI / 180;
 const es = (n: number, o = 1) => sayiYaz(n, o).replace("-", "−");
 
 export function vektorlerHesap(v: CografyaVerisi) {
-  const n = Math.round(ayarSayi(v, "n")), mod = ayarSec(v, "mod");
+  const par = ayarSec(v, "yerlesim") === "paralel", n = par ? Math.min(2, Math.round(ayarSayi(v, "n"))) : Math.round(ayarSayi(v, "n")), mod = ayarSec(v, "mod");
   const xs = ayarSayilar(v, "xs"), ys = ayarSayilar(v, "ys"), boy = ayarSayilar(v, "boy"), aci = ayarSayilar(v, "aci");
   const vek = Array.from({ length: n }, (_, i) => mod === "xy"
     ? { x: xs[i] ?? 0, y: ys[i] ?? 0 }
@@ -28,7 +28,7 @@ function beyaz(ctx: Ctx, metin: string, x: number, y: number, punto: number, hiz
 
 export function vektorSerbestCiz(ctx: Ctx, v: CografyaVerisi, k: Kutu) {
   kokluIle(v, () => {
-    const punto = puntoOlc(k), kal = ctx.lineWidth, h = vektorlerHesap(v), zincir = ayarSec(v, "yerlesim") === "ucuca";
+    const punto = puntoOlc(k), kal = ctx.lineWidth, h = vektorlerHesap(v), yer = ayarSec(v, "yerlesim"), zincir = yer === "ucuca", paralel = yer === "paralel" && h.n === 2, ayirma = yer === "bilesenler";
     const ad = bol(ayarMetin(v, "adlar")), birim = ayarMetin(v, "birim").trim();
     const adi = (i: number) => ad[i] || String.fromCharCode(65 + i), adR = ayarMetin(v, "adR").trim() || "R";
     const bir = birim ? " " + birim : "";
@@ -41,9 +41,11 @@ export function vektorSerbestCiz(ctx: Ctx, v: CografyaVerisi, k: Kutu) {
     });
     const bileske = ayarMantik(v, "bileske") && h.n > 1 && h.buyR > 1e-9;
     const nok = [{ x: 0, y: 0 }, h.R, ...seg.flatMap((s) => [s.a, s.b])];
-    if (ayarMantik(v, "eksen")) nok.push({ x: 0, y: 0 });
+    if (ayirma) for (const s of seg) nok.push({ x: s.b.x, y: 0 }, { x: 0, y: s.b.y });
+    if ((ayarMantik(v, "eksen") || ayirma)) nok.push({ x: 0, y: 0 });
     let mnx = Math.min(...nok.map((q) => q.x)), mxx = Math.max(...nok.map((q) => q.x)), mny = Math.min(...nok.map((q) => q.y)), mxy = Math.max(...nok.map((q) => q.y));
-    if (ayarMantik(v, "eksen")) { mnx = Math.min(mnx, -1); mny = Math.min(mny, -1); mxx = Math.max(mxx, 1); mxy = Math.max(mxy, 1); }
+    const eksenGoster = ayarMantik(v, "eksen") || ayirma;
+    if (eksenGoster) { mnx = Math.min(mnx, -1); mny = Math.min(mny, -1); mxx = Math.max(mxx, 1); mxy = Math.max(mxy, 1); }
     const gp = ayarMantik(v, "izgara") ? 2 : 0, sx = Math.max(1, mxx - mnx), sy = Math.max(1, mxy - mny), pay = 22;
     const c = Math.max(6, Math.min(36, (k.w - pay * 2) / (sx + gp), (k.h - pay * 2) / (sy + gp)));
     const ox = k.x + (k.w - sx * c) / 2 - mnx * c, oy = k.y + (k.h - sy * c) / 2 + mxy * c;
@@ -56,7 +58,7 @@ export function vektorSerbestCiz(ctx: Ctx, v: CografyaVerisi, k: Kutu) {
       for (let y = gy0; y <= gy1; y++) cizgi(ctx, X(gx0), Y(y), X(gx1), Y(y));
       ctx.restore(); ctx.strokeStyle = sk;
     }
-    if (ayarMantik(v, "eksen")) {
+    if (eksenGoster) {
       ctx.save(); ctx.lineWidth = Math.max(1, kal * 0.8);
       ok(ctx, X(Math.min(mnx, -1) - 0.6), Y(0), X(mxx + 0.8), Y(0), 6); ok(ctx, X(0), Y(Math.min(mny, -1) - 0.6), X(0), Y(mxy + 0.8), 6);
       ctx.restore();
@@ -68,6 +70,22 @@ export function vektorSerbestCiz(ctx: Ctx, v: CografyaVerisi, k: Kutu) {
       kesik(ctx, X(0), Y(0), X(h.R.x), Y(0), [3, 3]); kesik(ctx, X(h.R.x), Y(0), X(h.R.x), Y(h.R.y), [3, 3]); ctx.restore();
       if (Math.abs(h.R.x) > 1e-9) beyaz(ctx, `R_x = ${es(h.R.x)}${bir}`, X(h.R.x / 2), Y(0) + (h.R.y >= 0 ? 11 : -11), punto * 0.82);
       if (Math.abs(h.R.y) > 1e-9) beyaz(ctx, `R_y = ${es(h.R.y)}${bir}`, X(h.R.x) + (h.R.x >= 0 ? 6 : -6), Y(h.R.y / 2), punto * 0.82, h.R.x >= 0 ? "sol" : "sag");
+    }
+    if (paralel) {
+      const A = h.vek[0], B = h.vek[1];
+      ctx.save(); ctx.lineWidth = Math.max(0.9, kal * 0.7);
+      kesik(ctx, X(A.x), Y(A.y), X(h.R.x), Y(h.R.y), [5, 3]); kesik(ctx, X(B.x), Y(B.y), X(h.R.x), Y(h.R.y), [5, 3]); ctx.restore();
+    }
+    if (ayirma) {
+      const bas = (a: string) => { const t = a.replace(/_.*$/, ""); return t || "A"; };
+      seg.forEach((s, i) => {
+        const q = h.vek[i];
+        ctx.save(); ctx.lineWidth = Math.max(0.9, kal * 0.7);
+        kesik(ctx, X(0), Y(0), X(q.x), Y(0), [3, 3]); kesik(ctx, X(q.x), Y(0), X(q.x), Y(q.y), [3, 3]); ctx.restore();
+        const ad2 = bas(s.ad), deg = ayarMantik(v, "deger");
+        if (Math.abs(q.x) > 1e-9) beyaz(ctx, deg ? `${ad2}_x = ${es(q.x, 2)}${bir}` : `${ad2}_x`, X(q.x / 2), Y(0) + (q.y >= 0 ? 12 : -12), punto * 0.8);
+        if (Math.abs(q.y) > 1e-9) beyaz(ctx, deg ? `${ad2}_y = ${es(q.y, 2)}${bir}` : `${ad2}_y`, X(q.x) + (q.x >= 0 ? 6 : -6), Y(q.y / 2), punto * 0.8, q.x >= 0 ? "sol" : "sag");
+      });
     }
     // vektörler
     seg.forEach((s) => {
@@ -81,7 +99,7 @@ export function vektorSerbestCiz(ctx: Ctx, v: CografyaVerisi, k: Kutu) {
     });
     if (bileske) {
       ctx.save(); ctx.lineWidth = Math.max(2.4, kal * 1.9); ctx.setLineDash([]); ok(ctx, X(0), Y(0), X(h.R.x), Y(h.R.y), 10); ctx.restore();
-      const dx = X(h.R.x) - X(0), dy = Y(h.R.y) - Y(0), L = Math.hypot(dx, dy), nx = -dy / L, ny = dx / L, sg = ny >= 0 ? 1 : -1, rt = ayarMantik(v, "bilesen") ? 0.3 : zincir ? 0.5 : 0.62;
+      const dx = X(h.R.x) - X(0), dy = Y(h.R.y) - Y(0), L = Math.hypot(dx, dy), nx = -dy / L, ny = dx / L, sg = ny >= 0 ? -1 : 1, rt = ayarMantik(v, "bilesen") ? 0.4 : zincir ? 0.5 : 0.62;
       beyaz(ctx, ayarMantik(v, "deger") ? `${vecAd(adR)} = ${sayiYaz(h.buyR, 1)}${bir}` : vecAd(adR), X(0) + dx * rt + nx * sg * 13, Y(0) + dy * rt + ny * sg * 13, punto * 0.9);
       if (ayarMantik(v, "aciYay")) {
         const r = Math.min(26, L * 0.45), a1 = -(h.aciR * D2R);
