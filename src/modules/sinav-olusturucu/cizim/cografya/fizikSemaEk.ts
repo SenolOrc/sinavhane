@@ -423,10 +423,12 @@ export const FIZIK_EK_SEMA: Record<FizikEkYapi, Sema> = {
     ad: "Serbest vektör çizimi (1–6 vektör)", alt: "Fizik – Vektör",
     alanlar: [
       { k: "sayi", a: "n", ad: "Vektör sayısı", min: 1, max: 6, adim: 1, v: 3 },
-      { k: "sec", a: "yerlesim", ad: "Gösterim / işlem", sec: [["ayni", "Aynı noktadan (yalnız vektörler)"], ["ucuca", "Toplama: uç uca"], ["paralel", "Toplama: paralelkenar (ilk 2 vektör)"], ["bilesenler", "Bileşenlerine ayır (x ve y)"]], v: "ucuca" },
+      { k: "sec", a: "yerlesim", ad: "Gösterim / işlem", sec: [["ayni", "Aynı noktadan (yalnız vektörler)"], ["ucuca", "Toplama: uç uca"], ["paralel", "Toplama: paralelkenar (ilk 2 vektör)"], ["bilesenler", "Bileşenlerine ayır (x ve y)"], ["serbest", "Her vektör kendi başlangıç noktasında (ayrı ayrı)"]], v: "ucuca" },
       { k: "sec", a: "mod", ad: "Değer girişi", sec: [["xy", "Bileşenlerle (x, y)"], ["boyAci", "Büyüklük ve açıyla"]], v: "xy" },
       { k: "sayilar", a: "xs", ad: "x bileşenleri (A…F sırayla)", n: 6, min: -30, max: 30, v: [3, 1, -2, 0, 0, 0] },
       { k: "sayilar", a: "ys", ad: "y bileşenleri (A…F sırayla)", n: 6, min: -30, max: 30, v: [1, 3, 2, 0, 0, 0] },
+      { k: "sayilar", a: "bx0", ad: "Başlangıç noktası x (yalnız 'ayrı ayrı' işleminde)", n: 6, min: -30, max: 30, v: [0, 0, 0, 0, 0, 0] },
+      { k: "sayilar", a: "by0", ad: "Başlangıç noktası y (yalnız 'ayrı ayrı' işleminde)", n: 6, min: -30, max: 30, v: [0, 0, 0, 0, 0, 0] },
       { k: "sayilar", a: "boy", ad: "Büyüklükler (A…F), açıyla girişte", n: 6, min: 0, max: 60, v: [5, 4, 3, 2, 2, 2] },
       { k: "sayilar", a: "aci", ad: "Açılar ° (+x ekseninden, A…F)", n: 6, min: -360, max: 360, v: [30, 90, 150, 0, 0, 0] },
       { k: "metin", a: "adlar", ad: "Vektör adları (virgülle, sırayla)", en: 40, v: "A, B, C, D, E, F" },

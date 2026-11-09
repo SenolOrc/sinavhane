@@ -1003,6 +1003,8 @@ export const FIZIK_SABLONLARI: GeometriSablonu[] = [
   fz("f-vserbest-paralel", "Paralelkenar yöntemiyle toplama", "Aynı noktadan çıkan A ve B, bileşke köşegen", "vektorSerbest", { n: 2, yerlesim: "paralel", xs: [4, 1, 0, 0, 0, 0], ys: [1, 3, 0, 0, 0, 0] }, ["vektör", "paralelkenar", "bileşke", "toplama"]),
   fz("f-vserbest-ayristir", "Vektörü x ve y bileşenlerine ayırma", "F = 10 N için F_x ve F_y", "vektorSerbest", { n: 1, yerlesim: "bilesenler", bileske: false, xs: [6, 0, 0, 0, 0, 0], ys: [8, 0, 0, 0, 0, 0], adlar: "F", birim: "N", deger: true, izgara: false }, ["vektör", "bileşen", "ayırma", "x y", "kuvvet"]),
   fz("f-vserbest-ayristir-iki", "İki vektörü bileşenlerine ayırma", "Farklı bölgelerde A ve B", "vektorSerbest", { n: 2, yerlesim: "bilesenler", bileske: false, xs: [4, -3, 0, 0, 0, 0], ys: [3, 2, 0, 0, 0, 0], deger: true }, ["vektör", "bileşen", "ayırma", "x y"]),
+  fz("f-vserbest-ayri-4", "Kareli düzlemde ayrı ayrı vektörler (K, L, M, N)", "Her vektör kendi yerinde, soru için", "vektorSerbest", { n: 4, yerlesim: "serbest", bileske: false, adlar: "K, L, M, N", bx0: [0, 4, 1, 6, 0, 0], by0: [0, 0, 5, 4, 0, 0], xs: [3, 0, 4, -1, 0, 0], ys: [2, 3, -1, -3, 0, 0] }, ["vektör", "kareli", "ayrı", "K L M N", "soru"]),
+  fz("f-vserbest-ayri-3", "Kareli düzlemde üç ayrı vektör (X, Y, Z)", "Bileşkesi sorulabilir", "vektorSerbest", { n: 3, yerlesim: "serbest", bileske: false, adlar: "X, Y, Z", bx0: [0, 5, 0, 0, 0, 0], by0: [1, 0, 4, 0, 0, 0], xs: [4, -1, 3, 0, 0, 0], ys: [0, 4, -2, 0, 0, 0] }, ["vektör", "kareli", "ayrı", "X Y Z", "soru"]),
   // <<PAKET-EK-SABLON>>
 ];
 

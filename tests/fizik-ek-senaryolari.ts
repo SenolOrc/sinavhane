@@ -262,7 +262,7 @@ senaryo("Serbest vektör: bileşenle ve büyüklük+açıyla giriş, bileşke", 
   const d = vektorlerHesap(ayar("vektorSerbest", { mod: "boyAci", n: 1, boy: [10, 0, 0, 0, 0, 0], aci: [90, 0, 0, 0, 0, 0] }));
   dogrula(d.vek[0].x === 0 && yakin(d.vek[0].y, 10), "90° → x tam sıfır");
   dogrula(fizikHesapOzeti(ayar("vektorSerbest", { n: 2, xs: [3, 0, 0, 0, 0, 0], ys: [0, 4, 0, 0, 0, 0], adR: "F" }))?.includes("= 5"), "özet bileşke büyüklüğü");
-  for (const e of [{ n: 1 }, { n: 6, xs: [30, -30, 30, -30, 30, -30], ys: [30, 30, -30, -30, 0, 0] }, { yerlesim: "ayni", n: 6 }, { n: 3, bileske: false, izgara: false }, { n: 4, xs: [1, -1, 0, 0, 0, 0], ys: [0, 0, 0, 0, 0, 0] }, { mod: "boyAci", n: 6, aciYay: true, eksen: true, deger: true, birim: "N" }])
+  for (const e of [{ yerlesim: "serbest", n: 6, bx0: [0, 5, -5, 3, -3, 1], by0: [0, 5, -5, 3, -3, 1], bileske: true, bilesen: true }, { yerlesim: "serbest", n: 2, aciYay: true, deger: true }, { yerlesim: "paralel", n: 5 }, { yerlesim: "bilesenler", n: 3, mod: "boyAci" }, { n: 1 }, { n: 6, xs: [30, -30, 30, -30, 30, -30], ys: [30, 30, -30, -30, 0, 0] }, { yerlesim: "ayni", n: 6 }, { n: 3, bileske: false, izgara: false }, { n: 4, xs: [1, -1, 0, 0, 0, 0], ys: [0, 0, 0, 0, 0, 0] }, { mod: "boyAci", n: 6, aciYay: true, eksen: true, deger: true, birim: "N" }])
     dogrula(mürekkep(ayar("vektorSerbest", e as never)) > 100, "vektorSerbest boş/çöktü " + JSON.stringify(e));
 });
 // <<PAKET-EK-TEST>>
