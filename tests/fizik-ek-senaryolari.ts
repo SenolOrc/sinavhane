@@ -14,6 +14,9 @@ import { ucluHesap, akiHesap, ohmHesap, surtunmeHesap, lambaV, ekBul, gSayi } fr
 import { hareketParcalari, GRAFIK_SABLONLARI, grafikCiz } from "../src/modules/sinav-olusturucu/cizim/grafik";
 import { atmaYuksekligi, dalgaHesap, rezonansHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizDalga";
 
+import { alanHesap, alanVektoru, alanSifirNoktasi, alanTam, degerYaz } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizAlan";
+import { FIZIK_SABLONLARI } from "../src/modules/sinav-olusturucu/cizim/geometriSekilleri";
+
 function dogrula(k: unknown, m: string) { if (!k) { console.error("✗ " + m); process.exit(1); } }
 function senaryo(ad: string, f: () => void) { f(); console.log("  ✓ " + ad); }
 const yakin = (a: number, b: number, e = 1e-6) => Math.abs(a - b) <= e;
@@ -538,6 +541,87 @@ senaryo("Sayı biçimi ve eksen aralığı yardımcıları", () => {
   dogrula(gSayi(-1.5) === "−1,5" && gSayi(-0.001) === "0" && gSayi(0.25) === "0,25", "Türkçe ondalık, −");
   const e = ekBul(-3, 6); dogrula(e.lo <= -3 && e.hi >= 6 && e.adim > 0, "aralık kapsar");
   dogrula(ekBul(0, 0).lo === -1 && ekBul(0, 0).hi === 1, "hepsi sıfır");
+});
+// ── Elektrik alan: kareli düzlemde nokta yükler (elektrikAlanNokta)
+senaryo("elektrikAlanNokta: tek yük E = |q|/r², yön + yükten uzağa / − yüke doğru", () => {
+  const a = alanVektoru([{ x: 0, y: 0, q: 2 }], 3, 0);
+  dogrula(yakin(a.ex, 2 / 9) && yakin(a.ey, 0), "+2q, r=3 → 2/9");
+  const b = alanVektoru([{ x: 0, y: 0, q: -1 }], 0, 2);
+  dogrula(yakin(b.ex, 0) && yakin(b.ey, -1 / 4), "−q: yüke doğru (−y), 1/4");
+  const h = alanHesap(ayar("elektrikAlanNokta", { yukSayisi: 1, yx: [-2, 0, 0, 0], yq: [2, 0, 0, 0], noktaSayisi: 2, nx: [1, -2, 0], ny: [0, 2, 0] }));
+  dogrula(yakin(h.noktalar[0].buy, 2 / 9) && yakin(h.noktalar[1].buy, 1 / 2) && yakin(h.noktalar[1].ey, 1 / 2), "K, L büyüklükleri");
+});
+senaryo("elektrikAlanNokta: süperpozisyon (bileşke = tek tek alanların vektörel toplamı)", () => {
+  const h = alanHesap(ayar("elektrikAlanNokta", { yukSayisi: 4, yx: [-3, 3, 3, -3], yy: [3, 3, -3, -3], yq: [1, -2, 3, -1], noktaSayisi: 3, nx: [0, 2, -1], ny: [0, 1, -2] }));
+  for (const p of h.noktalar) {
+    const t = alanVektoru(h.yukler, p.x, p.y);
+    dogrula(yakin(p.ex, t.ex) && yakin(p.ey, t.ey), p.ad + ": toplam");
+    dogrula(yakin(p.ex, p.tek.reduce((s2, x) => s2 + x.ex, 0)), p.ad + ": tek tek toplam");
+    dogrula(yakin(p.buy, Math.hypot(p.ex, p.ey)), p.ad + ": büyüklük");
+  }
+  const sab = (id: string) => FIZIK_SABLONLARI.find((x) => x.id === id)!.olustur();
+  const u = alanHesap(sab("f-ealannokta-uc-yuk")).noktalar[0];
+  dogrula(yakin(u.ex, 0) && yakin(u.ey, 1 / 2) && yakin(u.aci, 90), "+q,+q,−2q: bileşke +y, 1/2");
+});
+senaryo("elektrikAlanNokta: simetri — eşit yüklerin ortası E = 0, dipol ortası 2kq/r² (−q'ya doğru), kare merkezi √2/4", () => {
+  const sab = (id: string) => FIZIK_SABLONLARI.find((x) => x.id === id)!.olustur();
+  const e = alanHesap(sab("f-ealannokta-esit-orta")).noktalar[0];
+  dogrula(e.sifir && e.buy === 0 && yakin(e.tek[0].buy, 1 / 9) && yakin(e.tek[1].buy, 1 / 9), "iki +q ortası: sıfır");
+  const d = alanHesap(sab("f-ealannokta-dipol-orta")).noktalar[0];
+  dogrula(yakin(d.ex, 2 / 9) && yakin(d.ey, 0) && !d.sifir, "dipol: +x (−q yönü), 2/9");
+  const k = alanHesap(sab("f-ealannokta-kare-4")).noktalar[0];
+  dogrula(yakin(k.buy, Math.SQRT2 / 4) && yakin(k.ex, 0) && yakin(k.ey, -Math.SQRT2 / 4) && yakin(k.aci, -90), "kare-4 merkez: √2/4, −y");
+  const fiz = FIZIK_SABLONLARI.filter((x) => x.id.startsWith("f-ealannokta-"));
+  dogrula(fiz.length >= 8, "en az 8 şablon: " + fiz.length);
+  for (const t of fiz) dogrula(cografyaGecerliMi(t.olustur() as unknown as Record<string, unknown>) && mürekkep(t.olustur()) > 800, t.id + ": geçerli ve boş değil");
+});
+senaryo("elektrikAlanNokta: doğru üzerinde E = 0 noktası (q ve 4q → 1/3'te; zıt yükte dışarıda)", () => {
+  dogrula(yakin(alanSifirNoktasi(0, 1, 3, 4)!, 1), "q (0) ve 4q (3): x = 1 (d/3)");
+  dogrula(yakin(alanSifirNoktasi(0, 4, 3, 1)!, 2), "4q (0) ve q (3): x = 2");
+  dogrula(yakin(alanSifirNoktasi(0, 1, 3, -4)!, -3), "q ve −4q: küçük yükün dışında x = −3");
+  dogrula(yakin(alanSifirNoktasi(0, 4, 3, -1)!, 6), "4q ve −q: x = 6");
+  dogrula(alanSifirNoktasi(0, 1, 3, -1) === null, "eşit zıt yükler: yok");
+  dogrula(alanSifirNoktasi(2, 1, 2, 1) === null && alanSifirNoktasi(0, 0, 3, 1) === null, "çakışık / yüksüz: yok");
+  for (const [q1, q2] of [[1, 4], [2, 3], [1, -4], [3, -2], [5, 5]] as [number, number][]) {
+    const x = alanSifirNoktasi(-1, q1, 4, q2)!;
+    const f = alanVektoru([{ x: -1, y: 0, q: q1 }, { x: 4, y: 0, q: q2 }], x, 0);
+    dogrula(Math.hypot(f.ex, f.ey) < 1e-9, `q1=${q1}, q2=${q2}: bulunan noktada alan sıfır`);
+  }
+  const v = ayar("elektrikAlanNokta", { mod: "dogru", yx: [0, 3, 0, 0], yq: [1, 4, 0, 0], noktaSayisi: 0 });
+  dogrula(yakin(alanHesap(v).sifirX!, 1), "mod dogru: sifirX");
+  dogrula((fizikHesapOzeti(v) ?? "").includes("x = 1"), "özet: E = 0 noktası x = 1: " + fizikHesapOzeti(v));
+});
+senaryo("elektrikAlanNokta: köklü ve kesirli çıktı tam (√2/2, 3/5, 1/4), özet köklü", () => {
+  const v = ayar("elektrikAlanNokta", { yukSayisi: 2, yx: [-1, 1, 0, 0], yy: [0, 0, 0, 0], yq: [1, -1, 0, 0], noktaSayisi: 1, nx: [0, 0, 0], ny: [1, 0, 0] });
+  const p = alanHesap(v).noktalar[0];
+  dogrula(yakin(p.buy, Math.SQRT2 / 2) && yakin(p.ex, Math.SQRT2 / 2) && yakin(p.ey, 0), "dipol dik açı: √2/2");
+  dogrula(alanTam(p.buy) === "√2/2" && alanTam(0.25) === "1/4" && alanTam(-3 / 5) === "−3/5" && alanTam(0) === "0", "alanTam biçimleri");
+  const oz = fizikHesapOzeti(v) ?? "";
+  dogrula(oz.includes("|E| = √2/2 kq/d²") && oz.includes("E_y = 0"), "özet köklü: " + oz);
+  const ayarli = (kok: boolean) => mürekkep(ayar("elektrikAlanNokta", { yukSayisi: 2, yx: [-1, 1, 0, 0], yy: [0, 0, 0, 0], yq: [1, -1, 0, 0], noktaSayisi: 1, nx: [0, 0, 0], ny: [1, 0, 0], deger: true, kokYaz: kok }));
+  dogrula(degerYaz(Math.SQRT2 / 2, true) === "√2/2" && degerYaz(Math.SQRT2 / 2, false) === "0,71" && degerYaz(0.25, false) === "1/4", "şekil yazısı: köklü kip √, kapalıyken ondalık");
+  dogrula(ayarli(true) > 500 && ayarli(false) > 500, "köklü kip çizimi");
+  const k2 = alanHesap(ayar("elektrikAlanNokta", { yukSayisi: 2, yx: [-1, 2, 0, 0], yy: [0, 1, 0, 0], yq: [1, 3, 0, 0], noktaSayisi: 1, nx: [0, 0, 0], ny: [0, 0, 0] })).noktalar[0];
+  dogrula(alanTam(k2.tek[0].buy) === "1" && alanTam(k2.tek[1].buy) === "3/5", "kesirli tek tek alanlar");
+});
+senaryo("elektrikAlanNokta: kenar durumlar (yük üzerinde nokta, çakışık yükler, hepsi sıfır, soru modu, yalnız yön)", () => {
+  const ust = ayar("elektrikAlanNokta", { yukSayisi: 2, yx: [0, 3, 0, 0], yy: [0, 0, 0, 0], yq: [1, -2, 0, 0], noktaSayisi: 2, nx: [0, 1, 0], ny: [0, 1, 0], deger: true });
+  const hu = alanHesap(ust);
+  dogrula(hu.noktalar[0].yukUstunde && hu.noktalar[0].tek.length === 0 && !hu.noktalar[1].yukUstunde, "yük üzerindeki nokta atlanır");
+  dogrula(/yükün üzerinde/.test(fizikHesapOzeti(ust) ?? "") && mürekkep(ust) > 500, "özet ve çizim");
+  const cak = alanHesap(ayar("elektrikAlanNokta", { yukSayisi: 2, yx: [1, 1, 0, 0], yy: [1, 1, 0, 0], yq: [1, 2, 0, 0], noktaSayisi: 1, nx: [-1, 0, 0], ny: [0, 0, 0] })).noktalar[0];
+  const tek = alanVektoru([{ x: 1, y: 1, q: 3 }], -1, 0);
+  dogrula(yakin(cak.ex, tek.ex) && yakin(cak.ey, tek.ey), "çakışık yükler toplanır");
+  const sifir = ayar("elektrikAlanNokta", { yukSayisi: 3, yq: [0, 0, 0, 0], noktaSayisi: 3 });
+  dogrula(alanHesap(sifir).yukler.length === 0 && /Yük bulunamadı/.test(fizikHesapOzeti(sifir) ?? "") && mürekkep(sifir) > 100, "hepsi sıfır: çökmez");
+  const soru = ayar("elektrikAlanNokta", { goster: "yok" }), tam = ayar("elektrikAlanNokta", {}), bilesenYok = ayar("elektrikAlanNokta", { goster: "tek" });
+  dogrula(mürekkep(soru) < mürekkep(bilesenYok) && mürekkep(bilesenYok) < mürekkep(tam), "soru modu < yalnız tek < tümü");
+  const yon = ayar("elektrikAlanNokta", { olcek: "yon" });
+  dogrula(mürekkep(yon) !== mürekkep(tam), "yalnız yön farklı çizilir");
+  for (const e of [{ yukSayisi: 4, yx: [8, -8, 8, -8], yy: [8, 8, -8, -8], yq: [9, -9, 9, -9], noktaSayisi: 3, nx: [8, -8, 0], ny: [-8, 8, 0], deger: true, bilesen: true }, { kareBoy: 60, okBoy: 5 }, { mod: "dogru", noktaSayisi: 3, nx: [-8, 8, 0], deger: true }]) {
+    const v2 = ayar("elektrikAlanNokta", e as never);
+    dogrula(cografyaGecerliMi(v2 as unknown as Record<string, unknown>) && mürekkep(v2) > 300, "uç değer çizilir");
+  }
 });
 // <<PAKET-EK-TEST>>
 

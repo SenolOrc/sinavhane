@@ -11,6 +11,7 @@ export type FizikEkYapi =
   | "fotoelektrik" | "fotoGrafik" | "bozunma" | "basitMakine" | "vektorSerbest" | "kareliAlan" | "panelIzgara"
   | "kirilma" | "gorunurDerinlik" | "prizmaIsin" | "fiberOptik"
   | "karmaDevre"
+  | "elektrikAlanNokta"
   | "hareketUclu" | "ohmGrafik" | "surtunmeGrafik" | "akiEmk";
 
 type Sema = { ad: string; alt: string; alanlar: Alan[] };
@@ -248,6 +249,33 @@ export const FIZIK_EK_SEMA: Record<FizikEkYapi, Sema> = {
     ],
   },
   // <<PAKET-EK-SEMA>>
+  // ── Elektrik alan: kareli düzlemde nokta yükler ve K, L, M noktalarında bileşke alan
+  elektrikAlanNokta: {
+    ad: "Elektrik alan: kareli düzlemde nokta yükler (K, L, M)", alt: "Fizik – Elektrik alan",
+    alanlar: [
+      { k: "sec", a: "mod", ad: "Düzen", sec: [["duzlem", "Kareli düzlem (2 boyut)"], ["dogru", "Doğru üzerinde iki yük (E = 0 noktası)"]], v: "duzlem" },
+      { k: "sayi", a: "yukSayisi", ad: "Yük sayısı (doğru üzerinde 2 alınır)", min: 1, max: 4, adim: 1, v: 3 },
+      { k: "sayilar", a: "yx", ad: "Yüklerin x konumu (kare; q₁…q₄)", n: 4, min: -8, max: 8, v: [-2, 2, 0, 0] },
+      { k: "sayilar", a: "yy", ad: "Yüklerin y konumu (kare; doğru üzerinde yok sayılır)", n: 4, min: -8, max: 8, v: [0, 0, 2, 0] },
+      { k: "sayilar", a: "yq", ad: "Yük değerleri (q cinsinden, işaretli; 0 = yük yok)", n: 4, min: -9, max: 9, v: [1, 1, -2, 0] },
+      { k: "sec", a: "yazi", ad: "Yük yazıları", sec: [["deger", "Değerli (+q, −2q)"], ["ad", "Adlı (q₁, q₂)"], ["yok", "Yazı yok"]], v: "deger" },
+      { k: "metin", a: "adlar", ad: "Yük adları (virgülle: q1, q2, q3, q4)", en: 30, v: "q1, q2, q3, q4" },
+      { k: "sayi", a: "noktaSayisi", ad: "İşaretli nokta sayısı (K, L, M)", min: 0, max: 3, adim: 1, v: 1 },
+      { k: "sayilar", a: "nx", ad: "Noktaların x konumu (kare; K, L, M)", n: 3, min: -8, max: 8, v: [0, 3, -3] },
+      { k: "sayilar", a: "ny", ad: "Noktaların y konumu (kare; doğru üzerinde yok sayılır)", n: 3, min: -8, max: 8, v: [0, 0, 0] },
+      { k: "metin", a: "nAdlar", ad: "Nokta adları (virgülle: K, L, M)", en: 12, v: "K, L, M" },
+      { k: "sec", a: "goster", ad: "Alan vektörleri", sec: [["hepsi", "Tek tek alanlar + bileşke"], ["bileske", "Yalnız bileşke"], ["tek", "Yalnız tek tek alanlar (bileşke gizli)"], ["yok", "Soru modu: vektör yok"]], v: "hepsi" },
+      { k: "sec", a: "hedef", ad: "Vektörleri hangi noktada çiz", sec: [["hepsi", "Tüm noktalarda"], ["0", "Yalnız 1. nokta (K)"], ["1", "Yalnız 2. nokta (L)"], ["2", "Yalnız 3. nokta (M)"]], v: "hepsi" },
+      { k: "mantik", a: "bilesen", ad: "Bileşkenin x–y bileşenleri (kesikli)", v: false },
+      { k: "mantik", a: "deger", ad: "Büyüklükleri yaz (E = 2, kq/d² biriminde)", v: false },
+      { k: "mantik", a: "kokYaz", ad: "Köklü değerleri √ ile yaz", v: false },
+      { k: "sec", a: "olcek", ad: "Vektör uzunluğu", sec: [["orantili", "Büyüklükle orantılı"], ["yon", "Eşit uzunlukta (yalnız yön)"]], v: "orantili" },
+      { k: "sayi", a: "okBoy", ad: "En uzun vektör (kare)", min: 1, max: 5, adim: 0.5, v: 2.5 },
+      { k: "sayi", a: "kareBoy", ad: "Kare kenarı (px, 0 = otomatik)", min: 0, max: 60, adim: 2, v: 0 },
+      { k: "mantik", a: "izgara", ad: "Kare çizgileri", v: true },
+      { k: "mantik", a: "sifirNokta", ad: "Doğru üzerinde: E = 0 noktasını göster", v: true },
+    ],
+  },
   // ── Paket 3: Elektrik – manyetizma
   elektrikAlan: {
     ad: "Elektrik alan çizgileri (nokta yükler)", alt: "Fizik – Elektrik",
@@ -668,5 +696,6 @@ export const FIZIK_EK_BOYUT: Record<FizikEkYapi, { w: number; h: number }> = {
   fotoelektrik: { w: 440, h: 250 }, fotoGrafik: { w: 400, h: 260 }, bozunma: { w: 450, h: 250 }, basitMakine: { w: 420, h: 260 }, vektorSerbest: { w: 340, h: 280 }, kareliAlan: { w: 540, h: 230 }, panelIzgara: { w: 540, h: 190 },
   kirilma: { w: 440, h: 270 }, gorunurDerinlik: { w: 420, h: 270 }, prizmaIsin: { w: 440, h: 270 }, fiberOptik: { w: 530, h: 200 },
   karmaDevre: { w: 460, h: 270 },
+  elektrikAlanNokta: { w: 420, h: 330 },
   hareketUclu: { w: 400, h: 450 }, ohmGrafik: { w: 380, h: 250 }, surtunmeGrafik: { w: 380, h: 250 }, akiEmk: { w: 400, h: 380 },
 };
