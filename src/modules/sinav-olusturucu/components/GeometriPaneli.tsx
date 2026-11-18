@@ -61,7 +61,7 @@ export const GEO_PANELLI_NESNELER = [
   "ucgenABC", "dikUcgen", "benzerUcgen", "cemberGeo", "cokgenAd",
   "dogrudaAcilar", "dortgenGeo", "katiCisim", "kagitKatlama", "cografyaSekil", "fizikSekil",
   "aciYayi", "dikAci", "esIsaret",
-  "isinOk", "halkaAkim", "solenoid", "telAlan", "alanNokta", "dalgaGirisim", "enerjiDuzeyi",
+  "isinOk", "halkaAkim", "solenoid", "telAlan", "alanNokta", "akimliTel", "dalgaGirisim", "enerjiDuzeyi",
 ];
 
 export const geoPaneliVarMi = (nesne: string) => GEO_PANELLI_NESNELER.includes(nesne);
@@ -874,6 +874,32 @@ export function GeoEkPaneli({ sekil, guncelle, tarihceyeKaydet }: {
         ))}
         <TogglePill aktif={sekil.etiket === "vec(B)"} onClick={() => { tarihceyeKaydet(); guncelle({ etiket: sekil.etiket === "vec(B)" ? "B" : "vec(B)" }); }}>Etiket: B vektörü</TogglePill>
         <span className="text-[10px] text-slate-500">Çizgi seçiliyse ⊗/⊙ yerine oklu paralel çizgiler çizilir; küçülterek panele sığdırın.</span>
+      </div>
+    );
+  } else if (nesne === "akimliTel") {
+    const kesit = ek.metin === "cikan" || ek.metin === "giren";
+    const yer = sekil.etiketYeri ?? "ust";
+    icerik = (
+      <div className="flex flex-wrap items-center gap-2" data-testid="geo-tel-paneli">
+        <span className={BASLIK}>Kip</span>
+        <TogglePill aktif={!kesit} onClick={() => { tarihceyeKaydet(); ekYaz({ metin: "" }); }}>Çubuk (yandan)</TogglePill>
+        <TogglePill aktif={ek.metin === "cikan"} onClick={() => { tarihceyeKaydet(); ekYaz({ metin: "cikan" }); }}>Kesit ⊙</TogglePill>
+        <TogglePill aktif={ek.metin === "giren"} onClick={() => { tarihceyeKaydet(); ekYaz({ metin: "giren" }); }}>Kesit ⊗</TogglePill>
+        {!kesit && (
+          <>
+            <TogglePill aktif={ek.ters !== true} onClick={() => { tarihceyeKaydet(); ekYaz({ ters: false }); }}>Akım ileri →</TogglePill>
+            <TogglePill aktif={ek.ters === true} onClick={() => { tarihceyeKaydet(); ekYaz({ ters: true }); }}>Akım geri ←</TogglePill>
+            <OndalikGirdisi etiket="Kalınlık (3–16)" deger={ek.sayi ?? 7} onOdak={tarihceyeKaydet} onDegis={(v) => v !== undefined && v >= 3 && v <= 16 && ekYaz({ sayi: v })} />
+            <TogglePill aktif={ek.sayi2 === 1} onClick={() => { tarihceyeKaydet(); ekYaz({ sayi2: ek.sayi2 === 1 ? 0 : 1 }); }}>Açıyı göster (yatayla)</TogglePill>
+          </>
+        )}
+        <span className={BASLIK}>Etiket</span>
+        {["i", "I", "i_1", "i_2", "I_1"].map((e) => (
+          <TogglePill key={e} aktif={sekil.etiket === e} onClick={() => { tarihceyeKaydet(); guncelle({ etiket: e }); }}>{e.replace("_1", "₁").replace("_2", "₂")}</TogglePill>
+        ))}
+        <TogglePill aktif={yer === "ust"} onClick={() => { tarihceyeKaydet(); guncelle({ etiketYeri: "ust" }); }}>Üst</TogglePill>
+        <TogglePill aktif={yer === "alt"} onClick={() => { tarihceyeKaydet(); guncelle({ etiketYeri: "alt" }); }}>Alt</TogglePill>
+        <span className="text-[10px] text-slate-500">Telin dolgusu altındaki ⊗ ⊙ simgelerini örter: önce alanı, sonra teli ekleyin. Açı, şeklin döndürülmesinden gelir (30° eğik için döndürün).</span>
       </div>
     );
   } else if (nesne === "dalgaGirisim") {

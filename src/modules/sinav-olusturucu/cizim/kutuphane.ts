@@ -199,6 +199,7 @@ const EK_KELIMELER: Record<string, string[]> = {
   solenoid: ["bobin", "manyetik alan", "akım"],
   telAlan: ["manyetik alan", "akım", "tel"],
   alanNokta: ["manyetik alan", "sayfa", "giren çıkan"],
+  akimliTel: ["tel", "akım", "iletken", "manyetik kuvvet", "manyetik alan"],
   dalgaGirisim: ["dalga", "girişim", "çift yarık"],
   enerjiDuzeyi: ["bohr", "atom", "foton", "ışıma", "soğurma"],
   dugum: ["nokta", "devre", "bağlantı"],

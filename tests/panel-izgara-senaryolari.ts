@@ -8,14 +8,16 @@ import {
 } from "../src/modules/sinav-olusturucu/cizim/cografya";
 import { FIZIK_SABLONLARI, GEOMETRI_KUTUPHANESI } from "../src/modules/sinav-olusturucu/cizim/geometriSekilleri";
 import { HAZIR_SAHNELER } from "../src/modules/sinav-olusturucu/cizim/sahneler";
-import { panelGrafikSahnesi } from "../src/modules/sinav-olusturucu/cizim/panelSahneleri";
+import { manyetikKuvvetPanelSahnesi, panelGrafikSahnesi } from "../src/modules/sinav-olusturucu/cizim/panelSahneleri";
 import { panellereCogalt, secimPaneli, panelSekliHucreleri } from "../src/modules/sinav-olusturucu/cizim/panelCogalt";
 import { panelZeminiMi, zeminMi } from "../src/modules/sinav-olusturucu/cizim/geometri";
 import { baglantiPortlari, portluMu } from "../src/modules/sinav-olusturucu/cizim/etkilesim";
 import { enUstVurulan, etkilesimBelirle, sekilVuruldu } from "../src/modules/sinav-olusturucu/cizim/vurus";
 import { sekilleriCiz } from "../src/modules/sinav-olusturucu/cizim/ciz";
 import { sekilGecerliMi } from "../src/modules/sinav-olusturucu/cizim/sablon";
-import { fizikEkCiz } from "../src/modules/sinav-olusturucu/cizim/fizikEk";
+import { kutuphaneAra, kutuphaneGirdileri } from "../src/modules/sinav-olusturucu/cizim/kutuphane";
+import { FIZIK_TANIMLARI } from "../src/modules/sinav-olusturucu/cizim/fizik";
+import { akimliTelSiniri, fizikEkCiz } from "../src/modules/sinav-olusturucu/cizim/fizikEk";
 import type { Sekil } from "../src/modules/sinav-olusturucu/cizim/tipler";
 
 function dogrula(k: unknown, m: string) { if (!k) { console.error("✗ " + m); process.exit(1); } }
@@ -316,6 +318,101 @@ senaryo("⊗/⊙ alanı küçük panel hücresine sığar; alan çizgisi (→ �
   dogrula(yonler[0].o.n === yonler[1].o.n && yonler[2].o.n === yonler[3].o.n, "ters yön simetrik mürekkep");
   dogrula(ink({ sayi: 4, sayi2: 3, metin: "bozuk" }, w, h).n === sim, "bilinmeyen yön ⊗/⊙ olarak çizilir");
   dogrula(sekilGecerliMi({ id: "a", tur: "fizik", nesne: "alanNokta", kalinlik: 2, x: 0, y: 0, w: 90, h: 60, ek: { metin: "sag", sayi: 3 } }), "ek.metin geçerli");
+});
+
+senaryo("Akım taşıyan tel: tanım, geçerlilik, çizim, alanı örtme, döndürmede düz etiket", () => {
+  const td = FIZIK_TANIMLARI.akimliTel;
+  dogrula(td && td.grup === "elektrik" && td.etiket === "i" && td.w > td.h * 3, "akimliTel tanımı (uzun ince, grup elektrik, etiket i)");
+  dogrula(sekilGecerliMi({ id: "t", tur: "fizik", nesne: "akimliTel", kalinlik: 2, x: 0, y: 0, w: 140, h: 30, etiket: "i", donus: -30, ek: { sayi: 7, sayi2: 1, ters: true, metin: "cikan" } }), "akimliTel geçerli");
+  const W = 400, H = 260;
+  const cizim = (sekiller: Sekil[]) => {
+    const c = createCanvas(W, H), g = c.getContext("2d") as unknown as CanvasRenderingContext2D;
+    g.fillStyle = "#fff"; g.fillRect(0, 0, W, H);
+    sekilleriCiz(g, sekiller);
+    return { g, d: g.getImageData(0, 0, W, H).data };
+  };
+  const mürekkep = (d: Uint8ClampedArray, k?: { x0: number; y0: number; x1: number; y1: number }) => {
+    let n = 0, x0 = 1e9, x1 = -1, y0 = 1e9, y1 = -1;
+    for (let y = k?.y0 ?? 0; y < (k?.y1 ?? H); y++) for (let x = k?.x0 ?? 0; x < (k?.x1 ?? W); x++) if (d[(y * W + x) * 4] < 200) { n++; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    return { n, x0, x1, y0, y1 };
+  };
+  const tel = (o: Partial<FizikSekli>): FizikSekli => ({ id: "t", tur: "fizik", nesne: "akimliTel", kalinlik: 2, x: 130, y: 105, w: 140, h: 30, etiket: "i", etiketYeri: "ust", ...o });
+  const alan: FizikSekli = { id: "a", tur: "fizik", nesne: "alanNokta", kalinlik: 2, x: 20, y: 20, w: 360, h: 220, ek: { sayi: 12, sayi2: 8, ters: true } };
+  // Çizilir, boş değil; tel olmadan alanla karşılaştırıldığında ÇUBUĞUN altındaki simgeler örtülür
+  const yalnizAlan = cizim([alan]).d, telli = cizim([alan, tel({ etiket: "" })]).d;
+  const serit = { x0: 140, x1: 260, y0: 114, y1: 126 };
+  dogrula(mürekkep(yalnizAlan, serit).n > 40, "alan şeridi boş olmamalı (sınama geçersiz)");
+  let beyaz = 0, toplam = 0;
+  for (let y = 112; y <= 128; y++) for (let x = 150; x <= 250; x++) { toplam++; if (telli[(y * W + x) * 4] > 235) beyaz++; }
+  // Çubuğun iç bandında (çift çizgi arası) alan simgesi KALMAMALI: beyaz piksel oranı yüksek
+  dogrula(mürekkep(telli, { x0: 150, x1: 250, y0: 118, y1: 123 }).n < mürekkep(yalnizAlan, { x0: 150, x1: 250, y0: 118, y1: 123 }).n, "tel dolgusu alan simgelerini örtmeli");
+  dogrula(beyaz / toplam > 0.2, "çubuk içi beyaz dolgulu");
+  // Ok ve etiket: etiketli çizim daha çok mürekkep; tersleme okun yönünü değiştirir (ok ucu solda/sağda)
+  const ileri = cizim([tel({ ek: { ters: false } })]).d, geri = cizim([tel({ ek: { ters: true } })]).d;
+  const okSerit = { x0: 130, x1: 270, y0: 105, y1: 114 };
+  const sagYarim = (d: Uint8ClampedArray) => mürekkep(d, { ...okSerit, x0: 200 }).n, solYarim = (d: Uint8ClampedArray) => mürekkep(d, { ...okSerit, x1: 200 }).n;
+  dogrula(sagYarim(ileri) !== solYarim(ileri) && sagYarim(ileri) > sagYarim(geri) && solYarim(geri) > solYarim(ileri), "ters: ok başı öbür uçta");
+  dogrula(mürekkep(cizim([tel({})]).d).n > mürekkep(cizim([tel({ etiket: "" })]).d).n + 5, "etiket çizilmeli");
+  // Kalınlık ayarı çubuğu kalınlaştırır
+  const incey = mürekkep(cizim([tel({ etiket: "", ek: { sayi: 4 } })]).d), kalin = mürekkep(cizim([tel({ etiket: "", ek: { sayi: 14 } })]).d);
+  dogrula((kalin.y1 - kalin.y0) > (incey.y1 - incey.y0) + 6, "kalınlık ayarı");
+  // Etiket düzlüğü: dönmüş telde de yazı yatay (geniş > yüksek); "MMM" döndürülürse dar-uzun olurdu
+  for (const [donus, ayna] of [[0, false], [-90, false], [-30, false], [90, false], [-90, true]] as const) {
+    const a = cizim([tel({ etiket: "", donus, ayna })]).d, b = cizim([tel({ etiket: "MMM", donus, ayna })]).d;
+    const fark = new Uint8ClampedArray(a.length).fill(255);
+    for (let i = 0; i < a.length; i += 4) if (b[i] < 200 && a[i] >= 200) fark[i] = 0;
+    const m = mürekkep(fark);
+    dogrula(m.n > 20 && (m.x1 - m.x0) > (m.y1 - m.y0) * 1.4, `donus ${donus}${ayna ? " ayna" : ""}: etiket düz kalmalı ${JSON.stringify(m)}`);
+  }
+  // Açı göstergesi: kesikli yatay çizgi + yay + derece → daha çok mürekkep; 0° ve kesit kipinde çizilmez
+  const aciyla = mürekkep(cizim([tel({ donus: -30, ek: { sayi2: 1 } })]).d).n, aciSiz = mürekkep(cizim([tel({ donus: -30 })]).d).n;
+  dogrula(aciyla > aciSiz + 80, "açı göstergesi çizilmeli");
+  dogrula(mürekkep(cizim([tel({ donus: 0, ek: { sayi2: 1 } })]).d).n === mürekkep(cizim([tel({ donus: 0 })]).d).n, "0°'de açı çizilmez");
+  // Kesit kipi: çubuk yerine küçük daire (⊙ / ⊗)
+  const kc = mürekkep(cizim([tel({ w: 50, etiket: "", ek: { metin: "giren" } })]).d), ko = mürekkep(cizim([tel({ w: 50, etiket: "", ek: { metin: "cikan" } })]).d);
+  dogrula(kc.n > 60 && ko.n > 40 && kc.n !== ko.n && (kc.x1 - kc.x0) < 40 && (kc.y1 - kc.y0) < 40, "kesit kipi daire " + JSON.stringify([kc, ko]));
+  // Sınır: döndürülmüş, etiketli, açılı telin mürekkebi akimliTelSiniri içinde kalır
+  const c0 = createCanvas(W, H), g0 = c0.getContext("2d") as unknown as CanvasRenderingContext2D;
+  for (const donus of [0, -30, 30, -90, 45]) for (const yer of ["ust", "alt"] as const) {
+    const s = tel({ donus, etiketYeri: yer, ek: { sayi2: 1 } }), sn = akimliTelSiniri(g0, s), m = mürekkep(cizim([s]).d);
+    dogrula(m.x0 >= sn.x - 2 && m.x1 <= sn.x + sn.w + 2 && m.y0 >= sn.y - 2 && m.y1 <= sn.y + sn.h + 2, `donus ${donus} ${yer}: mürekkep sınır dışında ${JSON.stringify([m, sn])}`);
+  }
+});
+
+senaryo("Manyetik kuvvet 6 panel sahnesi: kayıtlı, geçerli, hücrelerde, alan altta tel üstte; çoğaltma tel ayarını korur; aranabilir", () => {
+  const kayit = HAZIR_SAHNELER.find((s) => s.id === "panel-manyetik-kuvvet-2x3");
+  dogrula(kayit && kayit.ad === "Manyetik kuvvet: 6 panel (tel ve alan)" && kayit.aramaKelimeleri!.includes("tel") && kayit.aramaKelimeleri!.includes("manyetik kuvvet"), "sahne kayıtlı");
+  const sahne = manyetikKuvvetPanelSahnesi();
+  dogrula(sahne.length === 13 && new Set(sahne.map((s) => s.id)).size === 13 && sahne.every(sekilGecerliMi), "13 şekil, benzersiz, geçerli");
+  const panel = sahne[0] as FizikSekli, hucreler = panelSekliHucreleri(panel)!;
+  dogrula(panelZeminiMi(panel) && hucreler.length === 6 && panelBasliklari(panel.geo as never).join("") === "①②③④⑥".replace("④⑥", "④⑤⑥"), "numaralı 2×3 panel");
+  hucreler.forEach((h, i) => {
+    const a = sahne.findIndex((s) => s.id === `mk-alan-${i + 1}`), t = sahne.findIndex((s) => s.id === `mk-tel-${i + 1}`);
+    dogrula(a > 0 && t > a, `hücre ${i + 1}: alan telden ÖNCE çizilmeli (z-sırası)`);
+    for (const s of [sahne[a], sahne[t]] as FizikSekli[]) dogrula(s.x >= h.cerceve.x && s.y >= h.cerceve.y && s.x + s.w <= h.cerceve.x + h.cerceve.w && s.y + s.h <= h.cerceve.y + h.cerceve.h, `hücre ${i + 1}: ${s.nesne} hücreye sığmalı`);
+  });
+  const telde = (i: number) => sahne.find((s) => s.id === `mk-tel-${i}`) as FizikSekli;
+  dogrula(telde(1).donus === -90 && telde(2).donus === -30 && telde(2).ek?.sayi2 === 1 && telde(3).donus === 0 && telde(5).donus === -30 && telde(6).ek?.metin === "giren", "dik / 30° eğik / yatay / kesit yönelimleri");
+  dogrula(sahne.filter((s) => s.tur === "fizik" && s.nesne === "akimliTel").every((s) => (s as FizikSekli).etiket === "i"), "i etiketleri");
+  // Çizim boş değil
+  const c = createCanvas(700, 460), g = c.getContext("2d") as unknown as CanvasRenderingContext2D;
+  g.fillStyle = "#fff"; g.fillRect(0, 0, 700, 460); sekilleriCiz(g, sahne);
+  const d = g.getImageData(0, 0, 700, 460).data; let n = 0;
+  for (let i = 0; i < d.length; i += 4) if (d[i] < 200) n++;
+  dogrula(n > 6000, "sahne boş (" + n + ")");
+  // Panellere çoğalt: hücre 2'deki (eğik) alan + tel diğer hücrelere dönüş/ek/etiketle kopyalanır
+  const r = panellereCogalt(ctx, sahne, ["mk-alan-2", "mk-tel-2"]);
+  dogrula(r && r.hedefHucreler.length === 5 && r.eklenen.length === 10, "5 hücre × 2");
+  const kopyaTel = r!.eklenen.filter((s) => s.tur === "fizik" && s.nesne === "akimliTel") as FizikSekli[];
+  dogrula(kopyaTel.length === 5 && kopyaTel.every((s) => s.donus === -30 && s.ek?.sayi2 === 1 && s.ek.sayi === 7 && s.etiket === "i" && s.w === telde(2).w), "çoğaltma: dönüş/ek/etiket korunur");
+  dogrula(r!.sekiller.every(sekilGecerliMi), "çoğaltılmış şekiller geçerli");
+  // Kütüphane araması: tel / akım / iletken / manyetik kuvvet
+  const girdiler = kutuphaneGirdileri();
+  for (const q of ["tel", "akım", "iletken", "manyetik kuvvet", "akim tasiyan tel"]) {
+    const bulunan = kutuphaneAra(girdiler, q);
+    dogrula(bulunan.some((e) => /Akım taşıyan tel/.test(e.ad)), `"${q}" aramasında Akım taşıyan tel çıkmalı`);
+  }
+  dogrula(kutuphaneAra(girdiler, "manyetik kuvvet").some((e) => /Manyetik kuvvet: 6 panel/.test(e.ad)), "manyetik kuvvet aramasında sahne çıkmalı");
 });
 
 console.log("TÜM PANEL IZGARASI SENARYOLARI BAŞARILI");

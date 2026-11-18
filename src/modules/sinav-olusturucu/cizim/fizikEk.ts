@@ -8,11 +8,11 @@
 
 import type { FizikEk, Nokta, Sekil } from "./tipler";
 import { MUREKKEP } from "./sabitler";
-import { fizikMetniCiz, fizikMetniOlcu } from "./fizik";
+import { FIZIK_ETIKET_PUNTO, fizikMetniCiz, fizikMetniOlcu } from "./fizik";
 
 type FizikSekli = Extract<Sekil, { tur: "fizik" }>;
 
-export const FIZIK_EK_NESNELERI = ["isinOk", "halkaAkim", "solenoid", "telAlan", "alanNokta", "dalgaGirisim", "enerjiDuzeyi"] as const;
+export const FIZIK_EK_NESNELERI = ["isinOk", "halkaAkim", "solenoid", "telAlan", "alanNokta", "akimliTel", "dalgaGirisim", "enerjiDuzeyi"] as const;
 export const fizikEkMi = (nesne: string) => (FIZIK_EK_NESNELERI as readonly string[]).includes(nesne);
 
 const TAM = Math.PI * 2;
@@ -191,7 +191,7 @@ function alanNoktaCiz(ctx: CanvasRenderingContext2D, s: FizikSekli, ek: FizikEk)
     // Düzgün alan çizgileri: yöne paralel, eşit aralıklı, ucunda ok (yatayda satır, düşeyde sütun sayısı kadar).
     const yatay = yon === "sag" || yon === "sol";
     const n = yatay ? satir : sutun;
-    const boy = Math.max(6, Math.min(w, h) * 0.18);
+    const boy = Math.max(6, Math.min(13, Math.min(w, h) * 0.18));
     ctx.save();
     ctx.lineWidth = Math.max(1, ctx.lineWidth * 0.85);
     for (let i = 0; i < n; i += 1) {
@@ -213,6 +213,178 @@ function alanNoktaCiz(ctx: CanvasRenderingContext2D, s: FizikSekli, ek: FizikEk)
   const cw = w / sutun, ch = h / satir;
   const r = Math.max(3, Math.min(10, Math.min(cw, ch) * 0.28));
   for (let i = 0; i < sutun; i += 1) for (let j = 0; j < satir; j += 1) girenCikanSimgesi(ctx, x + cw * (i + 0.5), y + ch * (j + 0.5), r, giren);
+}
+
+// ── Akım taşıyan tel ───────────────────────────────────────────────────────
+// MEB kitabındaki görünüm: uzun ince ÇUBUK (çift çizgi, beyaz dolgu, yuvarlak uçlar) — dolgusu altındaki
+// ⊗/⊙ simgelerini örter. Akım çubuğun kendisiyle değil, YANINDAKİ küçük oklu "i" ile gösterilir.
+//
+// Ayarlar (s.ek): sayi = çubuk kalınlığı (3–16, varsayılan 7), ters = akım ters yönde (←),
+// sayi2 = 1 → yatayla açıyı göster (kesikli yatay çizgi + yay + derece; açı `donus`tan gelir),
+// metin = "cikan" | "giren" → KESİT kipi: tel sayfaya dik; küçük daire içinde ⊙ / ⊗.
+// Etiket (s.etiket, varsayılan "i") ve yeri (s.etiketYeri: ust | alt) normal fizik etiketidir;
+// ama yazı hep DÜZ çizilir (şekil döndükçe okunaklı kalır).
+
+export const TEL_KESIT_KIPLERI = ["cikan", "giren"] as const;
+export const telKesitKipi = (ek: FizikEk): "cikan" | "giren" | null => ((TEL_KESIT_KIPLERI as readonly string[]).includes(ek.metin ?? "") ? (ek.metin as "cikan" | "giren") : null);
+export const telKalinligi = (ek: FizikEk) => sinirla(ek.sayi, 7, 3, 16);
+
+
+type TelGeo = {
+  merkez: Nokta; t: number; kesit: "cikan" | "giren" | null; yer: 1 | -1; etiket: string;
+  /** Yerel (dönmemiş) nokta → dünya (döndürme + ayna). */
+  dunya: (p: Nokta) => Nokta;
+  /** Çubuğun dünyadaki iki ucu; solda olan `sol`. */
+  sol: Nokta; sag: Nokta;
+  /** Çubuğun yatayla açısı (derece, −90…90); yukarı eğik negatif (ekranda). */
+  egim: number;
+  aciGoster: boolean;
+  /** Akım okunun yerel merkezi / etiketin yerel merkezi. */
+  okMerkez: Nokta; etiketYerel: Nokta; okBoy: number; kesitR: number;
+};
+
+function telGeo(s: FizikSekli, ek: FizikEk): TelGeo {
+  const merkez = { x: s.x + s.w / 2, y: s.y + s.h / 2 };
+  const r = ((s.donus ?? 0) * Math.PI) / 180, co = Math.cos(r), si = Math.sin(r), ay = s.ayna ? -1 : 1;
+  const dunya = (p: Nokta): Nokta => {
+    const dx = (p.x - merkez.x) * ay, dy = p.y - merkez.y;
+    return { x: merkez.x + dx * co - dy * si, y: merkez.y + dx * si + dy * co };
+  };
+  const t = telKalinligi(ek);
+  const kesit = telKesitKipi(ek);
+  const yer: 1 | -1 = (s.etiketYeri ?? "ust") === "alt" ? 1 : -1; // yerel y işareti: üst = −1
+  const a = dunya({ x: s.x, y: merkez.y }), b = dunya({ x: s.x + s.w, y: merkez.y });
+  const [sol, sag] = a.x < b.x || (a.x === b.x && a.y > b.y) ? [a, b] : [b, a];
+  const egim = (Math.atan2(sag.y - sol.y, sag.x - sol.x) * 180) / Math.PI;
+  const okBoy = Math.max(18, Math.min(44, s.w * 0.3));
+  const okOff = t / 2 + 7;
+  const kesitR = Math.max(8, Math.min(22, t * 1.5));
+  return {
+    merkez, t, kesit, yer, etiket: (s.etiket ?? "").trim(), dunya, sol, sag, egim, aciGoster: ek.sayi2 === 1 && !kesit,
+    okMerkez: { x: merkez.x, y: merkez.y + yer * okOff }, okBoy, kesitR,
+    etiketYerel: kesit ? { x: merkez.x, y: merkez.y + yer * (kesitR + 11) } : { x: merkez.x, y: merkez.y + yer * (okOff + 13) },
+  };
+}
+
+const dereceYazisi = (d: number) => `${String(Math.round(Math.abs(d) * 10) / 10).replace(".", ",")}°`;
+
+function kapsul(ctx: CanvasRenderingContext2D, x1: number, x2: number, cy: number, t: number) {
+  const r = t / 2;
+  ctx.beginPath();
+  ctx.moveTo(x1 + r, cy - r);
+  ctx.lineTo(x2 - r, cy - r);
+  ctx.arc(x2 - r, cy, r, -Math.PI / 2, Math.PI / 2);
+  ctx.lineTo(x1 + r, cy + r);
+  ctx.arc(x1 + r, cy, r, Math.PI / 2, (Math.PI * 3) / 2);
+  ctx.closePath();
+}
+
+/** Çizim bağlamı şekil döndürme/aynasıyla dönmüşken, dünya (dönmemiş) eksenlerine geri döner. */
+function dunyadaCiz(ctx: CanvasRenderingContext2D, s: FizikSekli, merkez: Nokta, f: () => void) {
+  ctx.save();
+  ctx.translate(merkez.x, merkez.y);
+  ctx.scale(s.ayna ? -1 : 1, 1);
+  ctx.rotate((-(s.donus ?? 0) * Math.PI) / 180);
+  ctx.translate(-merkez.x, -merkez.y);
+  f();
+  ctx.restore();
+}
+
+function akimliTelCiz(ctx: CanvasRenderingContext2D, s: FizikSekli, ek: FizikEk) {
+  const g = telGeo(s, ek);
+  const { merkez, t } = g;
+  const cy = merkez.y;
+  const lw = Math.max(1.2, ctx.lineWidth);
+  const punto = FIZIK_ETIKET_PUNTO;
+
+  if (g.kesit) {
+    // KESİT: tel sayfaya dik → beyaz dolgulu daire + ⊙ / ⊗ ve yanında "i".
+    ctx.save();
+    ctx.lineWidth = lw;
+    ctx.beginPath(); ctx.arc(merkez.x, cy, g.kesitR, 0, TAM);
+    ctx.fillStyle = "#ffffff"; ctx.fill();
+    ctx.fillStyle = MUREKKEP;
+    girenCikanSimgesi(ctx, merkez.x, cy, g.kesitR, g.kesit === "giren");
+    ctx.restore();
+  } else {
+    // Açı göstergesi (dünya eksenlerinde): kesikli yatay başvuru çizgisi, yay ve derece. Çubuktan ÖNCE çizilir.
+    if (g.aciGoster && Math.abs(g.egim) >= 0.5) {
+      const uz = Math.max(36, s.w * 0.85), yr = Math.max(16, Math.min(34, s.w * 0.28));
+      const ac = (g.egim * Math.PI) / 180;
+      dunyadaCiz(ctx, s, merkez, () => {
+        ctx.save();
+        ctx.lineWidth = Math.max(1, lw * 0.6);
+        ctx.setLineDash([3, 3]);
+        cizgi(ctx, g.sol.x - 4, g.sol.y, g.sol.x + uz, g.sol.y);
+        ctx.setLineDash([]);
+        ctx.beginPath(); ctx.arc(g.sol.x, g.sol.y, yr, 0, ac, ac < 0); ctx.stroke();
+        // Derece: dikey kolun DIŞINDA (kitaptaki gibi): yukarı eğikte çizginin altında, aşağı eğikte üstünde.
+        const yz = dereceYazisi(g.egim), yo = fizikMetniOlcu(ctx, yz, 15), yx = g.sol.x + yr + 22, yy = g.sol.y + (ac < 0 ? 12 : -12);
+        ctx.fillStyle = "#ffffff"; ctx.fillRect(yx - yo.w / 2 - 2, yy - yo.h / 2, yo.w + 4, yo.h);
+        ctx.fillStyle = MUREKKEP;
+        fizikMetniCiz(ctx, yz, yx, yy, 15, "orta");
+        ctx.restore();
+      });
+    }
+    // Çubuk: çift çizgi (dış koyu + iç ince gri), beyaz dolgu → altındakini örter.
+    ctx.save();
+    ctx.lineWidth = lw;
+    kapsul(ctx, s.x, s.x + s.w, cy, t);
+    ctx.fillStyle = "#ffffff"; ctx.fill(); ctx.stroke();
+    if (t >= 5) {
+      ctx.lineWidth = 0.8;
+      ctx.strokeStyle = "#9ca3af";
+      kapsul(ctx, s.x + 2.4, s.x + s.w - 2.4, cy, Math.max(1.5, t - 4.8));
+      ctx.stroke();
+    }
+    ctx.restore();
+    // Akım oku: çubuğun yanında (etiket tarafı), küçük dolu ok başlı.
+    const ters = ek.ters === true;
+    const ox = g.okMerkez.x, oy = g.okMerkez.y, yarim = g.okBoy / 2;
+    const bas = ters ? ox + yarim : ox - yarim, son = ters ? ox - yarim : ox + yarim;
+    ctx.save();
+    // Beyaz halo: ok, altındaki ⊗/⊙ simgeleriyle karışmasın.
+    const govde = () => { cizgi(ctx, bas, oy, son - (ters ? -7 : 7), oy); okBasi(ctx, son, oy, ters ? Math.PI : 0, 10); };
+    ctx.strokeStyle = "#ffffff"; ctx.fillStyle = "#ffffff"; ctx.lineWidth = 6;
+    govde();
+    ctx.strokeStyle = MUREKKEP; ctx.fillStyle = MUREKKEP; ctx.lineWidth = Math.max(1.4, lw * 0.8);
+    govde();
+    ctx.restore();
+  }
+  if (g.etiket) {
+    const w = g.dunya(g.etiketYerel);
+    const o = fizikMetniOlcu(ctx, g.etiket, punto);
+    dunyadaCiz(ctx, s, merkez, () => {
+      // Etiketin arkası beyaz: altındaki alan simgeleri yazıyı bozmasın.
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(w.x - o.w / 2 - 2, w.y - o.h / 2 - 1, o.w + 4, o.h + 2);
+      ctx.fillStyle = MUREKKEP;
+      fizikMetniCiz(ctx, g.etiket, w.x, w.y, punto, "orta");
+    });
+  }
+}
+
+/** Telin DÜNYA sınırı (çubuk + akım oku + etiket + açı göstergesi): içerik kırpılmasın diye `sinirlar.ts` kullanır. */
+export function akimliTelSiniri(ctx: CanvasRenderingContext2D, s: FizikSekli) {
+  const ek: FizikEk = s.ek ?? {};
+  const g = telGeo(s, ek);
+  const noktalar: Nokta[] = [];
+  if (g.kesit) {
+    noktalar.push({ x: g.merkez.x - g.kesitR, y: g.merkez.y - g.kesitR }, { x: g.merkez.x + g.kesitR, y: g.merkez.y + g.kesitR });
+  } else {
+    const yarim = g.t / 2 + 7 + 14;
+    for (const [px, sg] of [[s.x, -1], [s.x + s.w, 1]] as const) for (const dy of [-yarim, yarim]) noktalar.push(g.dunya({ x: px + sg * 0, y: g.merkez.y + dy }));
+    if (g.aciGoster && Math.abs(g.egim) >= 0.5) {
+      const uz = Math.max(36, s.w * 0.85), yr = Math.max(16, Math.min(34, s.w * 0.28));
+      noktalar.push({ x: g.sol.x - 4, y: g.sol.y - 6 }, { x: g.sol.x + uz, y: g.sol.y + 6 }, { x: g.sol.x + yr + 44, y: g.sol.y + (g.egim < 0 ? 22 : -22) });
+    }
+  }
+  if (g.etiket) {
+    const o = fizikMetniOlcu(ctx, g.etiket, FIZIK_ETIKET_PUNTO), w = g.dunya(g.etiketYerel);
+    noktalar.push({ x: w.x - o.w / 2 - 3, y: w.y - o.h / 2 - 3 }, { x: w.x + o.w / 2 + 3, y: w.y + o.h / 2 + 3 });
+  }
+  const x = Math.min(...noktalar.map((p) => p.x)), y = Math.min(...noktalar.map((p) => p.y));
+  return { x, y, w: Math.max(...noktalar.map((p) => p.x)) - x, h: Math.max(...noktalar.map((p) => p.y)) - y };
 }
 
 // ── Girişim deseni ─────────────────────────────────────────────────────────
@@ -413,6 +585,7 @@ export function fizikEkCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
     case "solenoid": solenoidCiz(ctx, s, ek); break;
     case "telAlan": telAlanCiz(ctx, s, ek); break;
     case "alanNokta": alanNoktaCiz(ctx, s, ek); break;
+    case "akimliTel": akimliTelCiz(ctx, s, ek); break;
     case "dalgaGirisim": dalgaGirisimCiz(ctx, s, ek); break;
     case "enerjiDuzeyi": enerjiDuzeyiCiz(ctx, s, ek); break;
     default: break;

@@ -315,6 +315,12 @@ Faz D'ye dokunmadan önce bilinmesi gereken iki bilinçli tercih:
   konumda öbür hücrelere kopyalar; tek geçmiş adımı. Hücre geometrisi `cografya/panelIzgara.ts`, eylem
   `panelCogalt.ts`; "2×3 boş grafik paneli (eksenli)" hazır sahnesi `panelSahneleri.ts`. ⊗/⊙ alanı
   (`alanNokta`) küçülünce hücreye sığar; panelde → ← ↑ ↓ alan çizgisi ve "B vektörü" etiketi seçilebilir.
+  **Akım taşıyan tel** (`akimliTel`, Elektrik): MEB 11. sınıf s. 227 görünümü — uzun ince çubuk (çift çizgi,
+  beyaz dolgu, yuvarlak uç; altındaki ⊗ ⊙ simgelerini örter) + yanında küçük oklu "i" (akım çubuğun kendisiyle
+  değil okla gösterilir). Ayarlar `ek`: `sayi` kalınlık, `ters` akım yönü, `sayi2 = 1` açıyı göster (kesikli yatay
+  çizgi + yay + derece, açı `donus`tan), `metin = "cikan" | "giren"` kesit kipi (daire içinde ⊙/⊗). Etiket ve
+  `etiketYeri` normal fizik etiketidir ama yazı hep düz çizilir; çizim/sınır `fizikEk.ts` (`akimliTelSiniri`).
+  Hazır sahne: "Manyetik kuvvet: 6 panel (tel ve alan)" (`panelSahneleri.ts`; z-sırası panel → alan → tel).
 - **Hareket grafikleri** (Fizik > Hareket grafikleri): x–t, v–t, a–t, sinüs/kosinüs, noktalarla ve
   "x–t, v–t, a–t üçlü" (aynı hareketin üç grafiği alt alta, zaman eksenleri hizalı). Eğri hareket
   evreleriyle (süre, ivme), noktalarla ya da genlik/periyotla tanımlanır; köşe noktaları tuvalde

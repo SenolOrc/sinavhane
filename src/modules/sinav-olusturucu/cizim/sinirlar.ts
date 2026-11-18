@@ -14,7 +14,7 @@ import { grafikEtiketPayi } from "./grafik";
 import { istatistikPayi } from "./istatistik";
 import { semaPayi } from "./sema";
 import { kimyaPayi } from "./kimya";
-import { enerjiDuzeyiDisPayi } from "./fizikEk";
+import { akimliTelSiniri, enerjiDuzeyiDisPayi } from "./fizikEk";
 import { egikKuvvetDisPayi } from "./fizikSahneler";
 import { siviDisPayi } from "./sivi";
 import { geometriDisPayi, geometriMi } from "./geometriSekilleri";
@@ -242,7 +242,7 @@ export function cizimIcerikSiniri(
       if (s.tur === "baglayici") return [baglayiciSiniri(sekiller, s)];
       // Fizik etiketi kutunun DIŞINA yazılabilir ("R" direncin üstünde): içerik
       // sınırına katılmazsa soruya eklenen görselde kırpılırdı.
-      if (s.tur === "fizik") return [sekilSinirlari(ctx, s), fizikEtiketSiniri(ctx, s), fizikDisPayKutusu(ctx, s)];
+      if (s.tur === "fizik") return [sekilSinirlari(ctx, s), s.nesne === "akimliTel" ? akimliTelSiniri(ctx, s) : fizikEtiketSiniri(ctx, s), fizikDisPayKutusu(ctx, s)];
       return [sekilSinirlari(ctx, s)];
     })
     .filter((s): s is NonNullable<typeof s> => s !== null);

@@ -125,6 +125,7 @@ export const FIZIK_TANIMLARI: Record<FizikNesnesi, FizikTanimi> = {
   solenoid: { ad: "Solenoid", grup: "elektrik", w: 290, h: 150, etiketYeri: "alt", etiket: "", ipucu: "Sarımlı bobin; iç alan çizgileri ve dış dönüş çizgileri (yön, sarım sayısı panelden)" },
   telAlan: { ad: "Düz tel alanı", grup: "elektrik", w: 170, h: 170, etiketYeri: "alt", etiket: "", elips: true, ipucu: "Telin kesiti (⊙ ya da ⊗) ve çevresinde eş merkezli alan çizgileri, oklu" },
   alanNokta: { ad: "⊗ ⊙ alanı", grup: "elektrik", w: 200, h: 120, etiketYeri: "ust", etiket: "B", ipucu: "Sayfaya giren (⊗) ya da çıkan (⊙) düzgün manyetik alan; satır/sütun panelden" },
+  akimliTel: { ad: "Akım taşıyan tel", grup: "elektrik", w: 170, h: 30, etiketYeri: "ust", etiket: "i", ipucu: "Uzun ince çubuk (çift çizgi, beyaz dolgulu: altındaki ⊗ ⊙ simgelerini örter) + yanında küçük akım oku ve \"i\" etiketi. Döndürerek eğik yapın; isteğe bağlı açı (kesikli yatay çizgi + yay + 30°) ve kesit (⊙ ⊗) kipi", aramaKelimeleri: ["tel", "akım", "iletken", "akım taşıyan tel", "manyetik kuvvet", "manyetik alan", "çubuk", "i", "kesit"] },
   dalgaGirisim: { ad: "Girişim deseni", grup: "optik", w: 270, h: 180, etiketYeri: "alt", etiket: "", ipucu: "İki kaynaklı dalga girişimi: dalga cepheleri ve (isteğe bağlı) sönüm çizgileri" },
   enerjiDuzeyi: { ad: "Enerji düzeyleri", grup: "optik", ekGruplar: ["diger"], w: 290, h: 210, etiketYeri: "alt", etiket: "", ipucu: "Bohr/atom enerji düzeyleri ve geçiş okları (ışıma/soğurma); düzeyleri panelden yazın" },
   dugum: { ad: "Düğüm noktası", grup: "elektrik", w: 11, h: 11, etiketYeri: "ust", etiket: "", elips: true, ipucu: "Devrede T-bağlantı noktası (dolu nokta); teller buna bağlanır" },
@@ -879,7 +880,7 @@ function govdeCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
     case "aciYayi": case "dikAci": case "esIsaret":
       geometriIsaretiCiz(ctx, s);
       return;
-    case "isinOk": case "halkaAkim": case "solenoid": case "telAlan": case "alanNokta": case "dalgaGirisim": case "enerjiDuzeyi":
+    case "isinOk": case "halkaAkim": case "solenoid": case "telAlan": case "alanNokta": case "akimliTel": case "dalgaGirisim": case "enerjiDuzeyi":
       fizikEkCiz(ctx, s);
       return;
     case "egikKuvvet":
@@ -1012,6 +1013,8 @@ export function fizikCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
   if (["ucgenABC", "dikUcgen", "benzerUcgen", "cemberGeo", "cokgenAd", "aciYayi", "dogrudaAcilar", "dortgenGeo", "katiCisim", "kagitKatlama", "cografyaSekil", "fizikSekil"].includes(s.nesne)) return;
   // Hesaplı düzenekler kendi yazılarını çizer.
   if (s.nesne === "egikKuvvet" || s.nesne === "optikDuzenek" || s.nesne === "siviKabi") return;
+  // Akım taşıyan tel: "i" etiketini akım okunun yanına, düz (dönmeden) kendisi çizer.
+  if (s.nesne === "akimliTel") return;
 
   if (s.nesne === "koordinat") {
     const [dikey, yatay] = etiket.split("|");

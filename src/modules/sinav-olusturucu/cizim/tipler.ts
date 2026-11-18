@@ -78,7 +78,7 @@ export type FizikNesnesi =
   // v1.2 geometri (bkz. `geometriEk.ts`): doğruda açılar, özel dörtgenler, 3B katı cisimler, kağıt katlama.
   | "dogrudaAcilar" | "dortgenGeo" | "katiCisim" | "kagitKatlama" | "cografyaSekil" | "fizikSekil"
   // Fizik ek şekilleri (bkz. `fizikEk.ts`): ışın ok, halka akım, solenoid, düz tel alanı, ⊗/⊙ alanı, girişim, enerji düzeyi, devre düğümü.
-  | "isinOk" | "halkaAkim" | "solenoid" | "telAlan" | "alanNokta" | "dalgaGirisim" | "enerjiDuzeyi" | "dugum"
+  | "isinOk" | "halkaAkim" | "solenoid" | "telAlan" | "alanNokta" | "akimliTel" | "dalgaGirisim" | "enerjiDuzeyi" | "dugum"
   // v1.2 hesaplı hazır sahneler (bkz. `fizikSahneler.ts`, `optik.ts`, `sivi.ts`): eğik düzlemde kuvvetler, asal eksenli optik düzenek, sıvı kapları.
   | "egikKuvvet" | "optikDuzenek" | "siviKabi";
 
