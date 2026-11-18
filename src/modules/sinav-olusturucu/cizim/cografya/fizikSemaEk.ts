@@ -8,7 +8,7 @@ export type FizikEkYapi =
   | "elektrikAlan" | "coulomb" | "levhaYuk" | "manyetikParcacik" | "iletkenCubuk" | "transformator"
   | "cembersel" | "yorunge" | "basitHarmonik" | "donme"
   | "yolYer" | "bagilHareket" | "serbestDusme" | "stroboskop" | "hareketGrafigi"
-  | "fotoelektrik" | "fotoGrafik" | "bozunma" | "basitMakine" | "vektorSerbest" | "kareliAlan"
+  | "fotoelektrik" | "fotoGrafik" | "bozunma" | "basitMakine" | "vektorSerbest" | "kareliAlan" | "panelIzgara"
   | "kirilma" | "gorunurDerinlik" | "prizmaIsin" | "fiberOptik";
 
 type Sema = { ad: string; alt: string; alanlar: Alan[] };
@@ -529,6 +529,21 @@ export const FIZIK_EK_SEMA: Record<FizikEkYapi, Sema> = {
       { k: "mantik", a: "eksen", ad: "Her alanda x–y eksenleri", v: false },
     ],
   },
+  // ── Çoklu panel: aynı düzeneğin varyantları (I, II, III / ①…⑥ / 1. Durum) çerçeveli ızgarada
+  panelIzgara: {
+    ad: "Panel ızgarası (çoklu panel, I–II–III / ①–⑥)", alt: "Fizik – Çoklu panel",
+    alanlar: [
+      { k: "sayi", a: "satir", ad: "Satır sayısı", min: 1, max: 3, adim: 1, v: 1 },
+      { k: "sayi", a: "sutun", ad: "Sütun sayısı", min: 1, max: 4, adim: 1, v: 3 },
+      { k: "sayi", a: "aralik", ad: "Paneller arası boşluk (px)", min: 0, max: 40, adim: 2, v: 12 },
+      { k: "mantik", a: "cerceve", ad: "Panel çerçevesi", v: true },
+      { k: "mantik", a: "dolgu", ad: "Açık gri zemin (baskıda gri tonu)", v: false },
+      { k: "sec", a: "baslik", ad: "Başlık biçimi", sec: [["yok", "Başlık yok"], ["roman", "I, II, III…"], ["romanDurum", "I. durum, II. durum…"], ["daire", "① ② ③ (dairede, çerçevenin içinde)"], ["sayi", "1, 2, 3…"], ["durum", "1. Durum, 2. Durum…"], ["ozel", "Özel (aşağıya yazın)"]], v: "roman" },
+      { k: "sec", a: "yer", ad: "Başlık yeri", sec: [["ust", "Üst"], ["alt", "Alt"]], v: "alt" },
+      { k: "sayi", a: "punto", ad: "Başlık yazı boyu", min: 8, max: 24, adim: 1, v: 14 },
+      { k: "metin", a: "basliklar", ad: "Özel başlıklar (virgülle, sırayla)", en: 90, v: "x–t, v–t, a–t" },
+    ],
+  },
 };
 
 export const FIZIK_EK_BOYUT: Record<FizikEkYapi, { w: number; h: number }> = {
@@ -537,6 +552,6 @@ export const FIZIK_EK_BOYUT: Record<FizikEkYapi, { w: number; h: number }> = {
   elektrikAlan: { w: 420, h: 250 }, coulomb: { w: 440, h: 230 }, levhaYuk: { w: 420, h: 240 }, manyetikParcacik: { w: 400, h: 260 }, iletkenCubuk: { w: 440, h: 240 }, transformator: { w: 440, h: 240 },
   cembersel: { w: 380, h: 260 }, yorunge: { w: 420, h: 260 }, basitHarmonik: { w: 440, h: 250 }, donme: { w: 440, h: 260 },
   yolYer: { w: 440, h: 260 }, bagilHareket: { w: 440, h: 250 }, serbestDusme: { w: 400, h: 290 }, stroboskop: { w: 460, h: 190 }, hareketGrafigi: { w: 440, h: 260 },
-  fotoelektrik: { w: 440, h: 250 }, fotoGrafik: { w: 400, h: 260 }, bozunma: { w: 450, h: 250 }, basitMakine: { w: 420, h: 260 }, vektorSerbest: { w: 340, h: 280 }, kareliAlan: { w: 540, h: 230 },
+  fotoelektrik: { w: 440, h: 250 }, fotoGrafik: { w: 400, h: 260 }, bozunma: { w: 450, h: 250 }, basitMakine: { w: 420, h: 260 }, vektorSerbest: { w: 340, h: 280 }, kareliAlan: { w: 540, h: 230 }, panelIzgara: { w: 540, h: 190 },
   kirilma: { w: 440, h: 270 }, gorunurDerinlik: { w: 420, h: 270 }, prizmaIsin: { w: 440, h: 270 }, fiberOptik: { w: 530, h: 200 },
 };

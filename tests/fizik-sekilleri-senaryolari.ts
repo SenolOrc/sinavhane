@@ -164,6 +164,8 @@ senaryo("fizik şekilleri bağlayıcı için 4 port verir (kutu kenarları), geo
   for (const y of FIZIK_YAPILARI) {
     const b = COGRAFYA_BOYUTLARI[y];
     const s = { id: "p", tur: "fizik", nesne: "fizikSekil", kalinlik: 2, x: 10, y: 20, w: b.w, h: b.h, geo: varsayilanCografya(y) } as Sekil;
+    // Panel ızgarası ZEMİNdir (kareli alan gibi): bağlayıcı bağlanmaz, port vermez.
+    if (y === "panelIzgara") { dogrula(!portluMu(s) && baglantiPortlari(s).length === 0, "panelIzgara: zemin portsuz olmalı"); continue; }
     dogrula(portluMu(s), y + ": portlu değil");
     const p = baglantiPortlari(s);
     dogrula(p.length === 4, y + ": port sayısı");

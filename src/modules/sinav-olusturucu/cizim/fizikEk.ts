@@ -177,10 +177,38 @@ function telAlanCiz(ctx: CanvasRenderingContext2D, s: FizikSekli, ek: FizikEk) {
 
 // ── ⊗ / ⊙ alanı ────────────────────────────────────────────────────────────
 
+/** Alan çizgisi yönü (ek.metin): boş = ⊗/⊙ simgeleri; aksi hâlde oklu paralel çizgiler. */
+export const ALAN_CIZGI_YONLERI = ["sag", "sol", "yukari", "asagi"] as const;
+export type AlanCizgiYonu = (typeof ALAN_CIZGI_YONLERI)[number];
+export const alanCizgiYonu = (ek: FizikEk): AlanCizgiYonu | null => ((ALAN_CIZGI_YONLERI as readonly string[]).includes(ek.metin ?? "") ? (ek.metin as AlanCizgiYonu) : null);
+
 function alanNoktaCiz(ctx: CanvasRenderingContext2D, s: FizikSekli, ek: FizikEk) {
   const { x, y, w, h } = s;
   const sutun = sinirla(ek.sayi, 5, 1, 14);
   const satir = sinirla(ek.sayi2, 3, 1, 10);
+  const yon = alanCizgiYonu(ek);
+  if (yon) {
+    // Düzgün alan çizgileri: yöne paralel, eşit aralıklı, ucunda ok (yatayda satır, düşeyde sütun sayısı kadar).
+    const yatay = yon === "sag" || yon === "sol";
+    const n = yatay ? satir : sutun;
+    const boy = Math.max(6, Math.min(w, h) * 0.18);
+    ctx.save();
+    ctx.lineWidth = Math.max(1, ctx.lineWidth * 0.85);
+    for (let i = 0; i < n; i += 1) {
+      const t = (i + 0.5) / n;
+      if (yatay) {
+        const yy = y + h * t, a = yon === "sag" ? x + 2 : x + w - 2, b = yon === "sag" ? x + w - 2 : x + 2;
+        cizgi(ctx, a, yy, b - (yon === "sag" ? boy * 0.7 : -boy * 0.7), yy);
+        okBasi(ctx, b, yy, yon === "sag" ? 0 : Math.PI, boy);
+      } else {
+        const xx = x + w * t, a = yon === "asagi" ? y + 2 : y + h - 2, b = yon === "asagi" ? y + h - 2 : y + 2;
+        cizgi(ctx, xx, a, xx, b - (yon === "asagi" ? boy * 0.7 : -boy * 0.7));
+        okBasi(ctx, xx, b, yon === "asagi" ? Math.PI / 2 : -Math.PI / 2, boy);
+      }
+    }
+    ctx.restore();
+    return;
+  }
   const giren = ek.ters === true;
   const cw = w / sutun, ch = h / satir;
   const r = Math.max(3, Math.min(10, Math.min(cw, ch) * 0.28));

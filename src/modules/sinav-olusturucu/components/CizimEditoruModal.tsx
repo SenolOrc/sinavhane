@@ -1,5 +1,5 @@
 import type { PointerEvent } from "react";
-import { COGRAFYA_BOYUTLARI } from "../cizim/cografya";
+import { cografyaKutuBoyutu } from "../cizim/cografya";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDisariTiklama } from "@/lib/disariTiklama";
 import {
@@ -131,6 +131,7 @@ import {
   seciliBaglayicilarlaGenislet,
   disUclariSerbestBirak,
   kimlikleriYenile,
+  zeminMi,
   birlikteTasinanBaglayicilar,
   ucgenNoktalari,
 } from "../cizim/geometri";
@@ -145,7 +146,8 @@ import {
   sekilTamKutusu,
 } from "../cizim/sinirlar";
 import { icerigeKirp } from "../cizim/kirpma";
-import { etkilesimBelirle, etkilesimIpucu, imlecSinifi, sekilTurAdi, sekilVuruldu, tutamacPayi } from "../cizim/vurus";
+import { panellereCogalt, secimPaneli } from "../cizim/panelCogalt";
+import { enUstVurulan, etkilesimBelirle, etkilesimIpucu, imlecSinifi, sekilTurAdi, sekilVuruldu, tutamacPayi } from "../cizim/vurus";
 import { bosYerBul, type Kutu } from "../cizim/yerlesim";
 import {
   boyutlandirmaAdaylari,
@@ -788,6 +790,16 @@ export function CizimEditoruModal({
     window.setTimeout(() => secimAyarla(yeniler.map((s) => s.id)), 0);
   }
 
+  /** Panel ızgarasının bir hücresindeki seçimi öbür hücrelere kopyalar; tek geçmiş adımı. */
+  function seciliyiPanellereCogalt() {
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return;
+    const guncel = sekillerRef.current;
+    const sonuc = panellereCogalt(ctx, guncel, seciliIdsRef.current);
+    if (!sonuc) return;
+    degisiklikUygula(sonuc.sekiller);
+  }
+
   function secilenleriGrupla() {
     if (seciliIds.length < 2) return;
     const grupId = `grup-${sekilId()}`;
@@ -980,7 +992,7 @@ export function CizimEditoruModal({
    * "Şekle yapışma" kapalıysa her zaman serbest nokta.
    */
   function baglayiciUcuBul(ctx: CanvasRenderingContext2D, nokta: Nokta, haric?: string): BaglayiciUcu {
-    const zeminMi = (sk: Sekil) => sk.tur === "fizik" && sk.nesne === "kareliAlan";
+    const kareliMi = (sk: Sekil) => sk.tur === "fizik" && sk.nesne === "kareliAlan";
     const liste = sekillerRef.current;
     const vurulan = [...liste]
       .reverse()
@@ -991,7 +1003,7 @@ export function CizimEditoruModal({
       return port ? { sekilId: vurulan.id, yon: port.yon } : { sekilId: vurulan.id };
     }
     const alan = [...liste].reverse().find((sk) => {
-      if (!zeminMi(sk) || sk.tur !== "fizik") return false;
+      if (!kareliMi(sk) || sk.tur !== "fizik") return false;
       const p = noktaYerel(ctx, sk, nokta);
       const pay = 10;
       return p.x >= sk.x - pay && p.x <= sk.x + sk.w + pay && p.y >= sk.y - pay && p.y <= sk.y + sk.h + pay;
@@ -1057,7 +1069,7 @@ export function CizimEditoruModal({
     const tol = Math.max(tutamacPayi(zoom) * 1.5, 12 * (100 / Math.max(zoom, 1)));
     const liste = sekillerRef.current;
     const secili = seciliIds.length === 1 ? liste.find((x) => x.id === seciliIds[0]) : undefined;
-    const vurulan = [...liste].reverse().find((s) => sekilVuruldu(ctx, s, nokta, zoom, liste));
+    const vurulan = enUstVurulan(ctx, liste, nokta, zoom);
     // Seçili geometri şeklinin köşe/kenarı, kutusunun içinde olmasa da önce denenir.
     const adaylar = [secili, vurulan].filter((x): x is Sekil => !!x);
     for (const s of adaylar) {
@@ -1130,7 +1142,7 @@ export function CizimEditoruModal({
 
     if (arac === "silgi") {
       if (!ctx) return;
-      const vurulan = [...sekiller].reverse().find((s) => sekilVuruldu(ctx, s, nokta, zoom, sekiller));
+      const vurulan = enUstVurulan(ctx, sekiller, nokta, zoom);
       if (!vurulan) return;
       tarihceyeKaydet();
       islemOncesiRef.current = sekiller;
@@ -1236,7 +1248,7 @@ export function CizimEditoruModal({
         const cevrik = katlananTarafiDegistir(seciliSekil, nokta);
         if (cevrik) flapTikRef.current = { yeni: cevrik, nokta };
       }
-      const vurulan = [...sekiller].reverse().find((s) => sekilVuruldu(ctx, s, nokta, zoom, sekiller));
+      const vurulan = enUstVurulan(ctx, sekiller, nokta, zoom);
       if (vurulan) {
         const vurulanIds = vurulan.grupId
           ? sekiller.filter((s) => s.grupId === vurulan.grupId).map((s) => s.id)
@@ -1413,7 +1425,7 @@ export function CizimEditoruModal({
     if (arac === "silgi" && silgiAktifRef.current) {
       const ctx = canvasRef.current?.getContext("2d");
       if (!ctx) return;
-      const vurulan = [...sekillerRef.current].reverse().find((s) => sekilVuruldu(ctx, s, nokta, zoom, sekillerRef.current));
+      const vurulan = enUstVurulan(ctx, sekillerRef.current, nokta, zoom);
       if (vurulan) setSekiller((liste) => {
         const yeni = yetimBaglayicilariAt(liste.filter((s) => s.id !== vurulan.id));
         sekillerRef.current = yeni;
@@ -1905,11 +1917,11 @@ export function CizimEditoruModal({
     // Kimya ve şema kutusu içeriğe göre ölçülür (birim çember, 3 aşamalı ağaç sıkışmasın).
     const t = nesne === "kimya" ? { ...t0, ...kimyaBoyutu(ek?.kimya ?? varsayilanKimya()) }
       : nesne === "sema" ? { ...t0, ...semaBoyutu(ek?.sema ?? varsayilanSema()) }
-      : ek?.geo && ek.geo.tur === "cografya" ? { ...t0, ...COGRAFYA_BOYUTLARI[ek.geo.yapi] } : t0;
+      : ek?.geo && ek.geo.tur === "cografya" ? { ...t0, ...cografyaKutuBoyutu(ek.geo) } : t0;
     const ctx = canvasRef.current?.getContext("2d");
     const kutular: Kutu[] = ctx
       ? sekiller
-          .filter((x) => x.tur !== "baglayici" && !(x.tur === "fizik" && x.nesne === "kareliAlan"))
+          .filter((x) => x.tur !== "baglayici" && !zeminMi(x))
           .map((x) => {
             const k = sekilTamKutusu(ctx, x);
             // Etiket/ip payı: yeni şekil etiketin üstüne de binmesin.
@@ -1969,7 +1981,7 @@ export function CizimEditoruModal({
       if (govde.length) {
         const k = birlesikSinir(ctx, govde);
         const kutular: Kutu[] = sekiller
-          .filter((x) => x.tur !== "baglayici" && !(x.tur === "fizik" && x.nesne === "kareliAlan"))
+          .filter((x) => x.tur !== "baglayici" && !zeminMi(x))
           .map((x) => sekilTamKutusu(ctx, x));
         const pay = 24;
         const konum = bosYerBul(kutular, k.w + pay * 2, k.h + pay * 2, tuvalOlcu);
@@ -2013,7 +2025,7 @@ export function CizimEditoruModal({
     const ctx = canvasRef.current?.getContext("2d");
     const kutular: Kutu[] = ctx
       ? sekiller
-          .filter((x) => x.tur !== "baglayici" && !(x.tur === "fizik" && x.nesne === "kareliAlan"))
+          .filter((x) => x.tur !== "baglayici" && !zeminMi(x))
           .map((x) => sekilTamKutusu(ctx, x))
       : [];
     const w = 360;
@@ -2330,6 +2342,10 @@ export function CizimEditoruModal({
 
   const yuzenAyar: YuzenAracAyarlari | null = (() => {
     if (!yuzenKonum) return null;
+    const panelSecimi = (() => {
+      const c = canvasRef.current?.getContext("2d");
+      return c ? secimPaneli(c, sekiller, seciliIds) : null;
+    })();
     const coklu = seciliIds.length > 1;
     const s = birincil ?? seciliSekiller[seciliSekiller.length - 1];
     if (!s) return null;
@@ -2337,6 +2353,7 @@ export function CizimEditoruModal({
     const ortak: YuzenAracAyarlari = {
       coklu,
       onCogalt: seciliCogalt,
+      onPanelCogalt: panelSecimi ? seciliyiPanellereCogalt : undefined,
       onSil: seciliSil,
       onAyrintilar: () => setSagPanelAcik((v) => !v),
       ayrintiAcik: panelAcik,

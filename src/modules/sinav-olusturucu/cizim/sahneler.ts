@@ -15,6 +15,7 @@
 
 import type { Sekil } from "./tipler";
 import { FIZIK_HAZIR_SAHNELER } from "./fizikSahneSablonlari";
+import { PANEL_HAZIR_SAHNELER } from "./panelSahneleri";
 
 export type HazirSahne = {
   id: string;
@@ -27,4 +28,6 @@ export type HazirSahne = {
 export const HAZIR_SAHNELER: HazirSahne[] = [
   // Fizik (F ajanı): eğik düzlem, makara, Atwood, palanga, tam devre, optik, sıvı kapları.
   ...FIZIK_HAZIR_SAHNELER,
+  // Çoklu panel: çerçeveli ızgara + boş eksenli grafikler.
+  ...PANEL_HAZIR_SAHNELER,
 ];

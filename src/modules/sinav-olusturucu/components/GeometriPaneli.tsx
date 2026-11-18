@@ -48,7 +48,7 @@ import {
 } from "../cizim/fizikEk";
 import type { FizikEk, GeoAciIsareti, GeometriVerisi, KatlamaAdimi, KatlamaKagidi, Sekil } from "../cizim/tipler";
 import { MetinGirdisi, OndalikGirdisi } from "./GrafikPaneli";
-import { COGRAFYA_BOYUTLARI, SEMA, fizikHesapOzeti, type Alan, type CografyaVerisi } from "../cizim/cografya";
+import { cografyaKutuBoyutu, SEMA, fizikHesapOzeti, type Alan, type CografyaVerisi } from "../cizim/cografya";
 import { EnerjiTablolari } from "./EnerjiDuzeyTablosu";
 import { TogglePill } from "./ModalParcalari";
 
@@ -790,7 +790,10 @@ export function GeoEkPaneli({ sekil, guncelle, tarihceyeKaydet }: {
       if (g.tur === "cografya") {
         // Yapı değişince (şablon seçimi) kutu o yapının önerilen boyutuna gelir; yoksa yalnız veri güncellenir.
         const eski = sekil.geo && sekil.geo.tur === "cografya" ? sekil.geo.yapi : null;
-        if (eski !== g.yapi) { const b = COGRAFYA_BOYUTLARI[g.yapi]; guncelle({ geo: g, w: b.w, h: b.h }); } else guncelle({ geo: g });
+        // Panel ızgarasında satır/sütun değişince de kutu yeni dizilime göre boyutlanır (hücreler ezilmesin).
+        const panelDizilimiDegisti = eski === "panelIzgara" && g.yapi === "panelIzgara" && sekil.geo?.tur === "cografya"
+          && (sekil.geo.ayar.satir !== g.ayar.satir || sekil.geo.ayar.sutun !== g.ayar.sutun);
+        if (eski !== g.yapi || panelDizilimiDegisti) { const b = cografyaKutuBoyutu(g); guncelle({ geo: g, w: b.w, h: b.h }); } else guncelle({ geo: g });
         return;
       }
       if (g.tur !== "katlama" || !g.yer) { guncelle({ geo: g }); return; }
@@ -865,6 +868,12 @@ export function GeoEkPaneli({ sekil, guncelle, tarihceyeKaydet }: {
         <TogglePill aktif={ek.ters === true} onClick={() => { tarihceyeKaydet(); ekYaz({ ters: true }); }}>Sayfaya giren ⊗</TogglePill>
         <OndalikGirdisi etiket="Sütun" deger={ek.sayi ?? 5} onOdak={tarihceyeKaydet} onDegis={(v) => v !== undefined && Number.isInteger(v) && v >= 1 && v <= 14 && ekYaz({ sayi: v })} />
         <OndalikGirdisi etiket="Satır" deger={ek.sayi2 ?? 3} onOdak={tarihceyeKaydet} onDegis={(v) => v !== undefined && Number.isInteger(v) && v >= 1 && v <= 10 && ekYaz({ sayi2: v })} />
+        <span className={BASLIK}>Alan çizgileri</span>
+        {([["sag", "→"], ["sol", "←"], ["yukari", "↑"], ["asagi", "↓"]] as const).map(([k, simge]) => (
+          <TogglePill key={k} aktif={ek.metin === k} onClick={() => { tarihceyeKaydet(); ekYaz({ metin: ek.metin === k ? "" : k }); }}>{simge}</TogglePill>
+        ))}
+        <TogglePill aktif={sekil.etiket === "vec(B)"} onClick={() => { tarihceyeKaydet(); guncelle({ etiket: sekil.etiket === "vec(B)" ? "B" : "vec(B)" }); }}>Etiket: B vektörü</TogglePill>
+        <span className="text-[10px] text-slate-500">Çizgi seçiliyse ⊗/⊙ yerine oklu paralel çizgiler çizilir; küçülterek panele sığdırın.</span>
       </div>
     );
   } else if (nesne === "dalgaGirisim") {

@@ -8,7 +8,7 @@
 //
 // Her şey saf (tuval/React bilmez); çizim yalnız `ctx` yöntemlerini çağırır.
 
-import { COGRAFYA_BOYUTLARI, varsayilanCografya } from "./cografya";
+import { cografyaKutuBoyutu, varsayilanCografya } from "./cografya";
 import type { FizikEk, GeoAciIsareti, GeometriVerisi, Nokta, Sekil } from "./tipler";
 import { MUREKKEP } from "./sabitler";
 import { icerikCizicisiKaydet } from "./fizikIcerik";
@@ -547,7 +547,7 @@ export function geometriCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
  * kutusunda çizip (w×h) alana sığdırır. Gerçek çizim rutini kullanılır.
  */
 export function geometriOnizlemeCiz(ctx: CanvasRenderingContext2D, nesne: string, geo: GeometriVerisi, w: number, h: number) {
-  const t = geo.tur === "cografya" ? COGRAFYA_BOYUTLARI[geo.yapi] : (FIZIK_TANIMLARI as Record<string, { w: number; h: number } | undefined>)[nesne] ?? { w: 220, h: 170 };
+  const t = geo.tur === "cografya" ? cografyaKutuBoyutu(geo) : (FIZIK_TANIMLARI as Record<string, { w: number; h: number } | undefined>)[nesne] ?? { w: 220, h: 170 };
   // Yazılar kutu dışına taşabildiği için çevresine pay bırakılır.
   const payX = 30, payY = 26;
   const olcek = Math.min(w / (t.w + 2 * payX), h / (t.h + 2 * payY));
@@ -855,7 +855,7 @@ const FIZIK_ALT: Record<string, string> = { atis: "Fizik – Atış", enerji: "F
   elektrikAlan: "Fizik – Elektrik", coulomb: "Fizik – Elektrik", levhaYuk: "Fizik – Elektrik", manyetikParcacik: "Fizik – Manyetizma", iletkenCubuk: "Fizik – Manyetizma", transformator: "Fizik – Manyetizma",
   cembersel: "Fizik – Çembersel hareket", yorunge: "Fizik – Çekim", basitHarmonik: "Fizik – Salınım", donme: "Fizik – Dönme",
   yolYer: "Fizik – Hareket", bagilHareket: "Fizik – Hareket", serbestDusme: "Fizik – Hareket", stroboskop: "Fizik – Hareket", hareketGrafigi: "Fizik – Hareket",
-  fotoelektrik: "Fizik – Modern fizik", fotoGrafik: "Fizik – Modern fizik", bozunma: "Fizik – Modern fizik", basitMakine: "Fizik – Basit makineler", vektorSerbest: "Fizik – Vektör", kareliAlan: "Fizik – Vektör",
+  fotoelektrik: "Fizik – Modern fizik", fotoGrafik: "Fizik – Modern fizik", bozunma: "Fizik – Modern fizik", basitMakine: "Fizik – Basit makineler", vektorSerbest: "Fizik – Vektör", kareliAlan: "Fizik – Vektör", panelIzgara: "Fizik – Çoklu panel",
   kirilma: "Fizik – Optik (kırılma)", gorunurDerinlik: "Fizik – Optik (kırılma)", prizmaIsin: "Fizik – Optik (kırılma)", fiberOptik: "Fizik – Optik (kırılma)" };
 const fz = (id: string, ad: string, ipucu: string, yapi: Parameters<typeof varsayilanCografya>[0], ek: Parameters<typeof varsayilanCografya>[1], anahtar: string[]): GeometriSablonu => ({
   id, ad, ipucu, nesne: "fizikSekil", altBaslik: FIZIK_ALT[yapi], aramaKelimeleri: ["fizik", ...anahtar], olustur: () => varsayilanCografya(yapi, ek),
@@ -1028,6 +1028,11 @@ export const FIZIK_SABLONLARI: GeometriSablonu[] = [
   fz("f-prizma-dagilma", "Prizmada ışığın dağılması", "Mavi, kırmızıdan daha çok sapar", "prizmaIsin", { A: 60, n: 1.5, aci: 50, dagilma: true, dn: 0.1 }, ["prizma", "dağılma", "renk", "kırmızı mavi", "optik"]),
   fz("f-fiber-optik", "Fiber optik kabloda tam yansıma", "n₁ > n₂: ışık çekirdekte zikzak ilerler", "fiberOptik", {}, ["fiber optik", "tam yansıma", "optik kablo", "çekirdek kılıf", "optik"]),
   fz("f-fiber-sizinti", "Fiber optik: büyük açıyla gelen ışık sızar", "α > α_maks: tam yansıma olmaz", "fiberOptik", { aci: 55, aciYaz: false }, ["fiber optik", "kabul açısı", "tam yansıma", "sızma", "optik"]),
+  fz("f-panel-roman", "3 panel I–II–III (yan yana)", "Aynı düzeneğin üç varyantı: çerçeveli paneller, altta I, II, III", "panelIzgara", { satir: 1, sutun: 3, baslik: "roman", yer: "alt" }, ["panel", "çoklu panel", "I II III", "roman", "yan yana", "durum", "varyant", "öncül"]),
+  fz("f-panel-roman-durum", "3 panel: I. durum – II. durum – III. durum", "Şekillerin altında I. durum, II. durum, III. durum", "panelIzgara", { satir: 1, sutun: 3, baslik: "romanDurum", yer: "alt" }, ["panel", "çoklu panel", "durum", "I. durum", "yan yana", "atış", "sürtünme"]),
+  fz("f-panel-daire-6", "2×3 numaralı panel (①…⑥)", "Altı çerçeveli panel; her birinin üst ortasında daireli numara", "panelIzgara", { satir: 2, sutun: 3, baslik: "daire", yer: "ust", aralik: 14 }, ["panel", "çoklu panel", "numaralı", "daireli", "①", "altı panel", "2x3", "manyetik alan", "tel"]),
+  fz("f-panel-durum-2", "2 panel: 1. Durum / 2. Durum", "Yan yana iki panel; üstte 1. Durum, 2. Durum", "panelIzgara", { satir: 1, sutun: 2, baslik: "durum", yer: "ust" }, ["panel", "çoklu panel", "durum", "1. durum", "iki panel", "önce sonra"]),
+  fz("f-panel-grafik", "2×3 boş panel (x–t, v–t, a–t başlıklı)", "Altı boş çerçeve; üstte x–t, v–t, a–t başlıkları. Eksenli sürüm: Hazır sahneler", "panelIzgara", { satir: 2, sutun: 3, baslik: "ozel", yer: "ust", basliklar: "x–t, v–t, a–t, x–t, v–t, a–t" }, ["panel", "çoklu panel", "boş grafik", "x-t", "v-t", "a-t", "grafik paneli", "2x3"]),
   // <<PAKET-EK-SABLON>>
 ];
 

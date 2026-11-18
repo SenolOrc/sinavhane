@@ -9,6 +9,7 @@ import { dinamikCiz, dinamikOzet } from "./fizikCizDinamik";
 import { hareketCiz, hareketOzet } from "./fizikCizHareket";
 import { modernCiz, modernOzet } from "./fizikCizModern";
 import { optikCiz, optikOzet } from "./fizikCizOptik";
+import { panelIzgaraCiz } from "./panelIzgara";
 import { kareliAlanCiz, vektorSerbestCiz, vektorSerbestOzet } from "./fizikCizVektor";
 
 type Ctx = CanvasRenderingContext2D;
@@ -338,6 +339,7 @@ export function fizikEkCiz(ctx: Ctx, v: CografyaVerisi, k: Kutu): boolean {
   if (dalgaCiz(ctx, v, k) || elektrikCiz(ctx, v, k) || dinamikCiz(ctx, v, k) || hareketCiz(ctx, v, k) || modernCiz(ctx, v, k) || optikCiz(ctx, v, k)) return true;
   if (v.yapi === "vektorSerbest") { vektorSerbestCiz(ctx, v, k); return true; }
   if (v.yapi === "kareliAlan") { kareliAlanCiz(ctx, v, k); return true; }
+  if (v.yapi === "panelIzgara") { panelIzgaraCiz(ctx, v, k); return true; }
   switch (v.yapi) {
     case "torricelli": torricelliCiz(ctx, v, k); return true;
     case "bernoulli": bernoulliCiz(ctx, v, k); return true;
@@ -349,7 +351,7 @@ export function fizikEkCiz(ctx: Ctx, v: CografyaVerisi, k: Kutu): boolean {
 
 /** Öğretmene hesap özeti (panelde gösterilir; şekle yazılmaz). */
 export function fizikEkHesapOzeti(v: CografyaVerisi): string | null | undefined {
-  const d = dalgaOzet(v) ?? elektrikOzet(v) ?? dinamikOzet(v) ?? hareketOzet(v) ?? modernOzet(v) ?? optikOzet(v) ?? (v.yapi === "vektorSerbest" ? vektorSerbestOzet(v) : v.yapi === "kareliAlan" ? null : undefined);
+  const d = dalgaOzet(v) ?? elektrikOzet(v) ?? dinamikOzet(v) ?? hareketOzet(v) ?? modernOzet(v) ?? optikOzet(v) ?? (v.yapi === "vektorSerbest" ? vektorSerbestOzet(v) : v.yapi === "kareliAlan" || v.yapi === "panelIzgara" ? null : undefined);
   if (d !== undefined) return d;
   switch (v.yapi) {
     case "torricelli": {

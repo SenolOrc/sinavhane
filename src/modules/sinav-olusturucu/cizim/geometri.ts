@@ -12,6 +12,19 @@ import { fizikIcerikTutunma } from "./fizikIcerik";
 import { ASGARI_CIZIM_PX, BAGLAYICI_CIKIS, VARSAYILAN_TUVAL } from "./sabitler";
 import type { TuvalOlcusu } from "./sabitler";
 
+/**
+ * Panel ızgarası (çoklu panel): `fizikSekil` + `cografya/panelIzgara`. Kareli alan gibi bir ZEMİN: her
+ * şeyin altında çizilir, içi tıklamayı çalmaz, bağlayıcı bağlanmaz.
+ */
+export function panelZeminiMi(s: Sekil): boolean {
+  return s.tur === "fizik" && s.nesne === "fizikSekil" && s.geo?.tur === "cografya" && s.geo.yapi === "panelIzgara";
+}
+
+/** Zemin şekilleri: kareli alan ve panel ızgarası. Altta çizilir, vuruşta en son sayılır. */
+export function zeminMi(s: Sekil): boolean {
+  return (s.tur === "fizik" && s.nesne === "kareliAlan") || panelZeminiMi(s);
+}
+
 export function sekilId() {
   return `sekil-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }

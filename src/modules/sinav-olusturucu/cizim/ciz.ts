@@ -29,6 +29,7 @@ import {
   noktaListesiKutusu,
   sekilGeometriKutusu,
   yolOrtaNoktasi,
+  zeminMi,
 } from "./geometri";
 import {
   birlesikSinir,
@@ -292,8 +293,8 @@ export function sekilCiz(ctx: CanvasRenderingContext2D, sekil: Sekil) {
  * seçilince ortaya çıkan bir kusur olurdu.
  */
 export function sekilleriCiz(ctx: CanvasRenderingContext2D, sekiller: Sekil[]) {
-  // Kareli alan ZEMİNdir: her şeyin altında çizilir (sonradan eklense de).
-  const zemin = (s: Sekil) => s.tur === "fizik" && s.nesne === "kareliAlan";
+  // Kareli alan ve panel ızgarası ZEMİNdir: her şeyin altında çizilir (sonradan eklense de).
+  const zemin = zeminMi;
   for (const sekil of sekiller) {
     if (zemin(sekil)) sekilCiz(ctx, sekil);
   }

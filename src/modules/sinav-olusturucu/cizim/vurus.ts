@@ -15,7 +15,10 @@ import {
   izgaraBoyutu,
   noktaCokgenIcindeMi,
   noktaSegmenteUzaklik,
+  panelZeminiMi,
+  zeminMi,
 } from "./geometri";
+import { panelKenarUzakligi } from "./cografya/panelIzgara";
 import { birlesikSinir, noktaYerel, sekilHamSinirlari, sekilTutamaclari } from "./sinirlar";
 
 // Vuruş payı, tuvalin gerçek çizim uzayında sabit bir mesafe (VURUS_PAYI). Uzaklaştırılmış
@@ -73,6 +76,16 @@ export function sekilKenarUzakligi(ctx: CanvasRenderingContext2D, sekil: Sekil, 
     for (let r = 0; r <= satir; r += 1) en = Math.min(en, Math.abs(p.y - (sekil.y + (sekil.h * r) / satir)));
     return en;
   }
+  // Panel ızgarası: kareli alan gibi yalnız çerçeve çizgileri/başlık bandı; içi boş (zemin).
+  if (panelZeminiMi(sekil) && sekil.tur === "fizik" && sekil.geo?.tur === "cografya") {
+    if (p.x < sekil.x - 1 || p.x > sekil.x + sekil.w + 1 || p.y < sekil.y - 1 || p.y > sekil.y + sekil.h + 1) {
+      return enKucukKenarUzakligi(p, [
+        { x: sekil.x, y: sekil.y }, { x: sekil.x + sekil.w, y: sekil.y },
+        { x: sekil.x + sekil.w, y: sekil.y + sekil.h }, { x: sekil.x, y: sekil.y + sekil.h },
+      ]);
+    }
+    return panelKenarUzakligi(sekil.geo, { x: sekil.x, y: sekil.y, w: sekil.w, h: sekil.h }, p);
+  }
   if (sekil.tur === "fizik") {
     const koseler = [
       { x: sekil.x, y: sekil.y },
@@ -126,6 +139,28 @@ export function sekilVuruldu(
     return enYakin <= BAGLAYICI_VURUS_PAYI;
   }
   return sekilKenarUzakligi(ctx, sekil, nokta) <= vurusPayi(zoomYuzde);
+}
+
+/**
+ * Tıklanan noktadaki EN ÜST şekil: önce zemin olmayanlar (üstteki önce), bulunamazsa zemin (kareli alan,
+ * panel ızgarası). Zemin dizide sonra gelse bile (ör. şablon sonradan eklendi) üstündeki şekilleri
+ * örtmez: panelin çerçevesi üstündeki bir tel/ok her zaman önce seçilir.
+ */
+export function enUstVurulan(
+  ctx: CanvasRenderingContext2D,
+  sekiller: Sekil[],
+  nokta: Nokta,
+  zoomYuzde = 100,
+): Sekil | undefined {
+  for (let i = sekiller.length - 1; i >= 0; i -= 1) {
+    const s = sekiller[i];
+    if (!zeminMi(s) && sekilVuruldu(ctx, s, nokta, zoomYuzde, sekiller)) return s;
+  }
+  for (let i = sekiller.length - 1; i >= 0; i -= 1) {
+    const s = sekiller[i];
+    if (zeminMi(s) && sekilVuruldu(ctx, s, nokta, zoomYuzde, sekiller)) return s;
+  }
+  return undefined;
 }
 
 // Bir köşenin, HARİÇ tutulan (kendi) şekil dışında başka herhangi bir şekle
@@ -187,7 +222,7 @@ export function etkilesimBelirle(
       return { tur: "nokta", hedefId: secili.id };
     }
   }
-  const vurulan = [...sekiller].reverse().find((s) => sekilVuruldu(ctx, s, nokta, zoom, sekiller));
+  const vurulan = enUstVurulan(ctx, sekiller, nokta, zoom);
   if (vurulan) return { tur: "tasi", hedefId: vurulan.id };
   return { tur: "sec", hedefId: null };
 }

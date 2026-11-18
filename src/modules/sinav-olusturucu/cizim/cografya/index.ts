@@ -6,10 +6,12 @@ import { izohipsCiz } from "./izohips";
 import { horstGrabenCiz, kivrimCiz } from "./jeoloji";
 import { fizikSekilCiz } from "./fizikCiz";
 import { FIZIK_BOYUTLARI } from "./fizikSema";
+import { panelBoyutu } from "./panelIzgara";
 import type { CografyaVerisi } from "./sema";
 
 export * from "./sema";
 export * from "./fizikSema";
+export * from "./panelIzgara";
 export { fizikHesapOzeti, fizikSekilCiz, atisHesapla, carpismaSonra, torkDengesi, pistNoktalari } from "./fizikCiz";
 export type Kutu = { x: number; y: number; w: number; h: number };
 
@@ -33,3 +35,8 @@ export const COGRAFYA_BOYUTLARI: Record<CografyaVerisi["yapi"], { w: number; h: 
   harita: { w: 520, h: 250 }, izohips: { w: 300, h: 260 }, horstGraben: { w: 300, h: 230 }, antiklinal: { w: 300, h: 230 }, senklinal: { w: 300, h: 230 },
   walter: { w: 340, h: 230 }, piramit: { w: 320, h: 260 }, mevsim: { w: 460, h: 260 }, aydinlanma: { w: 420, h: 260 },
 };
+
+/** Verinin önerilen kutu boyutu: panel ızgarası satır/sütuna göre, diğerleri yapı tablosundan. */
+export function cografyaKutuBoyutu(v: CografyaVerisi): { w: number; h: number } {
+  return v.yapi === "panelIzgara" ? panelBoyutu(v) : COGRAFYA_BOYUTLARI[v.yapi];
+}

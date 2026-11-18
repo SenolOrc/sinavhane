@@ -13,6 +13,7 @@ import {
   Copy,
   FlipHorizontal2,
   Group,
+  LayoutGrid,
   MoreHorizontal,
   Palette,
   PaintBucket,
@@ -56,6 +57,8 @@ export type YuzenAracAyarlari = {
   onKatla?: () => void;
   katlaAktif?: boolean;
   onCogalt: () => void;
+  /** Seçim bir panel ızgarasının tek hücresindeyse: aynı konumda öbür panellere kopyalar (yoksa düğme görünmez). */
+  onPanelCogalt?: () => void;
   onSil: () => void;
   onAyrintilar: () => void;
   ayrintiAcik: boolean;
@@ -287,6 +290,18 @@ export function YuzenAracCubugu({ konum, ayar }: { konum: { left: number; top: n
         <button type="button" className={DUGME} title="90° döndür" aria-label="90° döndür" onClick={ayar.onDondur}><RotateCw size={18} /></button>
       )}
       <button type="button" className={DUGME} title="Çoğalt (Ctrl+D)" aria-label="Çoğalt" onClick={ayar.onCogalt}><Copy size={18} /></button>
+      {ayar.onPanelCogalt && (
+        <button
+          type="button"
+          className={`${DUGME} text-xs font-semibold`}
+          title="Panellere çoğalt: seçili şekilleri öbür panellerin aynı konumuna kopyalar"
+          aria-label="Panellere çoğalt"
+          data-testid="arac-panellere-cogalt"
+          onClick={ayar.onPanelCogalt}
+        >
+          <LayoutGrid size={18} /><span>Panellere çoğalt</span>
+        </button>
+      )}
       <button type="button" className={`${DUGME} text-rose-600 hover:bg-rose-50`} title="Sil (Delete)" aria-label="Sil" onClick={ayar.onSil}><Trash2 size={18} /></button>
       <span className="mx-0.5 h-6 w-px bg-slate-200" />
       <button type="button" className={DUGME} title="Ayrıntılı ayarlar (sağ panel)" aria-label="Ayrıntılar" aria-pressed={ayar.ayrintiAcik} onClick={ayar.onAyrintilar}>

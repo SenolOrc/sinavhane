@@ -10,7 +10,7 @@
 import type { BaglayiciYonu, GrafikVerisi, Nokta, Sekil } from "./tipler";
 import { grafikDuzeni, type GrafikDuzeni } from "./grafik";
 import { FIZIK_TANIMLARI } from "./fizik";
-import { tutunmaNoktasi } from "./geometri";
+import { panelZeminiMi, tutunmaNoktasi } from "./geometri";
 
 type FizikSekli = Extract<Sekil, { tur: "fizik" }>;
 const RAD = Math.PI / 180;
@@ -115,6 +115,7 @@ const PORTSUZ = ["kareliAlan", "egikKuvvet", "optikDuzenek", "siviKabi", "grafik
 export function portluMu(s: Sekil): boolean {
   if (s.tur === "akis") return true;
   if (s.tur !== "fizik") return false;
+  if (panelZeminiMi(s)) return false;
   // Fizik şekilleri (atış, enerji, çarpışma, tork…) `geo` taşır ama birbirine bağlanabilir: kutu kenarlarından.
   if (s.nesne === "fizikSekil") return true;
   if (PORTSUZ.includes(s.nesne) || FIZIK_TANIMLARI[s.nesne]?.grup === "geometri") return false;

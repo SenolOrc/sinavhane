@@ -307,6 +307,14 @@ Faz D'ye dokunmadan önce bilinmesi gereken iki bilinçli tercih:
   Bağlayıcı aracında Kuvvet / Vektör türüyle alanın içine tıklayın ya da alan seçiliyken Ayrıntılar'daki
   "Vektör ekle"yi kullanın. Uçlar `BaglayiciUcu.dugum {c, r}`; alan taşınınca vektörler birlikte gelir.
   Kod: `cizim/geometri.ts` (`izgaraBoyutu`, `izgaraDugumu`, `enYakinDugum`), `FizikPaneli.tsx` (`KareliAlanPaneli`).
+- **Panel ızgarası** (Fizik > Çoklu panel): aynı düzeneğin varyantlarını (I–II–III, ①…⑥, 1. Durum) çerçeveli
+  satır (1–3) × sütun (1–4) ızgarada gösterir; aralık, çerçeve, açık gri zemin, başlık biçimi/yeri/boyu ve özel
+  başlıklar yan panelden. Kareli alan gibi ZEMİNdir: altta çizilir, yalnız çerçeve çizgisi/başlığına tıklayınca
+  seçilir, bağlayıcı bağlanmaz; üstteki şekiller dizide önce gelmese de önce seçilir (`vurus.enUstVurulan`).
+  **Panellere çoğalt** (yüzen çubuk): seçim tek bir hücrenin içindeyse (birleşik sınır merkezi) aynı göreli
+  konumda öbür hücrelere kopyalar; tek geçmiş adımı. Hücre geometrisi `cografya/panelIzgara.ts`, eylem
+  `panelCogalt.ts`; "2×3 boş grafik paneli (eksenli)" hazır sahnesi `panelSahneleri.ts`. ⊗/⊙ alanı
+  (`alanNokta`) küçülünce hücreye sığar; panelde → ← ↑ ↓ alan çizgisi ve "B vektörü" etiketi seçilebilir.
 - **Hareket grafikleri** (Fizik > Hareket grafikleri): x–t, v–t, a–t, sinüs/kosinüs, noktalarla ve
   "x–t, v–t, a–t üçlü" (aynı hareketin üç grafiği alt alta, zaman eksenleri hizalı). Eğri hareket
   evreleriyle (süre, ivme), noktalarla ya da genlik/periyotla tanımlanır; köşe noktaları tuvalde
