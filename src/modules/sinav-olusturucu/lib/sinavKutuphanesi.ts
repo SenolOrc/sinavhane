@@ -70,7 +70,7 @@ export function kabaBoyutBayt(taslak: SinavTaslagi): number {
     toplam += soru.metinHtml?.length ?? 0;
     toplam += soru.altMetinHtml?.length ?? 0;
     for (const parca of soru.ekGorseller ?? []) toplam += parca.dataUrl.length;
-    for (const madde of soru.maddeler) toplam += madde.metinHtml.length;
+    for (const madde of soru.maddeler) toplam += madde.metinHtml.length + (madde.gorselDataUrl?.length ?? 0);
   }
   toplam += taslak.baslik.logoDataUrl?.length ?? 0;
   return toplam;

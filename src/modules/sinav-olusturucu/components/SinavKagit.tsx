@@ -36,6 +36,14 @@ import {
 } from "../layout/a4";
 
 import {
+  SEKILLI_SIK_HARF_ARASI_MM,
+  SEKILLI_SIK_SATIR_ARASI_MM,
+  SEKILLI_SIK_SUTUN_ARASI_MM,
+  sekilliSikAktif,
+  sekilliSikGenisligiMm,
+  sekilliSikOlcusu,
+} from "../layout/sekilliSiklar";
+import {
   gorselYerlesimHesapla,
   hizalamaJustify,
   htmlToText,
@@ -1252,8 +1260,62 @@ function SoruIcerikTemel({
     icerikGenislikMm,
     sikDuzeni,
   );
+  // ŞEKİLLİ ŞIKLAR (test kipi): her şık bir şekil; eşit hücreli ızgara, harf
+  // hücrenin sol üstünde, şekil altında, şık metni (varsa) başlık olarak en
+  // altta. Metin-yalnız şıklar aşağıdaki eski dalda AYNEN çizilmeye devam eder.
+  const sekilliOlcu = sekilliSikAktif(soru, testModu)
+    ? sekilliSikOlcusu(soru, sekilliSikGenisligiMm(icerikGenislikMm))
+    : null;
+  const sekilliSiklar = sekilliOlcu ? (
+    <div
+      data-testid="sekilli-sik-izgara"
+      data-sekilli-sik-duzen={sekilliOlcu.duzen}
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${sekilliOlcu.kolon}, minmax(0, 1fr))`,
+        columnGap: olcu(SEKILLI_SIK_SUTUN_ARASI_MM),
+        rowGap: olcu(SEKILLI_SIK_SATIR_ARASI_MM),
+        marginTop: olcu(2),
+      }}
+    >
+      {soru.maddeler.map((madde, index) => {
+        const harf = maddeHarfi(index + (soru.maddeHarfBaslangic ?? 0), testModu, sikBicimi);
+        const genislik = sekilliOlcu.gorselMm[index];
+        return (
+          <div key={madde.id} data-sekilli-sik={harf} style={{ minWidth: 0, breakInside: "avoid" }}>
+            <div style={{ fontWeight: 700, lineHeight: 1.45 }}>{harf})</div>
+            {madde.gorselDataUrl && (
+              // Ortak kutu yüksekliği: aynı satırdaki hücreler eşit boyda,
+              // başlıklar aynı hizada (şekil boyları farklı olsa da).
+              <div style={{ marginTop: olcu(SEKILLI_SIK_HARF_ARASI_MM), height: olcu(sekilliOlcu.kutuYukMm) }}>
+                <img
+                  src={madde.gorselDataUrl}
+                  alt={`${harf} şıkkı şekli`}
+                  draggable={false}
+                  style={{
+                    display: "block",
+                    width: olcu(genislik),
+                    // Yükseklik görsel yüklenmeden belli olmalı (bkz. anaGorsel).
+                    height: olcu(genislik / Math.max(0.25, Math.min(8, madde.gorselOran ?? 1.35))),
+                    maxWidth: "100%",
+                    objectFit: "contain",
+                  }}
+                />
+              </div>
+            )}
+            {htmlToText(madde.metinHtml).trim() !== "" && (
+              <div style={{ marginTop: olcu(0.5) }}>
+                <RichTextGorunum html={madde.metinHtml} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  ) : null;
   const maddeler =
-    soru.maddeler.length > 0 ? (
+    sekilliSiklar ??
+    (soru.maddeler.length > 0 ? (
       <div
         style={{
           display: "grid",
@@ -1324,7 +1386,7 @@ function SoruIcerikTemel({
           </div>
         ))}
       </div>
-    ) : null;
+    ) : null);
 
   return (
     <div

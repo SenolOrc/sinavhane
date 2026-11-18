@@ -1,6 +1,7 @@
 import { KARE_MM, MM_PX, PT_MM, SATIR_MM } from "../constants";
 import type { Bant, CevapAlani, Madde, SayfaYerlesimi, SoruOgesi } from "../types";
 import { htmlToText } from "../utils";
+import { sekilliSikAktif, sekilliSikGenisligiMm, sekilliSikYuksekligiMm } from "./sekilliSiklar";
 
 export function mmPx(mm: number) {
   return mm * MM_PX;
@@ -80,6 +81,10 @@ export function kabaTahminMm(soru: SoruOgesi, icerikMm: number, testModu = false
   const kok = htmlToText(soru.tur === "metin" ? soru.metinHtml : soru.altMetinHtml);
   if (kok.length > 0) {
     toplam += Math.ceil(kok.length / satirKarakter) * (soru.punto * PT_MM * 1.45);
+  }
+  // Şekilli şıklar ızgara olarak dizilir: satır sayısı/şekil boyu ayrı hesaplanır.
+  if (sekilliSikAktif(soru, testModu)) {
+    return toplam + 2 + sekilliSikYuksekligiMm(soru, sekilliSikGenisligiMm(icerikMm));
   }
   for (const madde of soru.maddeler) {
     const uzunluk = Math.max(1, htmlToText(madde.metinHtml).length);

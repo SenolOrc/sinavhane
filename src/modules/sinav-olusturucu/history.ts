@@ -1,12 +1,16 @@
-import type { SinavTaslagi, SoruOgesi } from "./types";
+import type { Madde, SinavTaslagi, SoruOgesi } from "./types";
 
 type HafifEkGorsel = Omit<NonNullable<SoruOgesi["ekGorseller"]>[number], "dataUrl"> & {
   dataAssetId: string;
 };
 
-type HafifSoru = Omit<SoruOgesi, "gorselDataUrl" | "ekGorseller"> & {
+type HafifMadde = Omit<Madde, "gorselDataUrl"> & { gorselAssetId?: string };
+
+type HafifSoru = Omit<SoruOgesi, "gorselDataUrl" | "ekGorseller" | "maddeler"> & {
   gorselAssetId?: string;
   ekGorseller?: HafifEkGorsel[];
+  /** Şekilli şık görselleri de asset kaydına gider (her adımda kopyalanmasın). */
+  maddeler: HafifMadde[];
 };
 
 /**
@@ -89,9 +93,13 @@ export function hafifSnapshotOlustur(
   kayit: GorselAssetKaydi,
 ): string {
   const sorular: HafifSoru[] = durum.sorular.map((soru) => {
-    const { gorselDataUrl, ekGorseller, ...kalan } = soru;
+    const { gorselDataUrl, ekGorseller, maddeler, ...kalan } = soru;
     return {
       ...kalan,
+      maddeler: maddeler.map((madde): HafifMadde => {
+        const { gorselDataUrl: sikGorsel, ...maddeKalan } = madde;
+        return sikGorsel ? { ...maddeKalan, gorselAssetId: kayit.kaydet(sikGorsel) } : maddeKalan;
+      }),
       ...(gorselDataUrl ? { gorselAssetId: kayit.kaydet(gorselDataUrl) } : {}),
       ekGorseller: (ekGorseller ?? []).map((parca) => {
         const { dataUrl, ...parcaKalan } = parca;
@@ -119,13 +127,20 @@ export function hafifSnapshotGeriYukle(
 ): SinavGecmisDurumu {
   const hafif = JSON.parse(snapshot) as HafifDurum;
   const sorular = hafif.sorular.map((soru) => {
-    const { gorselAssetId, ekGorseller, ...kalan } = soru;
+    const { gorselAssetId, ekGorseller, maddeler, ...kalan } = soru;
     const gorselDataUrl = gorselAssetId ? kayit.getir(gorselAssetId) : undefined;
     if (gorselAssetId && !gorselDataUrl) {
       throw new Error(`Geri alma görseli bulunamadı: ${gorselAssetId}`);
     }
     return {
       ...kalan,
+      maddeler: maddeler.map((madde): Madde => {
+        const { gorselAssetId: sikAsset, ...maddeKalan } = madde;
+        if (!sikAsset) return maddeKalan;
+        const sikGorsel = kayit.getir(sikAsset);
+        if (!sikGorsel) throw new Error(`Geri alma görseli bulunamadı: ${sikAsset}`);
+        return { ...maddeKalan, gorselDataUrl: sikGorsel };
+      }),
       ...(gorselDataUrl ? { gorselDataUrl } : {}),
       ekGorseller: (ekGorseller ?? []).map((parca) => {
         const { dataAssetId, ...parcaKalan } = parca;

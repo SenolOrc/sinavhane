@@ -355,6 +355,8 @@ export function SinavOlusturucuScreen() {
   const [cizimModal, setCizimModal] = useState<{
     soruId?: string;
     ekGorselId?: string;
+    /** Şekilli şık: düzenlenen şıkkın kimliği (soruId ile birlikte). */
+    maddeId?: string;
     belge?: CizimBelgesi;
   } | null>(null);
   const [denklemModal, setDenklemModal] = useState<{
@@ -2064,6 +2066,19 @@ export function SinavOlusturucuScreen() {
   }
 
   function cizimSorusuOlustur(cikti: CizimCikti, hedef: "yeni" | "secili" | "inline") {
+    if (cizimModal?.soruId && cizimModal.maddeId) {
+      const hedefSoru = sorular.find((s) => s.id === cizimModal.soruId);
+      soruGuncelle(cizimModal.soruId, {
+        maddeler: (hedefSoru?.maddeler ?? []).map((madde) =>
+          madde.id === cizimModal.maddeId
+            ? { ...madde, gorselDataUrl: cikti.dataUrl, gorselOran: cikti.oran, cizimVerisi: cikti.cizimVerisi }
+            : madde,
+        ),
+      });
+      setCizimModal(null);
+      setAutosaveDurum("Şık şekli güncellendi.");
+      return;
+    }
     if (cizimModal?.soruId) {
       if (cizimModal.ekGorselId) {
         const soru = sorular.find((s) => s.id === cizimModal.soruId);
@@ -3480,6 +3495,13 @@ export function SinavOlusturucuScreen() {
                           belge: parca.cizimVerisi,
                         });
                     }}
+                    onSikCizimDuzenle={(maddeId) =>
+                      setCizimModal({
+                        soruId: seciliSoru.id,
+                        maddeId,
+                        belge: seciliSoru.maddeler.find((m) => m.id === maddeId)?.cizimVerisi,
+                      })
+                    }
                     onDenklemDuzenle={
                       seciliSoru.denklemVerisi
                         ? () =>

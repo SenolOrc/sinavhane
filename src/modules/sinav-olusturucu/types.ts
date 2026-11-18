@@ -19,7 +19,18 @@ export type Madde = {
   /** Cevap alanının görünümü (yalnız yazılı kipinde, açık uçlu maddelerde).
    *  Yoksa = boş (eski kayıtlar böyle açılır). */
   cevapAlani?: CevapAlani;
+  /** ŞEKİLLİ ŞIK (yalnız test kipinde): şıkkın kendisi bir şekil/grafik/devre.
+   *  Şık metni isteğe bağlı başlık olarak şeklin altında kalır. Yoksa şık
+   *  yalnız metindir (eski kayıtlar böyle açılır). */
+  gorselDataUrl?: string;
+  /** Şeklin genişlik/yükseklik oranı (PNG'den); yerleşim görsel yüklenmeden hesaplanır. */
+  gorselOran?: number;
+  /** Şekil çizim editöründe üretildiyse düzenlenebilsin diye kaynak belge. */
+  cizimVerisi?: CizimBelgesi;
 };
+
+/** Şekilli şıkların kâğıttaki dizilimi. `otomatik` = oran + sayfa genişliğine göre seçilir. */
+export type SikGorselDuzeni = "otomatik" | "yan5" | "uc-iki" | "iki-sutun" | "tek";
 
 export type EkGorselParcasi = {
   id: string;
@@ -92,6 +103,10 @@ export type SoruOgesi = {
   bepPuan?: number | null;
   maddeler: Madde[];
   maddeKolon: 1 | 2 | 3;
+  /** Şekilli şıkların dizilimi (yoksa = otomatik). Yalnız şıklarda şekil varken anlamlıdır. */
+  sikGorselDuzeni?: SikGorselDuzeni;
+  /** Şekilli şıkta her şeklin hedef genişliği (mm); yoksa otomatik. Hücre genişliğini aşamaz. */
+  sikGorselGenislikMm?: number;
   tamGenislik: boolean;
   /** Kitaptan TAM SAYFA olarak alinmis gorsel: kendi sayfasinda, tam
    *  genislikte basilir. 1. sayfada 58mm baslik oldugu icin oraya sigmaz

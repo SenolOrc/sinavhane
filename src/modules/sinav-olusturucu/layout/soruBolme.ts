@@ -14,6 +14,7 @@
 
 import type { SoruOgesi } from "../types";
 import { soruPuani, mantiksalSoruId } from "../utils";
+import { sekilliSikMi } from "./sekilliSiklar";
 
 /** Üst düzey blokların soru kutusuna göre üst kenarları (mm) ve kutu yüksekliği.
  *  `maddeUstMm`: şık/madde kutularının üst kenarları (yalnız maddeleri soru
@@ -29,6 +30,8 @@ export const BOLME_OLCUM_ESIGI_MM = 100;
 
 export function bolunebilirMi(soru: SoruOgesi): boolean {
   if (soru.tamSayfa || soru.paketId || mantiksalSoruId(soru) !== soru.id) return false;
+  // Şekilli şıklar tek bir ızgara bloğudur; hücreler sayfalar arasında bölünmez.
+  if (sekilliSikMi(soru)) return false;
   if (soru.tur === "metin") return (soru.ekGorseller ?? []).length === 0;
   // Görselli/çizimli soru: görsel ve kök (yan yana ise o satır da) ilk parçada
   // kalır, maddeler her zaman görselin ALTINDA dizildiği için madde sınırında

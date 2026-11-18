@@ -44,7 +44,8 @@ export function sinavTaslakOzeti(taslak: SinavTaslagi) {
     return toplam + (maddePuani || soru.puan || 0);
   }, 0);
   const gorselSayisi = taslak.sorular.reduce((toplam, soru) =>
-    toplam + (soru.gorselDataUrl ? 1 : 0) + (soru.ekGorseller?.length ?? 0), taslak.baslik.logoDataUrl ? 1 : 0);
+    toplam + (soru.gorselDataUrl ? 1 : 0) + (soru.ekGorseller?.length ?? 0)
+      + soru.maddeler.filter((madde) => madde.gorselDataUrl).length, taslak.baslik.logoDataUrl ? 1 : 0);
   return {
     ders: taslak.baslik.ders || "Belirtilmemiş",
     sinif: taslak.baslik.sinifSeviyesi || "Belirtilmemiş",
@@ -126,7 +127,11 @@ export function sinavTaslakKimlikleriniYenile(taslak: SinavTaslagi, idUret: () =
       id: yeniId,
       logicalQuestionId: grupId(mantiksalIdler, soru.logicalQuestionId) ?? grupId(paketIdleri, soru.paketId) ?? yeniId,
       paketId: grupId(paketIdleri, soru.paketId),
-      maddeler: soru.maddeler.map((madde) => ({ ...madde, id: idUret() })),
+      maddeler: soru.maddeler.map((madde) => ({
+        ...madde,
+        id: idUret(),
+        ...(madde.cizimVerisi ? { cizimVerisi: belgeIciKimlikleriYenile(madde.cizimVerisi, idUret) } : {}),
+      })),
       ekGorseller: soru.ekGorseller?.map((gorsel) => ({
         ...gorsel,
         id: idUret(),
@@ -206,10 +211,14 @@ function genelYapiSinirlari(deger: unknown): void {
 
 function maddeDogrula(deger: unknown): boolean {
   if (!nesneMi(deger)) return false;
-  return yalnizAlanlar(deger, ["id", "metinHtml", "puan", "cevapSatir", "cevapAlani"])
+  return yalnizAlanlar(deger, ["id", "metinHtml", "puan", "cevapSatir", "cevapAlani", "gorselDataUrl", "gorselOran", "cizimVerisi"])
     && metinMi(deger.id, 100, false) && metinMi(deger.metinHtml, 200_000)
     && (deger.puan === null || sayiMi(deger.puan, 0, 1_000)) && sayiMi(deger.cevapSatir, 0, 100, true)
-    && (deger.cevapAlani === undefined || CEVAP_ALANI_TURLERI.includes(deger.cevapAlani as CevapAlani));
+    && (deger.cevapAlani === undefined || CEVAP_ALANI_TURLERI.includes(deger.cevapAlani as CevapAlani))
+    // Şekilli şık: veri URL'si yalnız izinli görsel türlerinden olabilir (soru görseliyle aynı kural).
+    && (deger.gorselDataUrl === undefined || veriUrlMi(deger.gorselDataUrl))
+    && opsiyonelSayi(deger, "gorselOran", 0.02, 100)
+    && (deger.cizimVerisi === undefined || (nesneMi(deger.cizimVerisi) && deger.gorselDataUrl !== undefined));
 }
 
 function ekGorselDogrula(deger: unknown): boolean {
@@ -231,7 +240,7 @@ function soruDogrula(deger: unknown): boolean {
     "genislikMm", "gorselOran", "gorselYukseklikMm", "ekGorseller", "kaynakSecimNo", "kaynakSayfaNo",
     "kaynakAd", "kirpmaId", "kaynakAktarimId", "kaynakKitapId", "kaynakSayfa", "kaynakSinif", "kaynakDers",
     "kaynakKonu", "logicalQuestionId", "paketId", "paketSira", "paketParcaSayisi", "paketBasligi", "boslukMm", "cevapAlani",
-    "punto", "puan", "bepPuan", "maddeler", "maddeKolon", "tamGenislik", "tamSayfa", "kazanim", "dogruSik", "bolumBasligi",
+    "punto", "puan", "bepPuan", "maddeler", "maddeKolon", "sikGorselDuzeni", "sikGorselGenislikMm", "tamGenislik", "tamSayfa", "kazanim", "dogruSik", "bolumBasligi",
     "cizimVerisi", "denklemVerisi",
   ])) return false;
   if (!metinMi(deger.metinKonumu, 10, false) || !["ust", "alt", "sag", "sol", "yok"].includes(deger.metinKonumu)) return false;
@@ -249,6 +258,8 @@ function soruDogrula(deger: unknown): boolean {
     || !opsiyonelMetin(deger, "kazanim", 2_000) || !opsiyonelMetin(deger, "dogruSik", 20)
     || !opsiyonelMetin(deger, "bolumBasligi", 500) || !opsiyonelMetin(deger, "kaynakAd", 1_000)
     || !["kirpmaId", "kaynakAktarimId", "kaynakKitapId", "kaynakSinif", "kaynakDers", "kaynakKonu", "logicalQuestionId", "paketId", "paketBasligi"].every((alan) => opsiyonelMetin(deger, alan, 1_000))) return false;
+  if (!(deger.sikGorselDuzeni === undefined || ["otomatik", "yan5", "uc-iki", "iki-sutun", "tek"].includes(String(deger.sikGorselDuzeni)))
+    || !opsiyonelSayi(deger, "sikGorselGenislikMm", 5, 200)) return false;
   if (!opsiyonelSayi(deger, "gorselOran", 0.02, 100) || !opsiyonelSayi(deger, "gorselYukseklikMm", 2, 500)
     || !opsiyonelSayi(deger, "kaynakSecimNo", 0, 100_000, true) || !opsiyonelSayi(deger, "kaynakSayfaNo", 0, 100_000, true)
     || !opsiyonelSayi(deger, "kaynakSayfa", 0, 100_000, true) || !opsiyonelSayi(deger, "paketSira", 0, 10_000, true)

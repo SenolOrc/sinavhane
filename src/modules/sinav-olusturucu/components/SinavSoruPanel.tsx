@@ -39,6 +39,8 @@ import {
 import { htmlTemizle } from "../security/html";
 
 import { RichTextEditor } from "./SinavZenginMetin";
+import { SekilliSikAyarlari, SikSekliAlani } from "./SekilliSikPaneli";
+import { sekilliSikMi, sekliTumSiklaraKopyala, sekliKaldir, type SikSekli } from "../layout/sekilliSiklar";
 import { SoruKaliplari } from "./SoruKaliplari";
 import { MmInput } from "./SinavPanelParcalari";
 export function InlineSoruDuzenlemePanel({
@@ -56,6 +58,7 @@ export function InlineSoruDuzenlemePanel({
   onParcaKirp,
   onCizimDuzenle,
   onEkCizimDuzenle,
+  onSikCizimDuzenle,
   onDenklemDuzenle,
   onEkDenklemDuzenle,
   testModu = false,
@@ -77,6 +80,8 @@ export function InlineSoruDuzenlemePanel({
   onParcaKirp?: () => void;
   onCizimDuzenle?: () => void;
   onEkCizimDuzenle?: (parcaId: string) => void;
+  /** Şekilli şık: şıkkın şeklini çizim editöründe açar (şekli yoksa boş editör). */
+  onSikCizimDuzenle?: (maddeId: string) => void;
   onDenklemDuzenle?: () => void;
   onEkDenklemDuzenle?: (parcaId: string) => void;
   testModu?: boolean;
@@ -131,6 +136,22 @@ export function InlineSoruDuzenlemePanel({
       maddeler: soru.maddeler.map((madde) =>
         madde.id === id ? { ...madde, ...patch } : madde,
       ),
+    });
+  }
+
+  /** Sorunun ana şeklini (varsa) tüm şıklara başlangıç olarak kopyalar. */
+  function soruSekliniSiklaraKopyala() {
+    if (!soru.gorselDataUrl) return;
+    if (
+      soru.maddeler.some((m) => m.gorselDataUrl) &&
+      !window.confirm("Şıklardaki mevcut şekiller sorunun şekliyle DEĞİŞTİRİLECEK. Devam edilsin mi?")
+    ) return;
+    onChange({
+      maddeler: sekliTumSiklaraKopyala(soru.maddeler, {
+        gorselDataUrl: soru.gorselDataUrl,
+        gorselOran: soru.gorselOran,
+        cizimVerisi: soru.cizimVerisi,
+      }),
     });
   }
 
@@ -319,7 +340,7 @@ export function InlineSoruDuzenlemePanel({
               <div className="mt-3">
                 <div className="flex items-center justify-between">
                   <AlanEtiket>{testModu ? "Şıklar (A, B, C...)" : "Maddeler (a, b, c...)"}</AlanEtiket>
-                  {soru.maddeler.length > 1 && (
+                  {soru.maddeler.length > 1 && !(testModu && sekilliSikMi(soru)) && (
                     <div className="flex gap-1">
                       {([1, 2, 3] as const).map((kolon) => (
                         <TogglePill
@@ -340,6 +361,24 @@ export function InlineSoruDuzenlemePanel({
                         testModu={testModu}
                         sikBicimi={sikBicimi}
                         odakla={madde.id === odakMaddeId}
+                        sekil={
+                          testModu && onSikCizimDuzenle
+                            ? {
+                                digerSekilVar: soru.maddeler.some((m) => m.id !== madde.id && m.gorselDataUrl),
+                                onCiz: () => onSikCizimDuzenle(madde.id),
+                                onSekil: (sekil) => onChange({ maddeler: soru.maddeler.map((m) => (m.id === madde.id ? { ...sekliKaldir(m), ...sekil } : m)) }),
+                                onKaldir: () => onChange({ maddeler: soru.maddeler.map((m) => (m.id === madde.id ? sekliKaldir(m) : m)) }),
+                                onTumSiklaraKopyala: () =>
+                                  onChange({
+                                    maddeler: sekliTumSiklaraKopyala(
+                                      soru.maddeler,
+                                      { gorselDataUrl: madde.gorselDataUrl, gorselOran: madde.gorselOran, cizimVerisi: madde.cizimVerisi },
+                                      madde.id,
+                                    ),
+                                  }),
+                              }
+                            : undefined
+                        }
                         key={madde.id}
                         madde={madde}
                         index={index}
@@ -358,6 +397,24 @@ export function InlineSoruDuzenlemePanel({
                       />
                     ))}
                   </div>
+                )}
+                {testModu && sekilliSikMi(soru) && (
+                  <SekilliSikAyarlari
+                    soru={soru}
+                    icerikGenislikMm={icerikGenislikMm}
+                    onChange={onChange}
+                    soruSekliniKopyala={soru.gorselDataUrl ? soruSekliniSiklaraKopyala : undefined}
+                  />
+                )}
+                {testModu && !sekilliSikMi(soru) && soru.gorselDataUrl && soru.maddeler.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={soruSekliniSiklaraKopyala}
+                    data-testid="sik-soru-sekli-kopyala"
+                    className="mt-2 w-full rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                  >
+                    Sorunun şeklini tüm şıklara kopyala (şekilli şık)
+                  </button>
                 )}
                 <button
                   type="button"
@@ -761,8 +818,17 @@ export function MaddeSatiri({
   testModu,
   sikBicimi,
   odakla,
+  sekil,
 }: {
   odakla?: boolean;
+  /** Şekilli şık düzenleme (yalnız Test kipinde verilir). */
+  sekil?: {
+    digerSekilVar: boolean;
+    onCiz: () => void;
+    onSekil: (sekil: SikSekli) => void;
+    onKaldir: () => void;
+    onTumSiklaraKopyala: () => void;
+  };
   madde: Madde;
   index: number;
   onChange: (patch: Partial<Madde>) => void;
@@ -812,6 +878,17 @@ export function MaddeSatiri({
         kompakt
         autoFocus={odakla}
       />
+      {sekil && (
+        <SikSekliAlani
+          madde={madde}
+          harf={harf}
+          digerSekilVar={sekil.digerSekilVar}
+          onCiz={sekil.onCiz}
+          onSekil={sekil.onSekil}
+          onKaldir={sekil.onKaldir}
+          onTumSiklaraKopyala={sekil.onTumSiklaraKopyala}
+        />
+      )}
       {(maddePuaniGoster || cevapSatiriGoster) && (
       <div className="mt-2 grid grid-cols-2 gap-2">
         {maddePuaniGoster && (
