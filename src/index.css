@@ -115,6 +115,12 @@ p, td, th, label, [role="alert"], [role="status"] {
   vertical-align: middle;
 }
 .soru-tablo th { font-weight: 700; }
+/* Doğru/Yanlış + Açıklama kalıbı: önerme geniş, D/Y dar, açıklama kalan yer;
+   satırlar öğrencinin yazabileceği kadar yüksek. Yalnız siyah çizgi (S/B baskı). */
+.soru-tablo-dy { width: 100%; table-layout: fixed; }
+.soru-tablo-dy th:nth-child(1) { width: 40%; }
+.soru-tablo-dy th:nth-child(2), .soru-tablo-dy th:nth-child(3) { width: 8%; }
+.soru-tablo-dy td { height: 2.6em; text-align: left; }
 
 .denklem-inline, .cizim-inline {
   /* Tailwind preflight tüm img'lere display:block veriyor; bu satır içi

@@ -1,4 +1,5 @@
-import type { SinavTaslagi } from "../types";
+import type { CevapAlani, SinavTaslagi } from "../types";
+import { CEVAP_ALANI_TURLERI } from "../constants";
 import { dosyaKaydet } from "@/lib/dosya";
 import { parolaliSinavMi, sinaviParolala, sinavParolasiniAc } from "@/lib/parolaliSinav";
 
@@ -205,9 +206,10 @@ function genelYapiSinirlari(deger: unknown): void {
 
 function maddeDogrula(deger: unknown): boolean {
   if (!nesneMi(deger)) return false;
-  return yalnizAlanlar(deger, ["id", "metinHtml", "puan", "cevapSatir"])
+  return yalnizAlanlar(deger, ["id", "metinHtml", "puan", "cevapSatir", "cevapAlani"])
     && metinMi(deger.id, 100, false) && metinMi(deger.metinHtml, 200_000)
-    && (deger.puan === null || sayiMi(deger.puan, 0, 1_000)) && sayiMi(deger.cevapSatir, 0, 100, true);
+    && (deger.puan === null || sayiMi(deger.puan, 0, 1_000)) && sayiMi(deger.cevapSatir, 0, 100, true)
+    && (deger.cevapAlani === undefined || CEVAP_ALANI_TURLERI.includes(deger.cevapAlani as CevapAlani));
 }
 
 function ekGorselDogrula(deger: unknown): boolean {
@@ -235,7 +237,7 @@ function soruDogrula(deger: unknown): boolean {
   if (!metinMi(deger.metinKonumu, 10, false) || !["ust", "alt", "sag", "sol", "yok"].includes(deger.metinKonumu)) return false;
   if (!metinMi(deger.hizalama, 10, false) || !["sol", "orta", "sag"].includes(deger.hizalama)) return false;
   if (!sayiMi(deger.genislikMm, 5, 200) || !sayiMi(deger.boslukMm, 0, 300) || !sayiMi(deger.punto, 6, 72)) return false;
-  if (!(deger.cevapAlani === undefined || deger.cevapAlani === "bos" || deger.cevapAlani === "cizgi" || deger.cevapAlani === "kare")) return false;
+  if (!(deger.cevapAlani === undefined || CEVAP_ALANI_TURLERI.includes(deger.cevapAlani as CevapAlani))) return false;
   // `bepPuan` isteğe bağlı: eski dosyalarda hiç yok (undefined), paket parçalarında null.
   if (!(deger.bepPuan === undefined || deger.bepPuan === null || sayiMi(deger.bepPuan, 0, 1_000))) return false;
   if (!(deger.puan === null || sayiMi(deger.puan, 0, 1_000)) || ![1, 2, 3].includes(deger.maddeKolon as number) || typeof deger.tamGenislik !== "boolean") return false;

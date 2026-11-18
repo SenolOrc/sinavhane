@@ -1,5 +1,5 @@
-import { MM_PX, PT_MM, SATIR_MM } from "../constants";
-import type { Bant, SayfaYerlesimi, SoruOgesi } from "../types";
+import { KARE_MM, MM_PX, PT_MM, SATIR_MM } from "../constants";
+import type { Bant, CevapAlani, Madde, SayfaYerlesimi, SoruOgesi } from "../types";
 import { htmlToText } from "../utils";
 
 export function mmPx(mm: number) {
@@ -50,6 +50,21 @@ export function cevapAnahtariYuksekligiMm(maddeSayisi: number): number {
   );
 }
 
+/** Açık uçlu maddenin altındaki cevap alanının yüksekliği (mm). Kağıt
+ *  (SinavKagit) ve kaba tahmin AYNI fonksiyonu kullanır; ayrışırlarsa sayfalama
+ *  ölçümü ile ilk tahmin tutmaz. Kareli alan tam karelere yuvarlanır (alt kenarı
+ *  açık bir ızgara çizmemek için); 1 satır = SATIR_MM. */
+export function maddeCevapYuksekligiMm(
+  madde: Pick<Madde, "cevapSatir" | "cevapAlani">,
+  testModu = false,
+): number {
+  if (testModu || !(madde.cevapSatir > 0)) return 0;
+  const mm = madde.cevapSatir * SATIR_MM;
+  return (madde.cevapAlani as CevapAlani | undefined) === "kare"
+    ? Math.max(KARE_MM, Math.floor(mm / KARE_MM) * KARE_MM)
+    : mm;
+}
+
 export function kabaTahminMm(soru: SoruOgesi, icerikMm: number, testModu = false) {
   const satirKarakter = Math.max(18, icerikMm / 2.1);
   let toplam = 6;
@@ -71,7 +86,7 @@ export function kabaTahminMm(soru: SoruOgesi, icerikMm: number, testModu = false
     toplam +=
       (Math.ceil(uzunluk / satirKarakter) * (soru.punto * PT_MM * 1.45)) /
         soru.maddeKolon +
-      (testModu ? 0 : madde.cevapSatir * SATIR_MM);
+      maddeCevapYuksekligiMm(madde, testModu);
   }
   return toplam;
 }

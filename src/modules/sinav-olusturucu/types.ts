@@ -14,7 +14,11 @@ export type Madde = {
   id: string;
   metinHtml: string;
   puan: number | null;
+  /** Maddenin altındaki cevap alanının yüksekliği (satır; 1 satır = SATIR_MM). */
   cevapSatir: number;
+  /** Cevap alanının görünümü (yalnız yazılı kipinde, açık uçlu maddelerde).
+   *  Yoksa = boş (eski kayıtlar böyle açılır). */
+  cevapAlani?: CevapAlani;
 };
 
 export type EkGorselParcasi = {
@@ -74,7 +78,7 @@ export type SoruOgesi = {
   paketParcaSayisi?: number;
   paketBasligi?: string;
   boslukMm: number;
-  /** Soru altındaki boşluğun görünümü: boş (varsayılan), çizgili ya da kareli. Eski kayıtlarda yok = boş. */
+  /** Soru altındaki boşluğun görünümü: boş (varsayılan), çizgili, kareli ya da noktalı. Eski kayıtlarda yok = boş. */
   cevapAlani?: CevapAlani;
   punto: number;
   puan: number | null;
@@ -111,7 +115,7 @@ export type SoruOgesi = {
   gosterilenPuan?: number | null;
 };
 
-export type CevapAlani = "bos" | "cizgi" | "kare";
+export type CevapAlani = "bos" | "cizgi" | "kare" | "nokta";
 
 export type MetinTaslak = {
   html: string;

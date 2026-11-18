@@ -20,7 +20,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import type { Madde, SoruOgesi } from "../types";
+import type { CevapAlani, Madde, SoruOgesi } from "../types";
 import { INPUT_CLASS, SATIR_MM } from "../constants";
 
 import { AlanEtiket, MiniButon, TogglePill } from "./ModalParcalari";
@@ -39,6 +39,7 @@ import {
 import { htmlTemizle } from "../security/html";
 
 import { RichTextEditor } from "./SinavZenginMetin";
+import { SoruKaliplari } from "./SoruKaliplari";
 import { MmInput } from "./SinavPanelParcalari";
 export function InlineSoruDuzenlemePanel({
   soru,
@@ -312,6 +313,8 @@ export function InlineSoruDuzenlemePanel({
                   </>
                 )}
               </div>
+
+              <SoruKaliplari key={soru.id} soru={soru} testModu={testModu} onChange={onChange} />
 
               <div className="mt-3">
                 <div className="flex items-center justify-between">
@@ -694,25 +697,13 @@ export function InlineSoruDuzenlemePanel({
                     className={INPUT_CLASS}
                   />
                 </div>
-                <div>
+                <div className="col-span-2">
                   <AlanEtiket>Cevap alanı</AlanEtiket>
-                  <div className="flex gap-1" role="group" aria-label="Cevap alanı görünümü">
-                    {([["bos", "Boş"], ["cizgi", "Çizgili"], ["kare", "Kareli"]] as const).map(([k, ad]) => {
-                      const secili = (soru.cevapAlani ?? "bos") === k;
-                      return (
-                        <button
-                          key={k}
-                          type="button"
-                          aria-pressed={secili}
-                          data-testid={`cevap-alani-${k}`}
-                          onClick={() => onChange({ cevapAlani: k })}
-                          className={`flex-1 rounded-md border px-1.5 py-1.5 text-[11px] font-semibold ${secili ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"}`}
-                        >
-                          {ad}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <CevapAlaniSecici
+                    deger={soru.cevapAlani}
+                    onChange={(k) => onChange({ cevapAlani: k })}
+                    testIdOnek="cevap-alani"
+                  />
                 </div>
               </div>
 
@@ -860,6 +851,54 @@ export function MaddeSatiri({
         )}
       </div>
       )}
+      {cevapSatiriGoster && madde.cevapSatir > 0 && (
+        <div className="mt-2" data-testid="madde-cevap-alani-secici">
+          <AlanEtiket>Bu maddenin cevap alanı</AlanEtiket>
+          <CevapAlaniSecici
+            deger={madde.cevapAlani}
+            onChange={(k) => onChange({ cevapAlani: k })}
+            testIdOnek="madde-cevap-alani"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+const CEVAP_ALANI_ADLARI: readonly (readonly [CevapAlani, string])[] = [
+  ["bos", "Boş"],
+  ["cizgi", "Çizgili"],
+  ["kare", "Kareli"],
+  ["nokta", "Noktalı"],
+];
+
+/** Boş / çizgili / kareli / noktalı cevap alanı seçici (soru altı ve madde altı). */
+export function CevapAlaniSecici({
+  deger,
+  onChange,
+  testIdOnek,
+}: {
+  deger: CevapAlani | undefined;
+  onChange: (k: CevapAlani) => void;
+  testIdOnek: string;
+}) {
+  return (
+    <div className="mt-1 flex gap-1" role="group" aria-label="Cevap alanı görünümü">
+      {CEVAP_ALANI_ADLARI.map(([k, ad]) => {
+        const secili = (deger ?? "bos") === k;
+        return (
+          <button
+            key={k}
+            type="button"
+            aria-pressed={secili}
+            data-testid={`${testIdOnek}-${k}`}
+            onClick={() => onChange(k)}
+            className={`flex-1 rounded-md border px-1.5 py-1.5 text-[11px] font-semibold ${secili ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"}`}
+          >
+            {ad}
+          </button>
+        );
+      })}
     </div>
   );
 }

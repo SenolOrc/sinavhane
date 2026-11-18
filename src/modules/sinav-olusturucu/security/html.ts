@@ -11,6 +11,8 @@ const IZINLI_SINIFLAR = [
   "denklem-inline",
   "cizim-inline",
   "soru-tablo",
+  // Doğru/Yanlış + Açıklama kalıbı: sütun genişlikleri CSS'ten (öznitelik yok).
+  "soru-tablo-dy",
 ];
 
 // Basit soru tablosu (limit/türev değer tablosu, veri tablosu). YALNIZ bu etiketler;
@@ -33,8 +35,9 @@ function tabloTemizle(kok: HTMLElement) {
     });
   });
   kok.querySelectorAll<HTMLElement>("table, thead, tbody, tr, td, th").forEach((el) => {
+    const dyMi = el.tagName === "TABLE" && el.classList.contains("soru-tablo-dy");
     Array.from(el.attributes).forEach((o) => el.removeAttribute(o.name));
-    if (el.tagName === "TABLE") el.setAttribute("class", "soru-tablo");
+    if (el.tagName === "TABLE") el.setAttribute("class", dyMi ? "soru-tablo soru-tablo-dy" : "soru-tablo");
   });
   // Boş tablo (satırı kalmayan) kalmasın.
   kok.querySelectorAll("table").forEach((t) => {

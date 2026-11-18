@@ -1,4 +1,4 @@
-import type { LogoBoyut } from "./types";
+import type { CevapAlani, LogoBoyut } from "./types";
 
 export const DONEMLER = ["1. DÖNEM", "2. DÖNEM"];
 export const YAZILI_NUMARALARI = ["1. YAZILI", "2. YAZILI", "3. YAZILI"];
@@ -78,6 +78,9 @@ export const VARSAYILAN_LOGO_BOYUT: LogoBoyut = "orta";
 export const MM_PX = 700 / A4_GENISLIK_MM;
 export const PT_MM = 0.352778;
 export const SATIR_MM = 8;
+/** Kareli cevap alanında kare kenarı (mm). */
+export const KARE_MM = 5;
+export const CEVAP_ALANI_TURLERI: readonly CevapAlani[] = ["bos", "cizgi", "kare", "nokta"];
 /** Soru arası boşluk varsayılanı: yazılı kipinde 4 cevap satırı (el yazısı
  *  alanı), test kipinde yalnız ayırıcı boşluk (cevap alanı yok, sayfa israfı). */
 export const VARSAYILAN_SORU_BOSLUK_YAZILI_MM = 4 * SATIR_MM;

@@ -9,11 +9,12 @@
 import { memo, useMemo } from "react";
 import type { ReactNode } from "react";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
-import type { LogoBoyut, SoruOgesi, SayfaYerlesimi, YerlesimUyarisi } from "../types";
+import type { CevapAlani, LogoBoyut, SoruOgesi, SayfaYerlesimi, YerlesimUyarisi } from "../types";
 import {
   A4_GENISLIK_MM,
   A4_YAZDIRMA_YUKSEKLIK_PT,
   A4_YUKSEKLIK_MM,
+  KARE_MM,
   LOGO_BOYUT_MM,
   MM_PX,
   SATIR_MM,
@@ -31,6 +32,7 @@ import {
   ANAHTAR_UST_BOSLUK_MM,
   mmPx,
   puntoPx,
+  maddeCevapYuksekligiMm,
 } from "../layout/a4";
 
 import {
@@ -696,26 +698,53 @@ function OgretmenImzaAlani({
   );
 }
 
-/** Sorunun altındaki boşluğu (marginBottom) çizgili ya da kareli gösterir.
- *  Mutlak konumlu: yerleşim ölçümüne hiç etki etmez, yalnız mevcut boşluğu doldurur.
- *  Kâğıt B/Y basıldığı için tek tonlu ince çizgi kullanılır. */
-function CevapAlaniCizgisi({ soru, yazdirmaModu }: { soru: SoruOgesi; yazdirmaModu?: boolean }) {
-  const tur = soru.cevapAlani;
-  if ((tur !== "cizgi" && tur !== "kare") || !(soru.boslukMm > 0)) return null;
-  const adim = tur === "cizgi" ? SATIR_MM : 5;
-  const yukseklik = Math.floor(soru.boslukMm / adim) * adim;
-  if (yukseklik <= 0) return null;
-  const renk = "#8a8a8a";
+const CEVAP_ALANI_RENGI = "#8a8a8a";
+
+/** Çizgili / kareli / noktalı cevap alanının arka plan deseni. Soru altındaki
+ *  boşluk (`CevapAlaniCizgisi`) ve madde altındaki alan AYNI deseni kullanır.
+ *  Kâğıt S/B basıldığı için tek tonlu açık gri; desen CSS gradyanıdır, bu yüzden
+ *  ekranda (px) ve yazdırmada (mm) aynı görünür. `bos` için null döner. */
+export function cevapAlaniDeseni(
+  tur: CevapAlani | undefined,
+  yazdirmaModu?: boolean,
+): { backgroundImage: string; backgroundSize: string; boxShadow?: string } | null {
+  if (tur !== "cizgi" && tur !== "kare" && tur !== "nokta") return null;
   // mmOlcu ekranda birimsiz sayı döner (px); gradient boyutu birim ister.
   const birim = (mm: number) => (yazdirmaModu ? `${mm}mm` : `${mmPx(mm)}px`);
-  const a = birim(adim);
+  const renk = CEVAP_ALANI_RENGI;
+  const a = birim(tur === "kare" ? KARE_MM : SATIR_MM);
   const kalin = birim(0.25);
   const cizgi = `linear-gradient(to bottom, transparent calc(100% - ${kalin}), ${renk} 0)`;
+  if (tur === "cizgi") return { backgroundImage: cizgi, backgroundSize: `100% ${a}` };
+  if (tur === "nokta") {
+    // Her satırın dibinde, yatay sıra hâlinde nokta (ders kitabındaki noktalı çizgi).
+    const nokta = `radial-gradient(circle at 50% calc(100% - ${birim(0.4)}), ${renk} ${birim(0.24)}, transparent ${birim(0.3)})`;
+    return { backgroundImage: nokta, backgroundSize: `${birim(1.6)} ${a}` };
+  }
   const dikey = `linear-gradient(to right, transparent calc(100% - ${kalin}), ${renk} 0)`;
+  return {
+    backgroundImage: `${cizgi}, ${dikey}`,
+    backgroundSize: `100% ${a}, ${a} 100%`,
+    // Karelerde desen yalnız alt/sağ kenarları çizer; üst, sol ve (son kare yarım kalırsa) sağ kenar kapanmazsa ızgara açık kalır.
+    boxShadow: `inset 0 ${kalin} 0 ${renk}, inset ${kalin} 0 0 ${renk}, inset -${kalin} 0 0 ${renk}`,
+  };
+}
+
+/** Sorunun altındaki boşluğu (marginBottom) çizgili, kareli ya da noktalı gösterir.
+ *  Mutlak konumlu: yerleşim ölçümüne hiç etki etmez, yalnız mevcut boşluğu doldurur.
+ *  Kâğıt B/Y basıldığı için tek tonlu ince çizgi kullanılır. */
+export function CevapAlaniCizgisi({ soru, yazdirmaModu }: { soru: SoruOgesi; yazdirmaModu?: boolean }) {
+  const tur = soru.cevapAlani;
+  const desen = cevapAlaniDeseni(tur, yazdirmaModu);
+  if (!desen || !(soru.boslukMm > 0)) return null;
+  const adim = tur === "kare" ? KARE_MM : SATIR_MM;
+  const yukseklik = Math.floor(soru.boslukMm / adim) * adim;
+  if (yukseklik <= 0) return null;
   return (
     <div
       aria-hidden="true"
       data-testid="cevap-alani-cizgi"
+      data-cevap-alani={tur}
       style={{
         position: "absolute",
         left: 0,
@@ -723,10 +752,7 @@ function CevapAlaniCizgisi({ soru, yazdirmaModu }: { soru: SoruOgesi; yazdirmaMo
         top: "100%",
         height: mmOlcu(yukseklik, yazdirmaModu),
         pointerEvents: "none",
-        backgroundImage: tur === "cizgi" ? cizgi : `${cizgi}, ${dikey}`,
-        backgroundSize: tur === "cizgi" ? `100% ${a}` : `100% ${a}, ${a} 100%`,
-        // Karelerde desen yalnız alt/sağ kenarları çizer; üst, sol ve (son kare yarım kalırsa) sağ kenar kapanmazsa ızgara açık kalır.
-        boxShadow: tur === "kare" ? `inset 0 ${kalin} 0 ${renk}, inset ${kalin} 0 0 ${renk}, inset -${kalin} 0 0 ${renk}` : undefined,
+        ...desen,
         WebkitPrintColorAdjust: "exact",
         printColorAdjust: "exact",
       }}
@@ -1270,19 +1296,25 @@ function SoruIcerikTemel({
                 <RichTextGorunum html={madde.metinHtml} />
               </div>
             </div>
-            {madde.cevapSatir > 0 && !testModu && (
+            {maddeCevapYuksekligiMm(madde, testModu) > 0 && (
               <div
+                data-testid="madde-cevap-alani"
+                data-cevap-alani={madde.cevapAlani ?? "bos"}
+                aria-hidden="true"
                 style={{
-                  height: olcu(madde.cevapSatir * SATIR_MM),
+                  height: olcu(maddeCevapYuksekligiMm(madde, testModu)),
                   marginTop: olcu(1),
+                  ...(cevapAlaniDeseni(madde.cevapAlani, yazdirmaModu) ?? {}),
+                  WebkitPrintColorAdjust: "exact",
+                  printColorAdjust: "exact",
                 }}
                 className={
-                  tasarimModu
+                  tasarimModu && !cevapAlaniDeseni(madde.cevapAlani, yazdirmaModu)
                     ? "rounded border border-dashed border-slate-200"
                     : undefined
                 }
               >
-                {tasarimModu && (
+                {tasarimModu && !cevapAlaniDeseni(madde.cevapAlani, yazdirmaModu) && (
                   <span className="px-1 text-[9px] text-slate-300">
                     {madde.cevapSatir} satır cevap alanı
                   </span>
