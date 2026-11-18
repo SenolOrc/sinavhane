@@ -501,6 +501,8 @@ test("PNG dışa aktarım: yeni geometri şekillerinin yazıları kırpılmaz (g
       kc.drawImage(tuval as unknown as CanvasImageSource, b.x, b.y, b.w, b.h, 0, 0, b.w, b.h);
       fs.writeFileSync(`${kayit}/${ad}.png`, kirp.toBuffer!("image/png"));
     }
+    // Yerel tuval belleğini hemen bırak (şablon sayısı arttıkça süreç bellek sınırını aşıyordu)
+    (tuval as unknown as { width: number; height: number }).width = 1; (tuval as unknown as { width: number; height: number }).height = 1;
   }
   void geometriDisPayi;
 });

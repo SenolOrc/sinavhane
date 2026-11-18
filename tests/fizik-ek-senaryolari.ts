@@ -9,6 +9,7 @@ import { yolYerHesap, bagilHesap, dusmeHesap, stroboHesap, grafikHesap } from ".
 import { vektorlerHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizVektor";
 import { fotoHesap, bozunmaHesap, makineHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizModern";
 import { kirilmaHesap, derinlikHesap, prizmaHesap, fiberHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizOptik";
+import { devreAyristir, devreModeli, devreHesapla, devreDuzenle, devreOzet, degerleriOku, yapraklar } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizDevre";
 import { atmaYuksekligi, dalgaHesap, rezonansHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizDalga";
 
 function dogrula(k: unknown, m: string) { if (!k) { console.error("✗ " + m); process.exit(1); } }
@@ -339,6 +340,102 @@ senaryo("Optik şekilleri uç değerlerde çökmez ve boş değildir", () => {
   ];
   for (const [y, e] of liste) dogrula(mürekkep(ayar(y, e as never)) > 300, y + " boş/çöktü " + JSON.stringify(e));
   dogrula(mürekkep(ayar("kirilma", { aci: 20 })) !== mürekkep(ayar("kirilma", { aci: 60 })), "açı değişince şekil değişir");
+});
+// ── Karma devre
+const dv = (ek: Record<string, unknown>) => ayar("karmaDevre", ek as never);
+const hes = (ek: Record<string, unknown>) => { const m = devreModeli(dv(ek)); return { m, s: devreHesapla(m) }; };
+senaryo("Karma devre: ayrıştırıcı (boşluk, ∥, |, //, tek eleman, hatalar)", () => {
+  const ad = (i: string) => { const a = devreAyristir(i); return a.ok ? JSON.stringify(a.agac) : "HATA:" + a.hata; };
+  dogrula(ad("R1 + (R2 // R3)") === ad("R1+(R2∥R3)") && ad("R1+(R2|R3)") === ad("  r1 + ( r2 || r3 ) "), "ayırıcı yazımları eşdeğer");
+  dogrula(ad("R_1+(R_2//R_3)") === ad("R1+(R2//R3)"), "R_1 yazımı");
+  const a = devreAyristir("R1 + R2 // R3");
+  dogrula(a.ok && a.agac.t === "s" && a.agac.c[1].t === "p", "// '+' tan sıkı bağlanır");
+  const b = devreAyristir("(R1 + R2) // R3 + R4");
+  dogrula(b.ok && b.agac.t === "s" && b.agac.c.length === 2 && b.agac.c[0].t === "p", "(R1+R2)//R3+R4");
+  const c = devreAyristir("R1 + (R2 + R3)");
+  dogrula(c.ok && c.agac.t === "s" && c.agac.c.length === 3, "iç içe seri düzleşir");
+  dogrula(devreAyristir("R1").ok && devreAyristir("((R1))").ok, "tek eleman, gereksiz parantez");
+  for (const k of ["R1 + (R2 // R3", "R1 + R2)", "R1 + X2", "R1 R2", "R1 +", "", "()", "R1 + R1", "R1 // // R2", "5 + R1", "R1 $ R2"])
+    dogrula(!devreAyristir(k).ok, "hata beklenirdi: '" + k + "'");
+  dogrula(!devreAyristir("R1+R2+R3+R4+R5+R6+R7+R8+R9+R10+R11+R12+R13").ok, "eleman sınırı");
+  const d = degerleriOku("R1=2, R2=3,5 , L1 = 6,R3=1.5");
+  dogrula(d.R1 === 2 && d.R2 === 3.5 && d.L1 === 6 && d.R3 === 1.5, "değer okuma");
+  dogrula(dv({ ifade: "R1 + (R2" }) && (fizikHesapOzeti(dv({ ifade: "R1 + (R2" })) ?? "").startsWith("İfade okunamadı"), "özette hata");
+});
+senaryo("Karma devre: R_eş (seri, paralel, karma, iç içe derinlik 3)", () => {
+  const R = (i: string, d: string, ek: Record<string, unknown> = {}) => hes({ ifade: i, degerler: d, mod: "kl", ...ek }).s.Req;
+  dogrula(yakin(R("R1+R2+R3", "R1=2,R2=3,R3=5"), 10), "seri");
+  dogrula(yakin(R("R1//R2//R3", "R1=6,R2=3,R3=2"), 1), "paralel 1/6+1/3+1/2");
+  dogrula(yakin(R("R1+(R2//R3)", "R1=4,R2=6,R3=3"), 6), "R1+(R2//R3)");
+  dogrula(yakin(R("(R1+R2)//R3+R4", "R1=2,R2=4,R3=3,R4=4"), 6), "(R1+R2)//R3+R4");
+  dogrula(yakin(R("(R1//R2)+(R3//R4)", "R1=6,R2=3,R3=4,R4=4"), 4), "iki grup");
+  // derinlik 3: R1 + ((R2 + R3) // (R4 + (R5 // R6)))  = 2 + (6 // (1+2)) = 4
+  dogrula(yakin(R("R1 + ((R2 + R3) // (R4 + (R5 // R6)))", "R1=2,R2=3,R3=3,R4=1,R5=6,R6=3"), 4), "derinlik 3");
+  dogrula(yakin(R("(R1+(R2//(R3+(R4//R5))))//R6", "R1=1,R2=2,R3=3,R4=6,R5=3,R6=2"), (() => { const i = 3 + 2; const a = 2 * i / (2 + i); const b = 1 + a; return b * 2 / (b + 2); })()), "derinlik 4");
+  dogrula(R("R1", "R1=7") === 7, "tek eleman");
+  const eks = hes({ ifade: "R1+R2", degerler: "R1=1", mod: "kl" }).s;
+  dogrula(!eks.tam && eks.eksik.join() === "R2", "eksik değer");
+  dogrula((fizikHesapOzeti(dv({ mod: "kl", ifade: "R1+(R2//R3)", degerler: "R1=4,R2=6,R3=3" })) ?? "").includes("R_eş = 6 Ω"), "KL özeti");
+  dogrula(!(fizikHesapOzeti(dv({ mod: "kl", ifade: "R1+(R2//R3)", degerler: "R1=4,R2=6,R3=3" })) ?? "").includes(" A"), "KL: akım yok");
+});
+senaryo("Karma devre: akım/gerilim toplam kuralları ve ölçü aleti okumaları", () => {
+  const { m, s } = hes({ ifade: "R1 + ((R2 + R3) // (R4 + (R5 // R6)))", degerler: "R1=2,R2=3,R3=3,R4=1,R5=6,R6=3", V: 24, r: 1 });
+  dogrula(s.tam && yakin(s.Req, 4) && yakin(s.I, 24 / 5) && yakin(s.Vu, 24 - s.I), "I = V/(R_eş+r), dış gerilim");
+  const q = (a: string) => s.yaprak.get(yapraklar(m.agac).find((y) => y.ad === a)!)!;
+  dogrula(yakin(q("R1").I, s.I) && yakin(q("R1").V, 2 * s.I), "R1 ana akım");
+  const Vp = s.Vu - q("R1").V;
+  dogrula(yakin(q("R2").V + q("R3").V, Vp) && yakin(q("R4").V + q("R5").V, Vp), "kol gerilimleri toplamı = paralel gerilim");
+  dogrula(yakin(q("R2").I + q("R4").I, s.I), "kol akımları toplamı = I");
+  dogrula(yakin(q("R5").I + q("R6").I, q("R4").I) && yakin(q("R5").V, q("R6").V), "iç paralel: akım bölüşümü");
+  for (const y of yapraklar(m.agac)) dogrula(yakin(q(y.ad).V, q(y.ad).R * q(y.ad).I), "Ohm " + y.ad);
+  // ampermetre ana kol, voltmetre eleman
+  const a = hes({ ifade: "R1 + (R2 // R3)", degerler: "R1=4,R2=6,R3=3", V: 12, ampermetre: "ana", voltmetre: "eleman", voltmetreEleman: "R1" });
+  dogrula(yakin(a.s.I, 2) && yakin(a.s.yaprak.get(a.m.anaAmper!)!.I, 2) && yakin(a.s.yaprak.get(a.m.ekVolt!)!.V, 8) && yakin(a.s.yaprak.get(a.m.ekVolt!)!.I, 0), "A = 2 A, V = 8 V, ideal voltmetre akımsız");
+  dogrula(yakin(a.s.Req, 6), "ideal aletler R_eş'i değiştirmez");
+  const e = hes({ ifade: "R1 + (R2 // R3)", degerler: "R1=4,R2=6,R3=3", V: 12, ampermetre: "eleman", ampermetreEleman: "R3" });
+  dogrula(yakin(e.s.yaprak.get(e.m.ekAmper!)!.I, 4 / 3), "R3 kolundaki ampermetre 4/3 A");
+  const o = fizikHesapOzeti(dv({ ifade: "R1 + (R2 // R3)", degerler: "R1=4,R2=6,R3=3", V: 12, ampermetre: "ana", voltmetre: "eleman" })) ?? "";
+  dogrula(o.includes("I = V/(R_eş + r)") && o.includes("Ampermetre 2 A") && o.includes("Voltmetre 8 V") && o.includes("R₂ ∥ R₃") , "özet: " + o);
+  const u = hes({ voltmetre: "uretec", V: 12, r: 1 });
+  dogrula(yakin(u.s.Vu, 12 - 12 / 7), "üreteç uçları voltmetresi = V − I·r");
+  const bad = devreModeli(dv({ ampermetre: "eleman", ampermetreEleman: "R9" }));
+  dogrula(bad.hata && bad.hata.startsWith("Eleman bulunamadı"), "olmayan eleman adı");
+});
+senaryo("Karma devre: anahtar (açık → akım 0, kol kapanır) ve kısa devre", () => {
+  const ac = hes({ ifade: "L1 + (L2 // L3)", degerler: "L1=6,L2=6,L3=3", anahtar: true, anahtarDurum: "acik" }).s;
+  dogrula(ac.Req === Infinity && ac.I === 0, "açık anahtar: R_eş = ∞, I = 0");
+  dogrula((fizikHesapOzeti(dv({ ifade: "L1", degerler: "L1=6", anahtar: true, anahtarDurum: "acik" })) ?? "").includes("akım 0"), "açık devre özeti");
+  const kp = hes({ ifade: "L1 + (L2 // L3)", degerler: "L1=6,L2=6,L3=3", anahtar: true, anahtarDurum: "kapali", V: 12 }).s;
+  dogrula(yakin(kp.Req, 8) && yakin(kp.I, 1.5), "kapalı anahtar direnci 0");
+  const kolAcik = hes({ ifade: "R1 + (R2 // (S1 + R3))", degerler: "R1=4,R2=6,R3=3", anahtarDurum: "acik", V: 10 }).s;
+  dogrula(yakin(kolAcik.Req, 10) && yakin(kolAcik.I, 1), "kolundaki açık anahtar kolu devre dışı bırakır");
+  const kisa = hes({ ifade: "R1 // A1", degerler: "R1=5", V: 10, r: 1 }).s;
+  dogrula(kisa.Req === 0 && yakin(kisa.I, 10), "ampermetre koluyla kısa devre R_eş = 0");
+});
+senaryo("Karma devre: yerleşim (dik tel, çakışmasız elemanlar, kutuya sığar) ve çizim", () => {
+  const olc = (t: string) => t.length * 7;
+  const ifadeler = ["R1", "R1+R2+R3+R4+R5+R6", "R1//R2//R3//R4//R5//R6", "R1+(R2//R3)", "(R1+R2)//R3+R4", "R1 + ((R2 + R3) // (R4 + (R5 // R6)))", "(R1+(R2//(R3+(R4//R5))))//R6", "L1+(L2//L3)"];
+  for (const i of ifadeler) for (const yer of ["sol", "ust", "alt"]) for (const mod of ["uretec", "kl"]) {
+    const ek = { ifade: i, degerler: "R1=1,R2=2,R3=3,R4=4,R5=5,R6=6,L1=1,L2=2,L3=3", uretecYeri: yer, mod, voltmetre: "uretec", ampermetre: "ana", anahtar: true, dugum: true, akim: true, okuma: true };
+    const m = devreModeli(dv(ek)), s = devreHesapla(m);
+    const d = devreDuzenle(m, s, { punto: 12, olc, etiket: "adDeger", soru: false, okuma: true, uretecYeri: yer as "sol", uretecYaz: true, akim: true, dugum: true });
+    for (const p of d.prims) if (p.t === "tel") dogrula(p.x0 === p.x1 || p.y0 === p.y1, `${i}/${yer}/${mod}: tel dik değil`);
+    const el = d.prims.filter((p): p is Extract<typeof p, { t: "el" }> => p.t === "el");
+    for (let a = 0; a < el.length; a++) for (let b = a + 1; b < el.length; b++) {
+      const A = el[a], B = el[b];
+      dogrula(Math.abs(A.cx - B.cx) > (A.bw + B.bw) / 2 + 2 || Math.abs(A.cy - B.cy) > 26, `${i}/${yer}/${mod}: elemanlar çakışıyor`);
+    }
+    dogrula(d.kutu.x1 - d.kutu.x0 > 40 && d.kutu.y1 - d.kutu.y0 > 40, "kutu");
+  }
+  for (const i of ifadeler) {
+    const n = mürekkep(dv({ ifade: i, degerler: "R1=1,R2=2,R3=3,R4=4,R5=5,R6=6,L1=1,L2=2,L3=3" }));
+    dogrula(n > 800, "boş çizim: " + i);
+  }
+  dogrula(mürekkep(dv({ ifade: "R1 + (R2" })) > 100, "hata iletisi çizilir");
+  dogrula(mürekkep(dv({ voltmetre: "eleman", ampermetre: "eleman" })) > mürekkep(dv({})), "ölçü aletleri şekle eklenir");
+  dogrula(mürekkep(dv({ soru: false })) > mürekkep(dv({ soru: true })), "soru modunda değerler çizilmez");
+  dogrula(cografyaGecerliMi({ tur: "cografya", yapi: "karmaDevre", ayar: { ifade: "R1+(R2//R3)", V: 12 } }), "geçerli ayar");
+  dogrula(!cografyaGecerliMi({ tur: "cografya", yapi: "karmaDevre", ayar: { V: 999 } }), "V sınırı");
 });
 // <<PAKET-EK-TEST>>
 

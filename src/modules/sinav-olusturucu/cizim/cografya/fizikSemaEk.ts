@@ -9,7 +9,8 @@ export type FizikEkYapi =
   | "cembersel" | "yorunge" | "basitHarmonik" | "donme"
   | "yolYer" | "bagilHareket" | "serbestDusme" | "stroboskop" | "hareketGrafigi"
   | "fotoelektrik" | "fotoGrafik" | "bozunma" | "basitMakine" | "vektorSerbest" | "kareliAlan" | "panelIzgara"
-  | "kirilma" | "gorunurDerinlik" | "prizmaIsin" | "fiberOptik";
+  | "kirilma" | "gorunurDerinlik" | "prizmaIsin" | "fiberOptik"
+  | "karmaDevre";
 
 type Sema = { ad: string; alt: string; alanlar: Alan[] };
 
@@ -219,6 +220,30 @@ export const FIZIK_EK_SEMA: Record<FizikEkYapi, Sema> = {
       { k: "mantik", a: "nYaz", ad: "n değerlerini yaz", v: true },
       { k: "mantik", a: "ortamAd", ad: "Çekirdek / kılıf yazıları", v: true },
       { k: "mantik", a: "normal", ad: "Normaller (kesikli)", v: true },
+    ],
+  },
+  // ── Karma devre: seri–paralel ifadeden otomatik çizilen devre (üreteçli ya da K–L arası eşdeğer direnç)
+  karmaDevre: {
+    ad: "Elektrik devresi (seri–paralel karma)", alt: "Fizik – Elektrik devresi",
+    alanlar: [
+      { k: "sec", a: "mod", ad: "Devre türü", sec: [["uretec", "Üreteçli devre"], ["kl", "K–L arası (üreteçsiz, eşdeğer direnç)"]], v: "uretec" },
+      { k: "metin", a: "ifade", ad: "Bağlantı ifadesi: + seri, // paralel, ( ) grup. R direnç, L lamba, S anahtar, A ampermetre", en: 80, v: "R1 + (R2 // R3)", ipucu: "Örnek: R1 + (R2 // R3)   ·   (R1 + R2) // R3 + R4   ·   L1 + (L2 // L3)   ·   // yerine ∥ veya | da yazılabilir" },
+      { k: "metin", a: "degerler", ad: "Değerler (Ω): R1=4, R2=6, R3=3", en: 80, v: "R1=4, R2=6, R3=3", ipucu: "Lamba için de direnç yazılır: L1=6. Eksik değerli elemanın değeri şekilde görünmez." },
+      { k: "sec", a: "etiket", ad: "Eleman yazıları", sec: [["adDeger", "Ad ve değer (R₁ = 4 Ω)"], ["ad", "Yalnız ad (R₁)"], ["deger", "Yalnız değer (4 Ω)"], ["yok", "Yazı yok"]], v: "adDeger" },
+      { k: "mantik", a: "soru", ad: "Soru modu (değerleri ve okumaları gizle, adları yaz)", v: false },
+      { k: "sayi", a: "V", ad: "Üreteç gerilimi V (V)", min: 0.5, max: 240, adim: 0.5, v: 12 },
+      { k: "sayi", a: "r", ad: "Üreteç iç direnci r (Ω, 0 = ideal)", min: 0, max: 20, adim: 0.5, v: 0 },
+      { k: "sec", a: "uretecYeri", ad: "Üreteç yeri", sec: [["sol", "Sol kol"], ["ust", "Üst kol"], ["alt", "Alt kol"]], v: "sol" },
+      { k: "mantik", a: "uretecYaz", ad: "Üreteç değerini yaz (V = 12 V)", v: true },
+      { k: "mantik", a: "anahtar", ad: "Ana kolda anahtar", v: false },
+      { k: "sec", a: "anahtarDurum", ad: "Anahtar durumu (S ve ana kol anahtarı)", sec: [["kapali", "Kapalı"], ["acik", "Açık"]], v: "kapali" },
+      { k: "sec", a: "ampermetre", ad: "Ampermetre", sec: [["yok", "Yok"], ["ana", "Ana kolda"], ["eleman", "Seçilen elemanla seri"]], v: "yok" },
+      { k: "metin", a: "ampermetreEleman", ad: "Ampermetre hangi elemanla seri (örn. R2)", en: 8, v: "R2" },
+      { k: "sec", a: "voltmetre", ad: "Voltmetre", sec: [["yok", "Yok"], ["eleman", "Seçilen elemanın uçlarında"], ["uretec", "Üretecin uçlarında"]], v: "yok" },
+      { k: "metin", a: "voltmetreEleman", ad: "Voltmetre hangi elemanın uçlarında (örn. R1)", en: 8, v: "R1" },
+      { k: "mantik", a: "okuma", ad: "Ölçü aletlerinin okumasını yaz", v: false },
+      { k: "mantik", a: "akim", ad: "Ana akım oku (I)", v: false },
+      { k: "mantik", a: "dugum", ad: "Kavşak harfleri (K, L, M, N…)", v: false },
     ],
   },
   // <<PAKET-EK-SEMA>>
@@ -554,4 +579,5 @@ export const FIZIK_EK_BOYUT: Record<FizikEkYapi, { w: number; h: number }> = {
   yolYer: { w: 440, h: 260 }, bagilHareket: { w: 440, h: 250 }, serbestDusme: { w: 400, h: 290 }, stroboskop: { w: 460, h: 190 }, hareketGrafigi: { w: 440, h: 260 },
   fotoelektrik: { w: 440, h: 250 }, fotoGrafik: { w: 400, h: 260 }, bozunma: { w: 450, h: 250 }, basitMakine: { w: 420, h: 260 }, vektorSerbest: { w: 340, h: 280 }, kareliAlan: { w: 540, h: 230 }, panelIzgara: { w: 540, h: 190 },
   kirilma: { w: 440, h: 270 }, gorunurDerinlik: { w: 420, h: 270 }, prizmaIsin: { w: 440, h: 270 }, fiberOptik: { w: 530, h: 200 },
+  karmaDevre: { w: 460, h: 270 },
 };
