@@ -8,6 +8,7 @@ import { coulombHesap, cubukHesap, trafoHesap } from "../src/modules/sinav-olust
 import { yolYerHesap, bagilHesap, dusmeHesap, stroboHesap, grafikHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizHareket";
 import { vektorlerHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizVektor";
 import { fotoHesap, bozunmaHesap, makineHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizModern";
+import { kirilmaHesap, derinlikHesap, prizmaHesap, fiberHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizOptik";
 import { atmaYuksekligi, dalgaHesap, rezonansHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizDalga";
 
 function dogrula(k: unknown, m: string) { if (!k) { console.error("✗ " + m); process.exit(1); } }
@@ -269,6 +270,75 @@ senaryo("Boş kareli cevap alanı: 1–3 alan, yan yana/alt alta, çizgisiz ve e
   for (const e of [{}, { adet: 1 }, { adet: 2, yon: "alt" }, { adet: 3, yon: "alt", sutun: 20, satir: 16 }, { cizgi: false }, { eksen: true, sutun: 3, satir: 3 }, { baslik: "" }])
     dogrula(mürekkep(ayar("kareliAlan", e as never)) > 300, "kareliAlan boş/çöktü " + JSON.stringify(e));
   dogrula(cografyaGecerliMi(ayar("kareliAlan", { adet: 3 })), "geçerli");
+});
+// ── Optik: ışığın kırılması
+const R2D = 180 / Math.PI;
+senaryo("Kırılma: Snell yasası, sınır açısı, tam yansıma", () => {
+  const k = kirilmaHesap(ayar("kirilma", { n1: 1, n2: "4/3", aci: 53 }));
+  dogrula(yakin(k.n2, 4 / 3, 1e-9) && !k.tir1 && yakin(Math.sin(k.t2), Math.sin((53 * Math.PI) / 180) / (4 / 3)), "θ₂ Snell");
+  dogrula(yakin(k.t2 * R2D, 36.8, 0.02), "53° → 36,8°");
+  const c = kirilmaHesap(ayar("kirilma", { n1: 1.5, n2: 1, aci: 30 }));
+  dogrula(yakin(c.kritik1 * R2D, 41.8103, 1e-3) && !c.tir1, "sınır açısı asin(n₂/n₁)");
+  dogrula(kirilmaHesap(ayar("kirilma", { n1: 1.5, n2: 1, aci: 60 })).tir1, "60° > θ_s → tam yansıma");
+  const e = kirilmaHesap(ayar("kirilma", { n1: 2, n2: 1, aci: 30 }));
+  dogrula(e.sinirda && !e.tir1 && yakin(e.t2, Math.PI / 2, 1e-6), "tam sınır açısında θ₂ = 90°");
+  dogrula(!kirilmaHesap(ayar("kirilma", { n1: 1, n2: 1.5, aci: 89 })).tir1, "seyrekten yoğuna tam yansıma olmaz");
+  dogrula(yakin(kirilmaHesap(ayar("kirilma", { n1: 1.5, n2: 1.5, aci: 40 })).t2, (40 * Math.PI) / 180, 1e-9), "n₁ = n₂ → doğrultu değişmez");
+  const o = fizikHesapOzeti(ayar("kirilma", { n1: 1, n2: "4/3", aci: 53 }));
+  dogrula(o && o.includes("θ₂ = 36,8°"), "özet: " + o);
+  dogrula(cografyaGecerliMi(ayar("kirilma", { n2: "4/3" })) && !cografyaGecerliMi({ tur: "cografya", yapi: "kirilma", ayar: { n2: 5 } }), "n aralığı");
+});
+senaryo("Kırılma: paralel yüzlü levha ve üç katman", () => {
+  const l = kirilmaHesap(ayar("kirilma", { tip: "levha", n1: 1, n2: 1.5, aci: 50, e: 4 }));
+  dogrula(yakin(l.t3, l.t1, 1e-9), "çıkan ışın gelene paralel (θ₃ = θ₁)");
+  dogrula(yakin(l.d, (4 * Math.sin(l.t1 - l.t2)) / Math.cos(l.t2), 1e-9) && l.d > 0, "yanal kayma d");
+  dogrula(yakin(kirilmaHesap(ayar("kirilma", { tip: "levha", aci: 0 })).d, 0, 1e-9), "dik gelişte kayma yok");
+  const u = kirilmaHesap(ayar("kirilma", { tip: "uc", n1: 1, n2: 1.5, n3: "4/3", aci: 50 }));
+  dogrula(yakin(Math.sin(u.t1), u.n2 * Math.sin(u.t2), 1e-9) && yakin(u.n2 * Math.sin(u.t2), u.n3 * Math.sin(u.t3), 1e-9), "n₁sinθ₁ = n₂sinθ₂ = n₃sinθ₃");
+  const t = kirilmaHesap(ayar("kirilma", { tip: "uc", n1: 1.6, n2: 1.4, n3: 1, aci: 40 }));
+  dogrula(!t.tir1 && t.tir2 && yakin(t.kritik2 * R2D, 45.58, 0.01), "2. sınırda tam yansıma");
+});
+senaryo("Görünür derinlik: h′ = h·n_göz/n_cisim", () => {
+  const a = derinlikHesap(ayar("gorunurDerinlik", { n: "4/3", h: 40 }));
+  dogrula(yakin(a.hg, 30, 1e-3), "40 cm, n = 4/3 → 30 cm");
+  dogrula(yakin(derinlikHesap(ayar("gorunurDerinlik", { n: "4/3", h: 40, yon: "havada" })).hg, 53.3333, 1e-3), "gözlemci sıvıda → n·h");
+  const o = fizikHesapOzeti(ayar("gorunurDerinlik", { n: "4/3", h: 40 }));
+  dogrula(o && o.includes("30 cm"), "özet: " + o);
+});
+senaryo("Prizma: eşkenar minimum sapma, dik prizmada 90° ve 180° dönme", () => {
+  const A = 60, n = 1.5, t1 = Math.asin(n * Math.sin((A / 2) * Math.PI / 180)) * R2D;
+  const m = prizmaHesap(ayar("prizmaIsin", { A, n, aci: t1 }));
+  dogrula(m.cikti && yakin(m.sapma * R2D, 2 * t1 - A, 1e-6) && yakin(m.sapma * R2D, 37.1808, 1e-3), "minimum sapma δ = 2θ₁ − A");
+  const g = prizmaHesap(ayar("prizmaIsin", { A, n, aci: 30 }));
+  const t2 = Math.asin(Math.sin((30 * Math.PI) / 180) / n), t3 = (A * Math.PI) / 180 - t2, t4 = Math.asin(n * Math.sin(t3));
+  dogrula(yakin(g.iz.olaylar[1].aciDis, t4, 1e-9) && yakin(g.sapma * R2D, 30 + t4 * R2D - A, 1e-6), "çıkış açısı ve δ = θ₁ + θ₄ − A");
+  const d90 = prizmaHesap(ayar("prizmaIsin", { A: 90, n: 1.5, aci: 0, nokta: 50 }));
+  dogrula(d90.cikti && d90.tirSayisi === 1 && yakin(d90.sapma * R2D, 90, 1e-6), "dik prizma: 90° dönme");
+  const d180 = prizmaHesap(ayar("prizmaIsin", { A: 90, n: 1.5, giris: "taban", aci: 0, nokta: 28 }));
+  dogrula(d180.cikti && d180.tirSayisi === 2 && yakin(d180.sapma * R2D, 180, 1e-6), "dik prizma: 180° dönme");
+  const cam = prizmaHesap(ayar("prizmaIsin", { A: 90, n: 1.3, aci: 0 }));
+  dogrula(cam.tirSayisi === 0 && cam.cikti, "n = 1,3: 45° sınır açısını aşmaz, tam yansıma olmaz");
+  dogrula(fizikHesapOzeti(ayar("prizmaIsin", { A: 90, aci: 0 }))?.includes("tam yansıma"), "özet tam yansıma");
+});
+senaryo("Fiber optik: tam yansıma ve kabul açısı", () => {
+  const f = fiberHesap(ayar("fiberOptik", { n1: 1.5, n2: 1.4, aci: 25 }));
+  dogrula(f.tir && yakin(f.duvar, Math.PI / 2 - Math.asin(Math.sin((25 * Math.PI) / 180) / 1.5), 1e-9), "duvara gelme açısı 90° − θ₂");
+  dogrula(yakin(f.aMaks * R2D, Math.asin(Math.sqrt(2.25 - 1.96)) * R2D, 1e-6), "α_maks");
+  dogrula(!fiberHesap(ayar("fiberOptik", { aci: 55 })).tir, "α > α_maks → sızar");
+});
+senaryo("Optik şekilleri uç değerlerde çökmez ve boş değildir", () => {
+  const liste: [Parameters<typeof varsayilanCografya>[0], Record<string, unknown>][] = [
+    ["kirilma", { aci: 0 }], ["kirilma", { aci: 89, aciYaz: true }], ["kirilma", { n1: 1.5, n2: 1.5, aci: 40 }], ["kirilma", { n1: 1.5, n2: 1, aci: 89, kritik: true, aciYaz: true }],
+    ["kirilma", { n1: 2, n2: 1, aci: 30, kritik: true }], ["kirilma", { sinir: "dusey", n1: 1.5, n2: 1, aci: 70, kritik: true, yansima: true }],
+    ["kirilma", { tip: "levha", aci: 89 }], ["kirilma", { tip: "levha", n1: 1.5, n2: 1, aci: 30 }], ["kirilma", { tip: "uc", n1: 1, n2: 2.5, n3: 1, aci: 85 }],
+    ["kirilma", { tip: "uc", n1: 1.6, n2: 1.4, n3: 1, aci: 40, goster: "aciGizli" }], ["kirilma", { goster: "kirilanYok", nYaz: false, ortamAd: false, normal: false }],
+    ["prizmaIsin", { A: 20, aci: 10, aciYaz: true }], ["prizmaIsin", { A: 120, aci: -60, aciYaz: true, sapma: true }], ["prizmaIsin", { A: 60, n: 3, aci: 85, aciYaz: true }],
+    ["prizmaIsin", { A: 60, aci: 0, degerYaz: true, sapma: true }], ["prizmaIsin", { A: 45, giris: "taban", aci: 30, nokta: 80 }], ["prizmaIsin", { n: 1.05, aci: -85, dagilma: true, dn: 0.2 }],
+    ["gorunurDerinlik", { n: 3, h: 200 }], ["gorunurDerinlik", { n: 1.05, h: 1, deger: true }], ["gorunurDerinlik", { yon: "havada", n: 3, h: 200, deger: true }], ["gorunurDerinlik", { olcu: false, goz: false, cisim: "nokta" }],
+    ["fiberOptik", { aci: 0 }], ["fiberOptik", { aci: 80, n2: 1 }], ["fiberOptik", { n1: 1.05, n2: 1.05, aci: 10 }],
+  ];
+  for (const [y, e] of liste) dogrula(mürekkep(ayar(y, e as never)) > 300, y + " boş/çöktü " + JSON.stringify(e));
+  dogrula(mürekkep(ayar("kirilma", { aci: 20 })) !== mürekkep(ayar("kirilma", { aci: 60 })), "açı değişince şekil değişir");
 });
 // <<PAKET-EK-TEST>>
 

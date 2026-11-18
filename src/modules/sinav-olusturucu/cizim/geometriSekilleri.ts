@@ -855,7 +855,8 @@ const FIZIK_ALT: Record<string, string> = { atis: "Fizik – Atış", enerji: "F
   elektrikAlan: "Fizik – Elektrik", coulomb: "Fizik – Elektrik", levhaYuk: "Fizik – Elektrik", manyetikParcacik: "Fizik – Manyetizma", iletkenCubuk: "Fizik – Manyetizma", transformator: "Fizik – Manyetizma",
   cembersel: "Fizik – Çembersel hareket", yorunge: "Fizik – Çekim", basitHarmonik: "Fizik – Salınım", donme: "Fizik – Dönme",
   yolYer: "Fizik – Hareket", bagilHareket: "Fizik – Hareket", serbestDusme: "Fizik – Hareket", stroboskop: "Fizik – Hareket", hareketGrafigi: "Fizik – Hareket",
-  fotoelektrik: "Fizik – Modern fizik", fotoGrafik: "Fizik – Modern fizik", bozunma: "Fizik – Modern fizik", basitMakine: "Fizik – Basit makineler", vektorSerbest: "Fizik – Vektör", kareliAlan: "Fizik – Vektör" };
+  fotoelektrik: "Fizik – Modern fizik", fotoGrafik: "Fizik – Modern fizik", bozunma: "Fizik – Modern fizik", basitMakine: "Fizik – Basit makineler", vektorSerbest: "Fizik – Vektör", kareliAlan: "Fizik – Vektör",
+  kirilma: "Fizik – Optik (kırılma)", gorunurDerinlik: "Fizik – Optik (kırılma)", prizmaIsin: "Fizik – Optik (kırılma)", fiberOptik: "Fizik – Optik (kırılma)" };
 const fz = (id: string, ad: string, ipucu: string, yapi: Parameters<typeof varsayilanCografya>[0], ek: Parameters<typeof varsayilanCografya>[1], anahtar: string[]): GeometriSablonu => ({
   id, ad, ipucu, nesne: "fizikSekil", altBaslik: FIZIK_ALT[yapi], aramaKelimeleri: ["fizik", ...anahtar], olustur: () => varsayilanCografya(yapi, ek),
 });
@@ -1008,6 +1009,25 @@ export const FIZIK_SABLONLARI: GeometriSablonu[] = [
   fz("f-cevap-3", "Cevap alanı: 3 ayrı kareli alan (3 yöntem)", "Uç uca, paralelkenar, bileşenler", "kareliAlan", {}, ["cevap", "kareli", "alan", "yöntem", "çizim"]),
   fz("f-cevap-1", "Cevap alanı: tek kareli alan", "Öğrencinin çizeceği boş kareli alan", "kareliAlan", { adet: 1, baslik: "Cevap alanı", sutun: 10, satir: 7 }, ["cevap", "kareli", "alan", "boş"]),
   fz("f-cevap-2", "Cevap alanı: 2 kareli alan", "Yan yana iki boş alan", "kareliAlan", { adet: 2, baslik: "1. Yöntem, 2. Yöntem", sutun: 8, satir: 7 }, ["cevap", "kareli", "alan", "boş"]),
+  fz("f-kirilma-havadan-suya", "Işığın havadan suya kırılması", "n₁ = 1, n₂ = 4/3: ışın normale yaklaşır", "kirilma", { n1: 1, n2: "4/3", aci: 53, ad2: "su", aciYaz: true }, ["kırılma", "snell", "optik", "hava su", "normale yaklaşır", "kırılma indisi"]),
+  fz("f-kirilma-sudan-havaya", "Işığın sudan havaya kırılması", "Yoğundan seyreğe: ışın normalden uzaklaşır", "kirilma", { n1: "4/3", n2: 1, aci: 30, ad1: "su", ad2: "hava", aciYaz: true }, ["kırılma", "snell", "optik", "su hava", "normalden uzaklaşır"]),
+  fz("f-kirilma-tam-yansima", "Tam yansıma ve sınır açısı (camdan havaya)", "θ₁ > θ_s: kırılan ışın yok", "kirilma", { n1: 1.5, n2: 1, aci: 60, ad1: "cam", ad2: "hava", kritik: true, aciYaz: true }, ["tam yansıma", "sınır açısı", "kırılma", "optik", "cam hava"]),
+  fz("f-kirilma-sinir-acisi", "Sınır açısında kırılma (θ₂ = 90°)", "n₁ = 2, n₂ = 1: θ_s = 30°", "kirilma", { n1: 2, n2: 1, aci: 30, ad1: "cam", ad2: "hava", aciYaz: true }, ["sınır açısı", "tam yansıma", "kırılma", "optik", "90 derece"]),
+  fz("f-kirilma-levha", "Paralel yüzlü levhada yanal kayma", "Çıkan ışın gelene paralel, d kadar kayar", "kirilma", { tip: "levha", n1: 1, n2: 1.5, aci: 50, e: 4, ad2: "cam", aciYaz: true }, ["paralel yüzlü levha", "yanal kayma", "kırılma", "optik", "cam levha"]),
+  fz("f-kirilma-uc-ortam", "Üç farklı ortamda kırılma (hava–cam–su)", "n₁ sinθ₁ = n₂ sinθ₂ = n₃ sinθ₃", "kirilma", { tip: "uc", n1: 1, n2: 1.5, n3: "4/3", aci: 50, ad1: "hava", ad2: "cam", ad3: "su", aciYaz: true }, ["kırılma", "katman", "üç ortam", "snell", "optik"]),
+  fz("f-kirilma-uc-tam-yansima", "Katmanlar arasında tam yansıma", "2. sınırda θ₂ > sınır açısı", "kirilma", { tip: "uc", n1: 1.6, n2: 1.4, n3: 1, aci: 40, ad1: "cam", ad2: "yağ", ad3: "hava", aciYaz: false }, ["tam yansıma", "katman", "kırılma", "optik"]),
+  fz("f-kirilma-dusey", "Düşey sınırda kırılma", "Sınır düşey: normal yatay", "kirilma", { sinir: "dusey", n1: 1, n2: "4/3", aci: 45, ad2: "su", aciYaz: true }, ["kırılma", "düşey sınır", "optik", "snell"]),
+  fz("f-kirilma-soru-aci", "Kırılma açısını bul (soru)", "θ₂ = ? yazılı, θ₁ ve n değerleri verili", "kirilma", { n1: 1, n2: 1.5, aci: 45, goster: "aciGizli", aciYaz: true }, ["kırılma", "soru", "snell", "kırılma açısı", "optik"]),
+  fz("f-kirilma-soru-isin", "Kırılan ışını çiz (soru)", "Yalnız gelen ışın ve normal çizili", "kirilma", { n1: 1, n2: "4/3", aci: 50, goster: "kirilanYok", ad2: "su", aciYaz: true }, ["kırılma", "soru", "ışın çizimi", "optik"]),
+  fz("f-gorunur-derinlik", "Görünür derinlik (sudaki balık)", "h′ = h/n: balık yüzeye daha yakın görünür", "gorunurDerinlik", {}, ["görünür derinlik", "kırılma", "balık", "optik", "sanal görüntü"]),
+  fz("f-gorunur-derinlik-degerli", "Görünür derinlik (değerli)", "h = 40 cm, n = 4/3 → h′ = 30 cm", "gorunurDerinlik", { deger: true, cisim: "nokta" }, ["görünür derinlik", "kırılma", "optik", "h′"]),
+  fz("f-gorunur-yukseklik", "Sudan havadaki cismin görünür yüksekliği", "Gözlemci sıvıda: h′ = n·h", "gorunurDerinlik", { yon: "havada", cisim: "nokta", deger: true }, ["görünür yükseklik", "kırılma", "optik", "dalgıç"]),
+  fz("f-prizma-esken", "Eşkenar prizmada kırılma ve sapma", "A = 60°, n = 1,5: ışın iki yüzde de tabana doğru kırılır", "prizmaIsin", { A: 60, n: 1.5, aci: 48, aciYaz: true, sapma: true }, ["prizma", "eşkenar prizma", "kırılma", "sapma açısı", "optik"]),
+  fz("f-prizma-dik-90", "45°–45°–90° prizmada tam yansıma (90° dönme)", "Dik kenardan giren ışın hipotenüste tam yansır", "prizmaIsin", { A: 90, n: 1.5, aci: 0, nokta: 50, aciYaz: true }, ["prizma", "tam yansıma", "dik prizma", "periskop", "optik", "90 derece"]),
+  fz("f-prizma-dik-180", "Dik prizmada 180° geri dönme", "Hipotenüsten dik giren ışın iki tam yansımayla döner", "prizmaIsin", { A: 90, n: 1.5, giris: "taban", aci: 0, nokta: 28 }, ["prizma", "tam yansıma", "dik prizma", "geri dönme", "optik", "180 derece"]),
+  fz("f-prizma-dagilma", "Prizmada ışığın dağılması", "Mavi, kırmızıdan daha çok sapar", "prizmaIsin", { A: 60, n: 1.5, aci: 50, dagilma: true, dn: 0.1 }, ["prizma", "dağılma", "renk", "kırmızı mavi", "optik"]),
+  fz("f-fiber-optik", "Fiber optik kabloda tam yansıma", "n₁ > n₂: ışık çekirdekte zikzak ilerler", "fiberOptik", {}, ["fiber optik", "tam yansıma", "optik kablo", "çekirdek kılıf", "optik"]),
+  fz("f-fiber-sizinti", "Fiber optik: büyük açıyla gelen ışık sızar", "α > α_maks: tam yansıma olmaz", "fiberOptik", { aci: 55, aciYaz: false }, ["fiber optik", "kabul açısı", "tam yansıma", "sızma", "optik"]),
   // <<PAKET-EK-SABLON>>
 ];
 

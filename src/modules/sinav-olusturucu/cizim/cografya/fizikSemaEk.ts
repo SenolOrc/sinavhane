@@ -8,7 +8,8 @@ export type FizikEkYapi =
   | "elektrikAlan" | "coulomb" | "levhaYuk" | "manyetikParcacik" | "iletkenCubuk" | "transformator"
   | "cembersel" | "yorunge" | "basitHarmonik" | "donme"
   | "yolYer" | "bagilHareket" | "serbestDusme" | "stroboskop" | "hareketGrafigi"
-  | "fotoelektrik" | "fotoGrafik" | "bozunma" | "basitMakine" | "vektorSerbest" | "kareliAlan";
+  | "fotoelektrik" | "fotoGrafik" | "bozunma" | "basitMakine" | "vektorSerbest" | "kareliAlan"
+  | "kirilma" | "gorunurDerinlik" | "prizmaIsin" | "fiberOptik";
 
 type Sema = { ad: string; alt: string; alanlar: Alan[] };
 
@@ -146,6 +147,78 @@ export const FIZIK_EK_SEMA: Record<FizikEkYapi, Sema> = {
       { k: "mantik", a: "normal", ad: "Normal çizgisi", v: true },
       { k: "mantik", a: "etiket", ad: "Yazılar (i, r, λ, S₁, S₂)", v: true },
       { k: "mantik", a: "dugum", ad: "Girişim: düğüm (D) ve karın (K) çizgileri", v: true },
+    ],
+  },
+  // ── Optik: ışığın kırılması
+  kirilma: {
+    ad: "Işığın kırılması (Snell, tam yansıma)", alt: "Fizik – Optik (kırılma)",
+    alanlar: [
+      { k: "sec", a: "tip", ad: "Düzenek", sec: [["tek", "İki ortam (tek sınır)"], ["uc", "Üç ortam (paralel katmanlar)"], ["levha", "Paralel yüzlü levha (n₁ | n₂ | n₁)"]], v: "tek" },
+      { k: "sec", a: "sinir", ad: "Sınırın yönü (iki ortamda)", sec: [["yatay", "Yatay"], ["dusey", "Düşey"]], v: "yatay" },
+      { k: "sayi", a: "n1", ad: "1. ortam n₁ (4/3 yazılabilir)", min: 1, max: 3, adim: 0.01, v: 1, kok: true },
+      { k: "sayi", a: "n2", ad: "2. ortam n₂", min: 1, max: 3, adim: 0.01, v: 1.5, kok: true },
+      { k: "sayi", a: "n3", ad: "3. ortam n₃ (üç ortamda)", min: 1, max: 3, adim: 0.01, v: 1.2, kok: true },
+      { k: "sayi", a: "aci", ad: "Gelme açısı θ₁ (°)", min: 0, max: 89, adim: 1, v: 40 },
+      { k: "sayi", a: "e", ad: "Levha kalınlığı e (cm)", min: 1, max: 20, adim: 0.5, v: 4 },
+      { k: "sec", a: "goster", ad: "Gösterim", sec: [["tam", "Tüm ışınlar"], ["kirilanYok", "Soru: kırılan ışın çizilmez"], ["aciGizli", "Soru: kırılma açısı gizli (?)"]], v: "tam" },
+      { k: "mantik", a: "aciYaz", ad: "Açı değerlerini yaz (θ₁ = 40°)", v: false },
+      { k: "mantik", a: "nYaz", ad: "Kırılma indislerini yaz (n₁ = 1)", v: true },
+      { k: "mantik", a: "ortamAd", ad: "Ortam adlarını yaz", v: true },
+      { k: "mantik", a: "normal", ad: "Normal (kesikli çizgi)", v: true },
+      { k: "mantik", a: "yansima", ad: "Yansıyan ışını da çiz", v: false },
+      { k: "mantik", a: "kritik", ad: "Sınır açısını (θ_s) göster", v: false },
+      { k: "mantik", a: "kayma", ad: "Levha: yanal kayma d", v: true },
+      { k: "metin", a: "ad1", ad: "1. ortamın adı", en: 12, v: "hava" },
+      { k: "metin", a: "ad2", ad: "2. ortamın adı", en: 12, v: "cam" },
+      { k: "metin", a: "ad3", ad: "3. ortamın adı", en: 12, v: "su" },
+    ],
+  },
+  gorunurDerinlik: {
+    ad: "Görünür derinlik (cismin sanal konumu)", alt: "Fizik – Optik (kırılma)",
+    alanlar: [
+      { k: "sec", a: "yon", ad: "Durum", sec: [["suda", "Cisim sıvıda, gözlemci havada"], ["havada", "Cisim havada, gözlemci sıvıda"]], v: "suda" },
+      { k: "sayi", a: "n", ad: "Sıvının kırılma indisi n (4/3 yazılabilir)", min: 1.05, max: 3, adim: 0.01, v: 1.3333, kok: true },
+      { k: "sayi", a: "h", ad: "Gerçek derinlik / yükseklik h (cm)", min: 1, max: 200, adim: 1, v: 40 },
+      { k: "sec", a: "cisim", ad: "Cisim", sec: [["balik", "Balık"], ["nokta", "Nokta"]], v: "balik" },
+      { k: "mantik", a: "deger", ad: "Değerleri yaz (h = 40 cm)", v: false },
+      { k: "mantik", a: "sonuc", ad: "h′ değerini yaz (kapalıysa ?)", v: true },
+      { k: "mantik", a: "adYaz", ad: "O ve O′ yazıları", v: true },
+      { k: "mantik", a: "nYaz", ad: "Sıvının n değerini yaz", v: true },
+      { k: "mantik", a: "ortamAd", ad: "Ortam adlarını yaz", v: true },
+      { k: "mantik", a: "goz", ad: "Gözlemci (göz)", v: true },
+      { k: "mantik", a: "olcu", ad: "Derinlik ölçüleri (h, h′)", v: true },
+      { k: "metin", a: "sivi", ad: "Sıvının adı", en: 12, v: "su" },
+    ],
+  },
+  prizmaIsin: {
+    ad: "Prizmada ışın izleme (kırılma, tam yansıma, dağılma)", alt: "Fizik – Optik (kırılma)",
+    alanlar: [
+      { k: "sayi", a: "A", ad: "Tepe açısı A (°)", min: 20, max: 120, adim: 1, v: 60 },
+      { k: "sayi", a: "n", ad: "Prizma indisi n (havada)", min: 1.05, max: 3, adim: 0.01, v: 1.5, kok: true },
+      { k: "sec", a: "giris", ad: "Işığın girdiği yüzey", sec: [["sol", "Sol yüz"], ["taban", "Taban"]], v: "sol" },
+      { k: "sayi", a: "aci", ad: "Gelme açısı θ₁ (°; − değer öbür yandan)", min: -85, max: 85, adim: 1, v: 48 },
+      { k: "sayi", a: "nokta", ad: "Giriş noktası (yüzün %'si)", min: 15, max: 85, adim: 1, v: 50 },
+      { k: "mantik", a: "aciYaz", ad: "Açıları yaz (θ₁, θ₂…)", v: false },
+      { k: "mantik", a: "degerYaz", ad: "Açı değerlerini yaz", v: false },
+      { k: "mantik", a: "tepeYaz", ad: "Tepe açısı A yazısı", v: true },
+      { k: "mantik", a: "nYaz", ad: "n değerini yaz", v: true },
+      { k: "mantik", a: "normal", ad: "Normaller (kesikli)", v: true },
+      { k: "mantik", a: "sapma", ad: "Sapma açısı δ", v: false },
+      { k: "mantik", a: "dagilma", ad: "Dağılma (kırmızı ve mavi ışık)", v: false },
+      { k: "sayi", a: "dn", ad: "Dağılma: n_mavi − n_kırmızı", min: 0.01, max: 0.2, adim: 0.01, v: 0.05 },
+    ],
+  },
+  fiberOptik: {
+    ad: "Fiber optik kablo (tam yansıma)", alt: "Fizik – Optik (kırılma)",
+    alanlar: [
+      { k: "sayi", a: "n1", ad: "Çekirdek n₁", min: 1.05, max: 2.5, adim: 0.01, v: 1.5, kok: true },
+      { k: "sayi", a: "n2", ad: "Kılıf n₂", min: 1, max: 2.4, adim: 0.01, v: 1.4, kok: true },
+      { k: "sayi", a: "aci", ad: "Işığın uca gelme açısı α (°)", min: 0, max: 80, adim: 1, v: 25 },
+      { k: "mantik", a: "aciYaz", ad: "Açıları yaz", v: true },
+      { k: "mantik", a: "degerYaz", ad: "Açı değerlerini yaz", v: false },
+      { k: "mantik", a: "nYaz", ad: "n değerlerini yaz", v: true },
+      { k: "mantik", a: "ortamAd", ad: "Çekirdek / kılıf yazıları", v: true },
+      { k: "mantik", a: "normal", ad: "Normaller (kesikli)", v: true },
     ],
   },
   // <<PAKET-EK-SEMA>>
@@ -465,4 +538,5 @@ export const FIZIK_EK_BOYUT: Record<FizikEkYapi, { w: number; h: number }> = {
   cembersel: { w: 380, h: 260 }, yorunge: { w: 420, h: 260 }, basitHarmonik: { w: 440, h: 250 }, donme: { w: 440, h: 260 },
   yolYer: { w: 440, h: 260 }, bagilHareket: { w: 440, h: 250 }, serbestDusme: { w: 400, h: 290 }, stroboskop: { w: 460, h: 190 }, hareketGrafigi: { w: 440, h: 260 },
   fotoelektrik: { w: 440, h: 250 }, fotoGrafik: { w: 400, h: 260 }, bozunma: { w: 450, h: 250 }, basitMakine: { w: 420, h: 260 }, vektorSerbest: { w: 340, h: 280 }, kareliAlan: { w: 540, h: 230 },
+  kirilma: { w: 440, h: 270 }, gorunurDerinlik: { w: 420, h: 270 }, prizmaIsin: { w: 440, h: 270 }, fiberOptik: { w: 530, h: 200 },
 };
