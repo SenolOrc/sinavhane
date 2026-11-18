@@ -623,6 +623,99 @@ senaryo("elektrikAlanNokta: kenar durumlar (yük üzerinde nokta, çakışık y�
     dogrula(cografyaGecerliMi(v2 as unknown as Record<string, unknown>) && mürekkep(v2) > 300, "uç değer çizilir");
   }
 });
+// ── Manyetizma: mıknatıs alan çizgileri, pusula, indüksiyon (Lenz), çerçeve–alan
+import { induksiyonHesap, cerceveHesap, miknatisPusulalari, miknatisAlanCizgileri } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizMiknatis";
+import { GEOMETRI_KUTUPHANESI as MIK_KUTUPHANE } from "../src/modules/sinav-olusturucu/cizim/geometriSekilleri";
+{
+  const KUTU = { x: 0, y: 0, w: 420, h: 250 };
+  const pus = (ek: Record<string, number | string | boolean | number[]>, xy: [number, number][]) => {
+    const flat = xy.flatMap(([x, y]) => [(x / 420) * 100, (y / 250) * 100]); while (flat.length < 8) flat.push(-1);
+    return miknatisPusulalari(ayar("miknatisAlan", { pusula: "ozel", pusulaXY: flat, ...ek }), KUTU);
+  };
+  const yonu = (a: number) => ({ x: Math.cos(a), y: Math.sin(a) });
+  senaryo("Çubuk mıknatıs (N solda): pusula N ucu B yönünde — üstte sağa, eksende her iki dışta sola", () => {
+    const [ust, solDis, sagDis, alt] = pus({}, [[210, 60], [20, 125], [400, 125], [210, 190]]);
+    dogrula(yonu(ust.aci).x > 0.9, "üstte N→S yönü (sağa)"); dogrula(yonu(alt.aci).x > 0.9, "altta da sağa");
+    dogrula(yonu(solDis.aci).x < -0.9, "N ucunun dışında alan N'den uzağa (sola)");
+    dogrula(yonu(sagDis.aci).x < -0.9, "S ucunun dışında alan S'ye doğru (sola)");
+    const ters = pus({ kutup: "SN" }, [[210, 60], [20, 125]]);
+    dogrula(yonu(ters[0].aci).x < -0.9 && yonu(ters[1].aci).x > 0.9, "kutuplar ters çevrilince hepsi ters");
+  });
+  senaryo("U mıknatıs: aralıkta B, N kolundan S koluna (düzgün, sağa); iki mıknatıs NN / NS / SS ortası", () => {
+    const g = pus({ tip: "u" }, [[210, 70]])[0]; dogrula(Math.abs(yonu(g.aci).x) > 0.97 && yonu(g.aci).x > 0, "U: aralıkta sağa (N solda)");
+    const gs = pus({ tip: "u", kutup: "SN" }, [[210, 70]])[0]; dogrula(yonu(gs.aci).x < -0.97, "U ters kutup: sola");
+    const ns = pus({ tip: "iki", yuz: "NS" }, [[210, 100], [210, 125]]); dogrula(yonu(ns[0].aci).x > 0.8 && yonu(ns[1].aci).x > 0.97, "N–S: aralıkta soldan sağa");
+    const nn = pus({ tip: "iki", yuz: "NN" }, [[210, 90]])[0]; dogrula(yonu(nn.aci).y < -0.97, "N–N: orta eksenin üstünde alan yukarı (iter, dışa)");
+    const nn2 = pus({ tip: "iki", yuz: "NN" }, [[210, 160]])[0]; dogrula(yonu(nn2.aci).y > 0.97, "N–N: altta aşağı");
+    const ss = pus({ tip: "iki", yuz: "SS" }, [[210, 90]])[0]; dogrula(yonu(ss.aci).y > 0.97, "S–S: üstte alan içeri (aşağı)");
+  });
+  senaryo("Dünya (dipol): ekvatorda pusula kuzeyi (yukarı) gösterir, kuzey kutbunun üstünde alan yeryüzüne dalar", () => {
+    const [ekv, kuz] = pus({ tip: "dunya" }, [[210 + 80, 125], [210, 125 - 80]]);
+    dogrula(yonu(ekv.aci).y < -0.97, "ekvatorda kuzey (yukarı)"); dogrula(yonu(kuz.aci).y > 0.97, "kuzey kutbu üstünde alan aşağı");
+  });
+  senaryo("Alan çizgileri: orta çizgiler N → S yönünde kapalı ve simetrik; sayı çizgi ayarına uyar", () => {
+    const v = ayar("miknatisAlan", { cizgi: 3 }), hat = miknatisAlanCizgileri(v, KUTU);
+    const orta = hat.filter((h) => h.orta);
+    dogrula(orta.length === 6, "3 çizgi × 2 yan = 6 kapalı çizgi");
+    const cx = 210;
+    for (const h of orta) {
+      const a = h.pts[0], b = h.pts[h.pts.length - 1];
+      dogrula(a.x < cx && b.x > cx, "çizgi N (sol) ucundan başlar S (sağ) ucuna biter");
+      dogrula(Math.abs((cx - a.x) - (b.x - cx)) < 6, "sağ–sol simetri");
+    }
+    dogrula(miknatisAlanCizgileri(ayar("miknatisAlan", { cizgi: 6 }), KUTU).filter((h) => h.orta).length === 12, "6 çizgi → 12");
+    dogrula(miknatisAlanCizgileri(ayar("miknatisAlan", { eksen: false, cizgi: 1 }), KUTU).length === 2, "eksensiz: yalnız 2 orta çizgi");
+  });
+  senaryo("İndüksiyon (Lenz): 16 durum doğruluk tablosu, akı yöntemiyle bağımsız türetme + durgun", () => {
+    for (const yer of ["sol", "sag"] as const) for (const kutup of ["N", "S"] as const) for (const hareket of ["yaklasir", "uzaklasir"] as const) for (const sarim of ["ileri", "geri"] as const) {
+      const h = induksiyonHesap(ayar("induksiyon", { yer, kutup, hareket, sarim }));
+      // Bağımsız türetme: bobin ekseni +x. Mıknatıs solda ve N bakıyorsa B bobinde +x yönündedir (N'den uzağa).
+      const bx0 = (yer === "sol" ? 1 : -1) * (kutup === "N" ? 1 : -1);          // B_x işareti
+      const dBx = bx0 * (hareket === "yaklasir" ? 1 : -1);                        // |B| artar → B_x aynı işaretle büyür
+      const bInd = -Math.sign(dBx);                                               // Lenz: indüklenen B_x zıt işaretli
+      // Sağ el kuralı: ön tel (izleyiciye yakın) yukarı akıyorsa B_x < 0 (−x). "ileri" (/) sarımda soldan sağa akımda ön tel yukarı.
+      const bobinGecis = -bInd * (sarim === "ileri" ? 1 : -1);                    // +1: akım bobinde soldan sağa
+      dogrula(h.bobinYon === bobinGecis, `${yer}/${kutup}/${hareket}/${sarim}: bobin içi akım yönü`);
+      dogrula(h.galvoYon === -bobinGecis, `${yer}/${kutup}/${hareket}/${sarim}: galvanometre yönü (bobin soldan sağa ise galvo sağdan sola)`);
+      // Bakan ucun kutbu: indüklenen B ucun dış normali yönündeyse o uç N'dir
+      const bakanUc = yer === "sol" ? -1 : 1;
+      dogrula(h.indKutup === (bInd * bakanUc > 0 ? "N" : "S"), `${yer}/${kutup}/${hareket}: bakan uç kutbu`);
+      dogrula(h.indKutup === (hareket === "yaklasir" ? kutup : kutup === "N" ? "S" : "N"), "yaklaşırken aynı, uzaklaşırken zıt kutup");
+    }
+    const d = induksiyonHesap(ayar("induksiyon", { hareket: "durgun" }));
+    dogrula(!d.akim && d.indKutup === null && d.bobinYon === 0 && d.galvoYon === 0, "durgun: akım yok");
+    dogrula(induksiyonHesap(ayar("induksiyon", { eden: "bobin" })).galvoYon === induksiyonHesap(ayar("induksiyon", {})).galvoYon, "bağıl hareket: bobin ya da mıknatıs hareket etse de sonuç aynı");
+  });
+  senaryo("İndüksiyon özeti ve çizim: soru modu cevabı gizler, durgunda ibre ve oklar yok", () => {
+    const o = fizikHesapOzeti(ayar("induksiyon", {}))!;
+    dogrula(o.includes("N olur") && o.includes("sağdan sola") && o.includes("yaklaşırken"), "özet: " + o);
+    dogrula(fizikHesapOzeti(ayar("induksiyon", { kutup: "N", sarim: "geri" }))!.includes("soldan sağa") && fizikHesapOzeti(ayar("induksiyon", { kutup: "S", sarim: "geri" }))!.includes("sağdan sola"), "geri sarımda N: soldan sağa, S: sağdan sola");
+    dogrula(fizikHesapOzeti(ayar("induksiyon", { uclarAd: true }))!.includes("L'den K'ye"), "K–L yazısı");
+    dogrula(fizikHesapOzeti(ayar("induksiyon", { hareket: "durgun" }))!.includes("indüksiyon emk'sı ve akımı oluşmaz"), "durgun özet");
+    const tam = mürekkep(ayar("induksiyon", {})), soru = mürekkep(ayar("induksiyon", { soru: true })), durgun = mürekkep(ayar("induksiyon", { hareket: "durgun" }));
+    dogrula(tam > 1500 && soru < tam, "soru modu daha az çizim (kutup etiketi, akım oku gizli)");
+    dogrula(mürekkep(ayar("induksiyon", { ikiUc: true })) > tam, "iki uca kutup yazısı");
+    dogrula(durgun !== tam, "durgun farklı");
+  });
+  senaryo("Çerçeve–alan: akım yönü doğruluk tablosu (⊗/⊙ × girerken/içinde/çıkarken)", () => {
+    const t = (alan: string, durum: string) => cerceveHesap(ayar("cerceveAlan", { alan, durum })).yon;
+    dogrula(t("iceri", "girerken") === 1, "⊗ girerken: saatin tersi"); dogrula(t("iceri", "cikarken") === -1, "⊗ çıkarken: saat yönü");
+    dogrula(t("disari", "girerken") === -1, "⊙ girerken: saat yönü"); dogrula(t("disari", "cikarken") === 1, "⊙ çıkarken: saatin tersi");
+    dogrula(t("iceri", "icinde") === 0 && t("disari", "icinde") === 0, "tamamen içinde: akım yok");
+    dogrula(fizikHesapOzeti(ayar("cerceveAlan", {}))!.includes("saatin tersi"), "özet");
+    dogrula(mürekkep(ayar("cerceveAlan", { soru: true })) < mürekkep(ayar("cerceveAlan", {})), "soru: oklar gizli");
+  });
+  senaryo("Manyetizma şablonları: hepsi çizilir; her mıknatıs tipi ve uç değerler çökmez", () => {
+    const sab = MIK_KUTUPHANE.filter((x) => /^f-(miknatis|induksiyon|cerceve)-/.test(x.id));
+    dogrula(sab.length >= 18, "şablon sayısı " + sab.length);
+    for (const x of sab) { const g = x.olustur() as V; dogrula(cografyaGecerliMi(g as never), x.id + " geçerli"); dogrula(mürekkep(g) > 800, x.id + " boş değil"); }
+    for (const tip of ["cubuk", "u", "iki", "dunya"]) for (const cizgi of [1, 6]) for (const pusula of ["yok", "cevre", "ozel"]) for (const gizle of [false, true])
+      dogrula(mürekkep(ayar("miknatisAlan", { tip, cizgi, pusula, gizle, pusulaNo: true, igne: false })) > 300, `miknatisAlan ${tip}/${cizgi}/${pusula}/${gizle}`);
+    for (const tur of [3, 10]) for (const eden of ["miknatis", "bobin"]) for (const yer of ["sol", "sag"]) dogrula(mürekkep(ayar("induksiyon", { tur, eden, yer, uclarAd: true })) > 1000, `induksiyon ${tur}/${eden}/${yer}`);
+    dogrula(mürekkep(ayar("miknatisAlan", { cizgi: 99, ara: 999, pusulaXY: [1, 2, 3] as never })) > 300, "aşırı/bozuk değerler");
+    dogrula(pus({}, [[1000, 1000]]).length === 1, "kutu dışı pusula noktası da hesaplanır");
+  });
+}
 // <<PAKET-EK-TEST>>
 
 console.log("Tüm fizik ek paket senaryoları geçti.");

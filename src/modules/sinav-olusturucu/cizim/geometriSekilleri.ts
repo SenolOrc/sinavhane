@@ -858,7 +858,8 @@ const FIZIK_ALT: Record<string, string> = { atis: "Fizik – Atış", enerji: "F
   fotoelektrik: "Fizik – Modern fizik", fotoGrafik: "Fizik – Modern fizik", bozunma: "Fizik – Modern fizik", basitMakine: "Fizik – Basit makineler", vektorSerbest: "Fizik – Vektör", kareliAlan: "Fizik – Vektör", panelIzgara: "Fizik – Çoklu panel",
   kirilma: "Fizik – Optik (kırılma)", gorunurDerinlik: "Fizik – Optik (kırılma)", prizmaIsin: "Fizik – Optik (kırılma)", fiberOptik: "Fizik – Optik (kırılma)", karmaDevre: "Fizik – Elektrik devresi",
   elektrikAlanNokta: "Fizik – Elektrik alan",
-  hareketUclu: "Fizik – Hareket", ohmGrafik: "Fizik – Elektrik", surtunmeGrafik: "Fizik – Kuvvet", akiEmk: "Fizik – Manyetizma" };
+  hareketUclu: "Fizik – Hareket", ohmGrafik: "Fizik – Elektrik", surtunmeGrafik: "Fizik – Kuvvet", akiEmk: "Fizik – Manyetizma",
+  miknatisAlan: "Fizik – Manyetizma", induksiyon: "Fizik – Manyetizma", cerceveAlan: "Fizik – Manyetizma" };
 const fz = (id: string, ad: string, ipucu: string, yapi: Parameters<typeof varsayilanCografya>[0], ek: Parameters<typeof varsayilanCografya>[1], anahtar: string[]): GeometriSablonu => ({
   id, ad, ipucu, nesne: "fizikSekil", altBaslik: FIZIK_ALT[yapi], aramaKelimeleri: ["fizik", ...anahtar], olustur: () => varsayilanCografya(yapi, ek),
 });
@@ -1078,6 +1079,27 @@ export const FIZIK_SABLONLARI: GeometriSablonu[] = [
   fz("f-ealannokta-sifir-1d", "Elektrik alan: +q ve +4q arasında E = 0 noktası", "Doğru üzerinde: sıfır noktası q yüküne 1, 4q yüküne 2 kare uzaklıkta", "elektrikAlanNokta", { mod: "dogru", yx: [0, 3, 0, 0], yq: [1, 4, 0, 0], noktaSayisi: 0, deger: true }, ["elektrik alan","sıfır noktası","E = 0","doğru üzerinde","q ve 4q","iki yük","denge"]),
   fz("f-ealannokta-sifir-dis", "Elektrik alan: +q ve −4q, E = 0 noktası dışarıda", "Zıt işaretli yüklerde sıfır noktası küçük yükün dış tarafındadır", "elektrikAlanNokta", { mod: "dogru", yx: [0, 3, 0, 0], yq: [1, -4, 0, 0], noktaSayisi: 0, deger: true }, ["elektrik alan","sıfır noktası","E = 0","zıt yük","dışarıda","q ve -4q"]),
   fz("f-ealannokta-kok-bilesen", "Elektrik alan: +q, −q ve K noktasında köklü bileşke", "Bileşkenin x–y bileşenleri kesikli; |E| = √2/2 (kq/d² biriminde)", "elektrikAlanNokta", { yukSayisi: 2, yx: [-1, 1, 0, 0], yy: [0, 0, 0, 0], yq: [1, -1, 0, 0], noktaSayisi: 1, nx: [0, 0, 0], ny: [1, 0, 0], deger: true, kokYaz: true, bilesen: true }, ["elektrik alan","köklü","√2","bileşen","bileşke","dipol","K noktası"]),
+  // ── Manyetizma: mıknatıs alan çizgileri, indüksiyon (Lenz), çerçeve–alan
+  fz("f-miknatis-cubuk", "Çubuk mıknatıs: alan çizgileri", "N'den çıkıp S'ye giren kapalı çizgiler, oklarla", "miknatisAlan", {}, ["mıknatıs", "çubuk mıknatıs", "manyetik alan çizgileri", "N S kutup", "dipol"]),
+  fz("f-miknatis-pusula", "Çubuk mıknatıs: çevresinde pusulalar", "8 pusula iğnesi B yönünü gösterir (koyu uç = N)", "miknatisAlan", { pusula: "cevre", cizgi: 2 }, ["mıknatıs", "pusula", "iğne", "alan yönü", "manyetik alan"]),
+  fz("f-miknatis-soru", "Soru: pusuladan kutupları bul", "Kutuplar gizli, seçilen noktalarda pusula iğneleri; hangi uç N?", "miknatisAlan", { gizle: true, ok: false, cizgi: 2, pusula: "ozel", pusulaXY: [50, 16, 18, 50, 82, 50, 50, 84], pusulaNo: true }, ["mıknatıs", "soru", "pusula", "kutup bul", "gizli kutup"]),
+  fz("f-miknatis-u", "U (nal) mıknatıs: kutuplar arası alan", "Kutuplar arasında yaklaşık düzgün alan çizgileri", "miknatisAlan", { tip: "u", cizgi: 4 }, ["mıknatıs", "U mıknatıs", "nal mıknatıs", "düzgün alan", "manyetik alan"]),
+  fz("f-miknatis-u-pusula", "U mıknatıs: pusulalarla", "Aralıkta ve çevresinde pusulalar", "miknatisAlan", { tip: "u", cizgi: 3, pusula: "cevre" }, ["mıknatıs", "U mıknatıs", "pusula", "düzgün alan"]),
+  fz("f-miknatis-nn", "İki mıknatıs: N–N karşılıklı (iter)", "Aynı kutuplar karşı karşıya; ortada nötr nokta", "miknatisAlan", { tip: "iki", yuz: "NN", pusula: "cevre" }, ["mıknatıs", "iki mıknatıs", "N-N", "itme", "aynı kutup", "nötr nokta"]),
+  fz("f-miknatis-ns", "İki mıknatıs: N–S karşılıklı (çeker)", "Zıt kutuplar karşı karşıya; aralarında sık, paralel çizgiler", "miknatisAlan", { tip: "iki", yuz: "NS" }, ["mıknatıs", "iki mıknatıs", "N-S", "çekme", "zıt kutup"]),
+  fz("f-miknatis-ss", "İki mıknatıs: S–S karşılıklı (iter)", "Aynı (S) kutuplar karşı karşıya", "miknatisAlan", { tip: "iki", yuz: "SS" }, ["mıknatıs", "iki mıknatıs", "S-S", "itme", "aynı kutup"]),
+  fz("f-miknatis-dunya", "Dünya'nın manyetik alanı (dipol)", "İçte çubuk mıknatıs: N ucu coğrafi güneye bakar; pusula kuzeyi gösterir", "miknatisAlan", { tip: "dunya", pusula: "cevre" }, ["dünya", "dünyanın manyetik alanı", "pusula", "coğrafi kuzey", "dipol", "yer manyetik"]),
+  fz("f-induksiyon-n-yaklasir", "İndüksiyon: N kutbu bobine yaklaşıyor", "Bobinin bakan ucu N olur (iter); galvanometreden akım yönü gösterilir", "induksiyon", {}, ["indüksiyon", "lenz", "bobin", "galvanometre", "mıknatıs yaklaşıyor", "N kutbu"]),
+  fz("f-induksiyon-s-yaklasir", "İndüksiyon: S kutbu bobine yaklaşıyor", "Bobinin bakan ucu S olur", "induksiyon", { kutup: "S" }, ["indüksiyon", "lenz", "bobin", "galvanometre", "S kutbu", "yaklaşıyor"]),
+  fz("f-induksiyon-n-uzaklasir", "İndüksiyon: N kutbu bobinden uzaklaşıyor", "Bobinin bakan ucu S olur (çeker)", "induksiyon", { hareket: "uzaklasir" }, ["indüksiyon", "lenz", "uzaklaşıyor", "N kutbu", "galvanometre"]),
+  fz("f-induksiyon-s-uzaklasir", "İndüksiyon: S kutbu bobinden uzaklaşıyor", "Bobinin bakan ucu N olur", "induksiyon", { hareket: "uzaklasir", kutup: "S" }, ["indüksiyon", "lenz", "uzaklaşıyor", "S kutbu", "galvanometre"]),
+  fz("f-induksiyon-bobin", "İndüksiyon: bobin mıknatısa yaklaşıyor", "Mıknatıs sabit, bobin hareketli; bağıl hareket yine akı değiştirir", "induksiyon", { eden: "bobin" }, ["indüksiyon", "bobin hareketli", "mıknatıs sabit", "lenz", "bağıl hareket"]),
+  fz("f-induksiyon-durgun", "İndüksiyon: mıknatıs durgun (akım yok)", "Akı değişmez: ibre sıfırda", "induksiyon", { hareket: "durgun" }, ["indüksiyon", "durgun", "akım yok", "akı değişmez", "galvanometre"]),
+  fz("f-induksiyon-soru", "İndüksiyon soru: akım yönü? (gizli)", "Kutup, akım oku ve ibre sapması gizli; K ve L uçları yazılı", "induksiyon", { soru: true, uclarAd: true }, ["indüksiyon", "soru", "lenz", "akım yönü", "K L", "galvanometre", "gizli cevap"]),
+  fz("f-cerceve-girer", "Çerçeve ⊗ alanına giriyor", "Akı artar; indüksiyon akımı saatin tersi yönünde", "cerceveAlan", {}, ["çerçeve", "alana giriyor", "indüksiyon", "lenz", "sayfaya giren alan", "akı artıyor"]),
+  fz("f-cerceve-cikar", "Çerçeve ⊗ alanından çıkıyor", "Akı azalır; indüksiyon akımı saat yönünde", "cerceveAlan", { durum: "cikarken" }, ["çerçeve", "alandan çıkıyor", "indüksiyon", "lenz", "akı azalıyor"]),
+  fz("f-cerceve-disari", "Çerçeve ⊙ alanına giriyor", "Sayfadan çıkan alan: akım saat yönünde", "cerceveAlan", { alan: "disari" }, ["çerçeve", "⊙", "sayfadan çıkan alan", "indüksiyon", "lenz"]),
+  fz("f-cerceve-soru", "Çerçeve–alan soru (akım yönü gizli)", "Çerçeve alanda ilerliyor; akım yönü sorulur", "cerceveAlan", { soru: true, yon: "sol" }, ["çerçeve", "soru", "akım yönü", "indüksiyon", "gizli"]),
   // <<PAKET-EK-SABLON>>
 ];
 

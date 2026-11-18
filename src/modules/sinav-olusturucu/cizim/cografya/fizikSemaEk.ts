@@ -12,7 +12,8 @@ export type FizikEkYapi =
   | "kirilma" | "gorunurDerinlik" | "prizmaIsin" | "fiberOptik"
   | "karmaDevre"
   | "elektrikAlanNokta"
-  | "hareketUclu" | "ohmGrafik" | "surtunmeGrafik" | "akiEmk";
+  | "hareketUclu" | "ohmGrafik" | "surtunmeGrafik" | "akiEmk"
+  | "miknatisAlan" | "induksiyon" | "cerceveAlan";
 
 type Sema = { ad: string; alt: string; alanlar: Alan[] };
 
@@ -274,6 +275,55 @@ export const FIZIK_EK_SEMA: Record<FizikEkYapi, Sema> = {
       { k: "sayi", a: "kareBoy", ad: "Kare kenarı (px, 0 = otomatik)", min: 0, max: 60, adim: 2, v: 0 },
       { k: "mantik", a: "izgara", ad: "Kare çizgileri", v: true },
       { k: "mantik", a: "sifirNokta", ad: "Doğru üzerinde: E = 0 noktasını göster", v: true },
+    ],
+  },
+  // ── Mıknatıs alan çizgileri, indüksiyon (Lenz) düzeneği, çerçeve–alan (çizim: fizikCizMiknatis.ts)
+  miknatisAlan: {
+    ad: "Mıknatıs alan çizgileri (çubuk, U, iki mıknatıs, Dünya)", alt: "Fizik – Manyetizma",
+    alanlar: [
+      { k: "sec", a: "tip", ad: "Mıknatıs", sec: [["cubuk", "Çubuk mıknatıs"], ["u", "U (nal) mıknatıs"], ["iki", "İki çubuk mıknatıs (karşılıklı)"], ["dunya", "Dünya (dipol)"]], v: "cubuk" },
+      { k: "sec", a: "kutup", ad: "Kutuplar (çubuk, U)", sec: [["NS", "N solda / S sağda"], ["SN", "S solda / N sağda"]], v: "NS" },
+      { k: "sec", a: "yuz", ad: "Karşılıklı kutuplar (iki mıknatıs: sol–sağ)", sec: [["NN", "N – N (iter)"], ["NS", "N – S (çeker)"], ["SN", "S – N (çeker)"], ["SS", "S – S (iter)"]], v: "NS" },
+      { k: "sayi", a: "cizgi", ad: "Eksenin her yanında çizgi sayısı", min: 1, max: 6, adim: 1, v: 3 },
+      { k: "sayi", a: "ara", ad: "İki mıknatıs arası (%)", min: 10, max: 50, adim: 1, v: 24 },
+      { k: "mantik", a: "eksen", ad: "Eksen (orta) çizgileri", v: true },
+      { k: "mantik", a: "ok", ad: "Yön okları (N → S)", v: true },
+      { k: "mantik", a: "harf", ad: "Kutup harfleri (N, S)", v: true },
+      { k: "mantik", a: "gizle", ad: "Soru: kutupları gizle (harf ve koyu/tarama yok)", v: false },
+      { k: "sec", a: "pusula", ad: "Pusula iğneleri", sec: [["yok", "Yok"], ["cevre", "Mıknatısın çevresinde"], ["ozel", "Seçilen noktalarda"]], v: "yok" },
+      { k: "sayilar", a: "pusulaXY", ad: "Özel pusula noktaları x1,y1,x2,y2… (kutunun %'si; −1 = yok)", n: 8, min: -1, max: 100, v: [22, 22, 78, 22, 50, 82, -1, -1] },
+      { k: "mantik", a: "igne", ad: "Pusula iğnesini çiz (kapalıysa boş kadran)", v: true },
+      { k: "mantik", a: "pusulaNo", ad: "Pusulaları numarala (1, 2, 3…)", v: false },
+    ],
+  },
+  induksiyon: {
+    ad: "İndüksiyon düzeneği (mıknatıs – bobin – galvanometre, Lenz)", alt: "Fizik – Manyetizma",
+    alanlar: [
+      { k: "sec", a: "hareket", ad: "Hareket", sec: [["yaklasir", "Yaklaşıyor"], ["uzaklasir", "Uzaklaşıyor"], ["durgun", "Durgun (v = 0)"]], v: "yaklasir" },
+      { k: "sec", a: "eden", ad: "Hareket eden", sec: [["miknatis", "Mıknatıs"], ["bobin", "Bobin"]], v: "miknatis" },
+      { k: "sec", a: "kutup", ad: "Bobine bakan kutup", sec: [["N", "N kutbu"], ["S", "S kutbu"]], v: "N" },
+      { k: "sec", a: "yer", ad: "Mıknatıs bobinin", sec: [["sol", "Solunda"], ["sag", "Sağında"]], v: "sol" },
+      { k: "sec", a: "sarim", ad: "Sarım yönü (ön teller)", sec: [["ileri", "/ (soldan sağa sarılırken ön tel yukarı)"], ["geri", "\\ (soldan sağa sarılırken ön tel aşağı)"]], v: "ileri" },
+      { k: "sayi", a: "tur", ad: "Çizimdeki sarım sayısı", min: 3, max: 10, adim: 1, v: 6 },
+      { k: "mantik", a: "soru", ad: "Soru modu (indüklenen kutup, akım yönü ve ibre sapması gizli)", v: false },
+      { k: "mantik", a: "kutupYaz", ad: "Bobinin indüklenen kutbunu yaz", v: true },
+      { k: "mantik", a: "ikiUc", ad: "Bobinin iki ucuna da kutup yaz", v: false },
+      { k: "mantik", a: "akimOku", ad: "İndüksiyon akımı yönü oku", v: true },
+      { k: "mantik", a: "ibre", ad: "Galvanometre ibresi sapsın", v: true },
+      { k: "mantik", a: "uclarAd", ad: "Galvanometre uçlarına K, L yaz", v: false },
+      { k: "mantik", a: "hizYaz", ad: "Hız oku ve v yazısı", v: true },
+    ],
+  },
+  cerceveAlan: {
+    ad: "Çerçeve manyetik alana giriyor / çıkıyor (⊗ ⊙)", alt: "Fizik – Manyetizma",
+    alanlar: [
+      { k: "sec", a: "durum", ad: "Çerçevenin durumu", sec: [["girerken", "Alana girerken"], ["icinde", "Tamamen alanın içinde"], ["cikarken", "Alandan çıkarken"]], v: "girerken" },
+      { k: "sec", a: "alan", ad: "Alan yönü", sec: [["iceri", "Sayfaya giren (⊗)"], ["disari", "Sayfadan çıkan (⊙)"]], v: "iceri" },
+      { k: "sec", a: "yon", ad: "Hareket yönü", sec: [["sag", "Sağa"], ["sol", "Sola"]], v: "sag" },
+      { k: "mantik", a: "soru", ad: "Soru modu (akım yönü okları gizli)", v: false },
+      { k: "mantik", a: "akimOku", ad: "İndüksiyon akımı yön okları", v: true },
+      { k: "mantik", a: "hizYaz", ad: "Hız oku ve v yazısı", v: true },
+      { k: "mantik", a: "bYaz", ad: "B yazısı", v: true },
     ],
   },
   // ── Paket 3: Elektrik – manyetizma
@@ -698,4 +748,5 @@ export const FIZIK_EK_BOYUT: Record<FizikEkYapi, { w: number; h: number }> = {
   karmaDevre: { w: 460, h: 270 },
   elektrikAlanNokta: { w: 420, h: 330 },
   hareketUclu: { w: 400, h: 450 }, ohmGrafik: { w: 380, h: 250 }, surtunmeGrafik: { w: 380, h: 250 }, akiEmk: { w: 400, h: 380 },
+  miknatisAlan: { w: 420, h: 250 }, induksiyon: { w: 460, h: 260 }, cerceveAlan: { w: 420, h: 240 },
 };
