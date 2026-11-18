@@ -507,14 +507,16 @@ export function CizimEditoruModal({
 
   /**
    * Doğrudan etkileşim katmanı (seçim çerçevesinin üstünde): bağlantı portları
-   * (mavi halkalar), köşe/nokta tutamaçları, porttan çekilen bağlayıcının
+   * (mavi halkalar; yalnız Bağlayıcı aracında), köşe/nokta tutamaçları, porttan çekilen bağlayıcının
    * önizlemesi. Ekranda sabit boyda görünsün diye yakınlaştırmaya bölünür.
    */
   function etkilesimKatmaniCiz(ctx: CanvasRenderingContext2D) {
     const b = 100 / Math.max(zoom, 1);
     ctx.save();
     ctx.setLineDash([]);
-    if (arac === "sec" || arac === "baglayici") {
+    // Portlar yalnız Bağlayıcı aracında görünür; Seç aracında kenar ortası
+    // tutamaçlarıyla çakışıp boyutlandırma yerine ok çektiriyordu.
+    if (arac === "baglayici") {
       for (const sk of portluSekiller()) {
         for (const p of baglantiPortlari(sk)) {
           ctx.beginPath();
@@ -1012,6 +1014,7 @@ export function CizimEditoruModal({
   }
 
   function portBul(nokta: Nokta): (BaglantiPortu & { sekilId: string }) | null {
+    if (arac !== "baglayici") return null;
     for (const s of portluSekiller()) {
       const p = baglantiPortlari(s).find((q) => Math.hypot(q.x - nokta.x, q.y - nokta.y) <= portYaricapi());
       if (p) return { ...p, sekilId: s.id };
@@ -1162,13 +1165,6 @@ export function CizimEditoruModal({
         return;
       }
       if (cift && ciftTiklamaIsle(ctx, nokta)) return;
-      // BAĞLANTI PORTU: şeklin kenarındaki mavi halkadan sürükleyince bağlayıcı çekilir.
-      const port = portBul(nokta);
-      if (port) {
-        portSurukleRef.current = { kaynak: { sekilId: port.sekilId, yon: port.yon }, bas: { x: port.x, y: port.y } };
-        setPortCizgisi({ bas: { x: port.x, y: port.y }, son: nokta });
-        return;
-      }
       // DOĞRUDAN NOKTA TUTAMAÇLARI (üçgen köşesi, çember noktası, grafik köşesi).
       const nt = noktaTutamaclari().find((t) => Math.hypot(t.x - nokta.x, t.y - nokta.y) <= portYaricapi());
       if (nt && seciliId) {
@@ -1405,9 +1401,8 @@ export function CizimEditoruModal({
       && !grupDondurmeBaslangici.current && !secimKutusuBaslangiciRef.current) {
       const ctx = canvasRef.current?.getContext("2d");
       if (ctx) {
-        const portta = !!portBul(nokta);
-        const noktaTutamacinda = !portta && noktaTutamaclari().some((t) => Math.hypot(t.x - nokta.x, t.y - nokta.y) <= portYaricapi());
-        const etkilesim = etkilesimBelirle(ctx, sekiller, seciliIds, nokta, zoom, { portta, noktaTutamacinda });
+        const noktaTutamacinda = noktaTutamaclari().some((t) => Math.hypot(t.x - nokta.x, t.y - nokta.y) <= portYaricapi());
+        const etkilesim = etkilesimBelirle(ctx, sekiller, seciliIds, nokta, zoom, { noktaTutamacinda });
         const imlec = imlecSinifi(etkilesim.tur);
         const ipucu = etkilesimIpucu(etkilesim.tur);
         setImlecIpucu((onceki) => (onceki === ipucu ? onceki : ipucu));

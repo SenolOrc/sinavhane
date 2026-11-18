@@ -229,7 +229,7 @@ async function main() {
     console.log("✓ v12-U: sürekli bağlayıcı kipi, akıllı tür (devre teli/düz ok), sürükle-bırak, Esc");
   }
 
-  // ——— 4) Port: seçili kütlenin sağ portundan öteki kütleye sürükle ———
+  // ——— 4) Port: Bağlayıcı aracında kütlenin sağ portundan öteki kütleye sürükle ———
   {
     let cikti: any = null;
     const belge: any = { surum: 1, genislik: 960, yukseklik: 600, sekiller: [
@@ -237,14 +237,32 @@ async function main() {
       { id: "k2", tur: "fizik", nesne: "kutle", kalinlik: 2, x: 400, y: 100, w: 80, h: 60 },
     ] };
     await act(async () => root.render(<CizimEditoruModal key="k4" baslangicBelgesi={belge} duzenlemeModu onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
-    await tikla(140, 100); // kenarından seç
-    await bekle();
+    await etiketliTikla("Ok / Bağlayıcı");
     await surukle(180, 130, 430, 130); // sağ port (180,130) → k2
     await metinliTikla("Değişiklikleri Kaydet");
     const b = cikti.cizimVerisi.sekiller.find((s: any) => s.tur === "baglayici");
     dogrula(b && b.kaynak.sekilId === "k1" && b.kaynak.yon === "sag" && b.hedef.sekilId === "k2", `porttan bağlayıcı kurulmadı: ${JSON.stringify(b)}`);
     dogrula(cikti.cizimVerisi.sekiller.find((s: any) => s.id === "k1").x === 100, "porttan sürükleme kütleyi taşıdı");
-    console.log("✓ v12-U: bağlantı portundan sürükleyerek bağlama");
+    console.log("✓ v12-U: bağlantı portundan sürükleyerek bağlama (Bağlayıcı aracı)");
+  }
+
+  // ——— 4b) Seç aracında eski port konumundan sürüklemek bağlayıcı çekmez; köşe tutamacı boyutlandırır ———
+  {
+    let cikti: any = null;
+    const belge: any = { surum: 1, genislik: 960, yukseklik: 600, sekiller: [
+      { id: "k1", tur: "fizik", nesne: "kutle", kalinlik: 2, x: 100, y: 100, w: 80, h: 60 },
+    ] };
+    await act(async () => root.render(<CizimEditoruModal key="k4b" baslangicBelgesi={belge} duzenlemeModu onClose={() => {}} onOlustur={(v) => { cikti = v; }} />));
+    await tikla(140, 100); // kenarından seç
+    await bekle();
+    await surukle(180, 130, 240, 130); // sağ kenar ortası (eski port): bağlayıcı DEĞİL, taşıma
+    await surukle(240, 160, 300, 160); // taşınan şeklin sağ-alt köşe tutamacı → boyutlandırma
+    await metinliTikla("Değişiklikleri Kaydet");
+    const sk = cikti.cizimVerisi.sekiller;
+    dogrula(!sk.some((x: any) => x.tur === "baglayici"), `Seç aracında sürükleme bağlayıcı çekti: ${JSON.stringify(sk)}`);
+    const k = sk.find((x: any) => x.id === "k1");
+    dogrula(k.x === 160 && k.w > 80, `taşıma + köşeden boyutlandırma beklenen gibi değil: ${JSON.stringify(k)}`);
+    console.log("✓ v12-U: Seç aracında kenar ortası sürükleme ok çekmez, köşe tutamacı boyutlandırır");
   }
 
   // ——— 5) Yüzen araç çubuğu: renk, çevir, 90°, çoğalt, sil ———
