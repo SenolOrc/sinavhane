@@ -793,7 +793,10 @@ export function GeoEkPaneli({ sekil, guncelle, tarihceyeKaydet }: {
         // Panel ızgarasında satır/sütun değişince de kutu yeni dizilime göre boyutlanır (hücreler ezilmesin).
         const panelDizilimiDegisti = eski === "panelIzgara" && g.yapi === "panelIzgara" && sekil.geo?.tur === "cografya"
           && (sekil.geo.ayar.satir !== g.ayar.satir || sekil.geo.ayar.sutun !== g.ayar.sutun);
-        if (eski !== g.yapi || panelDizilimiDegisti) { const b = cografyaKutuBoyutu(g); guncelle({ geo: g, w: b.w, h: b.h }); } else guncelle({ geo: g });
+        // Hesaplı grafiklerde (üçlü, Φ–t/ε–t) dizilim ya da grafik sayısı değişince de kutu yeniden boyutlanır.
+        const grafikDizilimiDegisti = eski === g.yapi && (g.yapi === "hareketUclu" || g.yapi === "akiEmk") && sekil.geo?.tur === "cografya"
+          && (sekil.geo.ayar.yerlesim !== g.ayar.yerlesim || sekil.geo.ayar.goster !== g.ayar.goster);
+        if (eski !== g.yapi || panelDizilimiDegisti || grafikDizilimiDegisti) { const b = cografyaKutuBoyutu(g); guncelle({ geo: g, w: b.w, h: b.h }); } else guncelle({ geo: g });
         return;
       }
       if (g.tur !== "katlama" || !g.yer) { guncelle({ geo: g }); return; }

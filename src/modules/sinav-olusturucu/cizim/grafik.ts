@@ -509,6 +509,11 @@ export type GrafikSablonu = {
   aramaKelimeleri?: string[];
 };
 
+/** Boş cevap grafiği: eğri yok, adlı eksenler, sabit pencere ve kare çizgileri (adım = kare boyu). */
+function bosGrafik(xEtiket: string, yEtiket: string, xMin: number, xMax: number, yMin: number, yMax: number, xAdim: number, yAdim: number, ek: Partial<GrafikVerisi> = {}): GrafikVerisi {
+  return { egriler: [], xEtiket, yEtiket, xMin, xMax, yMin, yMax, xAdim, yAdim, izgara: true, sayilar: "oto", ...ek };
+}
+
 export const GRAFIK_SABLONLARI: GrafikSablonu[] = [
   {
     id: "x-t-sabit",
@@ -537,6 +542,12 @@ export const GRAFIK_SABLONLARI: GrafikSablonu[] = [
   { id: "sin", ad: "Sinüs", ipucu: "y = A·sin(2πt/T). Genlik, periyot, faz panelden değişir", olustur: () => sinusGrafigi("sin", false) },
   { id: "cos", ad: "Kosinüs", ipucu: "y = A·cos(2πt/T)", olustur: () => sinusGrafigi("cos", false) },
   { id: "sin-pi", ad: "sin θ (π eksenli)", ipucu: "Yatay eksen radyan: π/2, π, 3π/2, 2π", olustur: () => sinusGrafigi("sin", true) },
+  // ── Boş cevap grafikleri (öğrencinin çizeceği kareli alan; eksenler adlı, eğri yok) ──
+  { id: "bos-xt", ad: "Boş x–t", ipucu: "Boş cevap grafiği: kareli, x (m) ve t (s) adlı eksenler, sayılı", olustur: () => bosGrafik("t (s)", "x (m)", 0, 8, 0, 6, 1, 1), aramaKelimeleri: ["boş grafik", "cevap alanı", "grafiğini çiziniz", "x-t", "konum zaman", "kareli"] },
+  { id: "bos-vt", ad: "Boş v–t (negatif bölgeli)", ipucu: "Boş cevap grafiği: yatay eksen ortada, v (m/s) artı ve eksi", olustur: () => bosGrafik("t (s)", "v (m/s)", 0, 8, -4, 6, 1, 2), aramaKelimeleri: ["boş grafik", "cevap alanı", "grafiğini çiziniz", "v-t", "hız zaman", "negatif", "kareli"] },
+  { id: "bos-at", ad: "Boş a–t (negatif bölgeli)", ipucu: "Boş cevap grafiği: yatay eksen ortada, a (m/s²) artı ve eksi", olustur: () => bosGrafik("t (s)", "a (m/s^2)", 0, 8, -4, 4, 1, 2), aramaKelimeleri: ["boş grafik", "cevap alanı", "grafiğini çiziniz", "a-t", "ivme zaman", "negatif", "kareli"] },
+  { id: "bos-sayisiz", ad: "Boş grafik (sayısız, yalnız 0)", ipucu: "Kareli boş alan; eksen sayıları yok, yalnız orijinde 0 (sayıları öğrenci yazar)", olustur: () => bosGrafik("t (s)", "x (m)", 0, 8, 0, 6, 1, 1, { sayilar: "yok", sifir: true }), aramaKelimeleri: ["boş grafik", "cevap alanı", "grafiğini çiziniz", "sayısız", "kareli", "sıfır"] },
+  { id: "bos-vi", ad: "Boş V–I", ipucu: "Boş cevap grafiği: I (A) yatay, V (V) düşey", olustur: () => bosGrafik("I (A)", "V (V)", 0, 6, 0, 6, 1, 1), aramaKelimeleri: ["boş grafik", "cevap alanı", "grafiğini çiziniz", "V-I", "ohm", "akım gerilim", "kareli"] },
   { id: "ozel", ad: "Noktalarla", ipucu: "Köşe noktalarını kendiniz yazın: 0,0; 4,20; 8,20; 10,0", olustur: () => varsayilanGrafik() },
 ];
 
@@ -1046,6 +1057,7 @@ export function grafikVerisiGecerliMi(v: unknown): v is GrafikVerisi {
   for (const a of ["xMin", "xMax", "yMin", "yMax", "xAdim", "yAdim"]) if (!secenek(g[a])) return false;
   if (g.kesisim !== undefined && typeof g.kesisim !== "boolean") return false;
   if (g.tepe !== undefined && typeof g.tepe !== "boolean") return false;
+  if (g.sifir !== undefined && typeof g.sifir !== "boolean") return false;
   if (g.sayilar !== undefined && !["oto", "kilavuz", "yok"].includes(String(g.sayilar))) return false;
   return g.egriler.every((e) => {
     if (!e || typeof e !== "object") return false;
@@ -1423,9 +1435,15 @@ export function grafikCiz(ctx: CanvasRenderingContext2D, s: FizikSekli) {
     }
     if (merkez0) {
       // Eksenin hemen altında bir y değeri (ör. −2) varsa "0" üstte durur; yoksa o değerin yazısını silerdi.
-      const yakin = ySayilari.some((Y) => Math.abs(Y) > 1e-9 && Math.abs(py(Y) - (ay + 13)) < 14);
-      haleliYaz(ctx, "0", ax - 8, yakin ? ay - 12 : ay + 13, "right");
+      // (Yazı yüksekliği ~13 px: 11 px'ten yakın bir sayı varsa "0" öbür tarafa geçer.)
+      // Yatay eksen ortadaysa (negatif bölge var) "0" sıradan bir y sayısı gibi eksenin hizasında, solda durur.
+      const yakin = ySayilari.some((Y) => Math.abs(Y) > 1e-9 && Math.abs(py(Y) - (ay + 13)) < 11);
+      if (d.yMin < -1e-9) haleliYaz(ctx, "0", ax - 8, ay, "right");
+      else haleliYaz(ctx, "0", ax - 8, yakin ? ay - 12 : ay + 13, "right");
     }
+  } else if (!sade && veri.sifir && Math.abs(eksenX) < 1e-9 && Math.abs(eksenY) < 1e-9) {
+    // Sayılar kapalı ama orijin "0" istenmiş (boş cevap grafiği).
+    haleliYaz(ctx, "0", ax - 8, d.yMin < -1e-9 ? ay : ay + 13, "right");
   }
 
   // 6) Eksen adları ve eğri etiketleri

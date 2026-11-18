@@ -10,7 +10,8 @@ export type FizikEkYapi =
   | "yolYer" | "bagilHareket" | "serbestDusme" | "stroboskop" | "hareketGrafigi"
   | "fotoelektrik" | "fotoGrafik" | "bozunma" | "basitMakine" | "vektorSerbest" | "kareliAlan" | "panelIzgara"
   | "kirilma" | "gorunurDerinlik" | "prizmaIsin" | "fiberOptik"
-  | "karmaDevre";
+  | "karmaDevre"
+  | "hareketUclu" | "ohmGrafik" | "surtunmeGrafik" | "akiEmk";
 
 type Sema = { ad: string; alt: string; alanlar: Alan[] };
 
@@ -541,6 +542,93 @@ export const FIZIK_EK_SEMA: Record<FizikEkYapi, Sema> = {
       { k: "mantik", a: "kokYaz", ad: "Köklü büyüklüğü √ ile yaz", v: false },
     ],
   },
+  // ── Hesaplı grafikler (ders kitabı biçimi; boş cevap grafiği için: "Boş grafik" şablonları)
+  hareketUclu: {
+    ad: "Hareket üçlüsü: x–t, v–t, a–t (etaplardan)", alt: "Fizik – Hareket",
+    alanlar: [
+      { k: "sec", a: "giris", ad: "Etap girişi", sec: [["ivme", "Süre + ivme"], ["hiz", "Süre + etap sonu hızı (v–t köşeleri)"]], v: "ivme" },
+      { k: "sayi", a: "n", ad: "Etap sayısı", min: 1, max: 6, adim: 1, v: 3 },
+      { k: "sayi", a: "x0", ad: "İlk konum x₀ (m)", min: -200, max: 200, adim: 1, v: 0 },
+      { k: "sayi", a: "v0", ad: "İlk hız v₀ (m/s)", min: -60, max: 60, adim: 1, v: 0 },
+      { k: "sayilar", a: "sure", ad: "Etap süreleri (s; 0 = etap yok)", n: 6, min: 0, max: 30, v: [4, 4, 2, 0, 0, 0] },
+      { k: "sayilar", a: "ivme", ad: "Etap ivmeleri (m/s²) — süre + ivme girişinde", n: 6, min: -30, max: 30, v: [5, 0, -10, 0, 0, 0] },
+      { k: "sayilar", a: "vson", ad: "Etap sonu hızları (m/s) — süre + hız girişinde", n: 6, min: -60, max: 60, v: [20, 20, 0, 0, 0, 0] },
+      { k: "sec", a: "goster", ad: "Gösterim (soru modu)", sec: [["hepsi", "Üç grafik de dolu"], ["x", "Yalnız x–t verilir; v–t ve a–t boş"], ["v", "Yalnız v–t verilir; x–t ve a–t boş"], ["a", "Yalnız a–t verilir; x–t ve v–t boş"]], v: "hepsi" },
+      { k: "sec", a: "yerlesim", ad: "Dizilim", sec: [["alt", "Alt alta (zaman eksenleri hizalı)"], ["yan", "Yan yana"]], v: "alt" },
+      { k: "sec", a: "sayilar", ad: "Zaman ekseni sayıları", sec: [["etap", "Etap sınırları"], ["adim", "Düzenli aralık"], ["yok", "Yok"]], v: "etap" },
+      { k: "mantik", a: "izgara", ad: "Kare çizgileri", v: false },
+      { k: "mantik", a: "kilavuz", ad: "Etap sınırlarında kesikli dikey kılavuz", v: true },
+      { k: "mantik", a: "nokta", ad: "Köşe noktaları (x–t, v–t)", v: false },
+      { k: "mantik", a: "alan", ad: "v–t: eğri altı alanı boya", v: false },
+      { k: "mantik", a: "bosSayi", ad: "Boş grafiklerde de düşey eksen sayıları", v: true },
+      { k: "mantik", a: "sifir", ad: "Orijine 0 yaz", v: true },
+      { k: "metin", a: "tAd", ad: "Yatay eksen adı", en: 30, v: "t (s)" },
+      { k: "metin", a: "xAd", ad: "Konum ekseni adı", en: 30, v: "x (m)" },
+      { k: "metin", a: "vAd", ad: "Hız ekseni adı", en: 30, v: "v (m/s)" },
+      { k: "metin", a: "aAd", ad: "İvme ekseni adı", en: 30, v: "a (m/s^2)" },
+    ],
+  },
+  ohmGrafik: {
+    ad: "V–I (Ohm) grafiği: dirençler ve lamba", alt: "Fizik – Elektrik",
+    alanlar: [
+      { k: "sayi", a: "n", ad: "Direnç sayısı", min: 1, max: 3, adim: 1, v: 2 },
+      { k: "sayilar", a: "R", ad: "Dirençler R₁, R₂, R₃ (Ω)", n: 3, min: 0.5, max: 1000, v: [2, 5, 10] },
+      { k: "sec", a: "lamba", ad: "Lamba (ohmik olmayan eğri)", sec: [["yok", "Yok"], ["ekle", "Dirençlerle birlikte"], ["yalniz", "Yalnız lamba"]], v: "yok" },
+      { k: "sayi", a: "Rl", ad: "Lamba: düşük akımdaki direnç (Ω)", min: 0.5, max: 1000, adim: 0.5, v: 4 },
+      { k: "sayi", a: "Imax", ad: "Akım ekseni sonu (A)", min: 0.5, max: 100, adim: 0.5, v: 4 },
+      { k: "sayi", a: "I0", ad: "Kılavuz noktası I₀ (A, 0 = kılavuz yok)", min: 0, max: 100, adim: 0.5, v: 2 },
+      { k: "sec", a: "eksen", ad: "Eksenler", sec: [["VI", "V düşey, I yatay (V–I)"], ["IV", "I düşey, V yatay (I–V)"]], v: "VI" },
+      { k: "mantik", a: "deger", ad: "Kılavuz değerlerini sayıyla yaz", v: false },
+      { k: "mantik", a: "rDeger", ad: "Çizgi adlarına R değerini yaz", v: false },
+      { k: "mantik", a: "eksenSayi", ad: "Eksen sayıları", v: false },
+      { k: "mantik", a: "izgara", ad: "Kare çizgileri", v: false },
+      { k: "metin", a: "iAd", ad: "Akım ekseni adı", en: 30, v: "I (A)" },
+      { k: "metin", a: "vAd", ad: "Gerilim ekseni adı", en: 30, v: "V (V)" },
+      { k: "metin", a: "rAd", ad: "Direnç harfi", en: 4, v: "R" },
+      { k: "metin", a: "lambaAd", ad: "Lamba yazısı", en: 12, v: "lamba" },
+    ],
+  },
+  surtunmeGrafik: {
+    ad: "Sürtünme kuvveti grafiği (F_s – F)", alt: "Fizik – Kuvvet",
+    alanlar: [
+      { k: "sayi", a: "fsmax", ad: "En büyük durgun sürtünme f_s,max (N)", min: 1, max: 500, adim: 1, v: 20 },
+      { k: "sayi", a: "fk", ad: "Kinetik sürtünme f_k (N; ≤ f_s,max)", min: 0, max: 500, adim: 1, v: 14 },
+      { k: "sayi", a: "uzat", ad: "F ekseni uzunluğu (f_s,max'ın katı)", min: 1.3, max: 3, adim: 0.1, v: 1.8 },
+      { k: "mantik", a: "etiket", ad: "\"durgun\" ve \"kinetik\" yazıları", v: true },
+      { k: "mantik", a: "kilavuz", ad: "Kesikli kılavuzlar ve eksen değerleri", v: true },
+      { k: "mantik", a: "deger", ad: "Değerleri sayıyla yaz", v: false },
+      { k: "mantik", a: "devam", ad: "f = F doğrusunu kesikli uzat", v: false },
+      { k: "mantik", a: "eksenSayi", ad: "Eksen sayıları", v: false },
+      { k: "mantik", a: "izgara", ad: "Kare çizgileri", v: false },
+      { k: "metin", a: "xAd", ad: "Yatay eksen adı", en: 30, v: "F (N)" },
+      { k: "metin", a: "yAd", ad: "Düşey eksen adı", en: 30, v: "F_s (N)" },
+      { k: "metin", a: "maxAd", ad: "En büyük durgun sürtünme yazısı", en: 12, v: "F_{s,max}" },
+      { k: "metin", a: "kAd", ad: "Kinetik sürtünme yazısı", en: 12, v: "F_k" },
+    ],
+  },
+  akiEmk: {
+    ad: "Manyetik akı ve indüksiyon emk'sı (Φ–t, ε–t)", alt: "Fizik – Manyetizma",
+    alanlar: [
+      { k: "sec", a: "goster", ad: "Gösterim", sec: [["ikisi", "Φ–t ve ε–t (ikisi dolu)"], ["aki", "Yalnız Φ–t"], ["emk", "Yalnız ε–t"], ["akiVerilir", "Φ–t verilir; ε–t boş (soru)"], ["emkVerilir", "ε–t verilir; Φ–t boş (soru)"]], v: "ikisi" },
+      { k: "sayi", a: "n", ad: "Etap sayısı", min: 1, max: 6, adim: 1, v: 4 },
+      { k: "sayi", a: "N", ad: "Sarım sayısı N", min: 1, max: 1000, adim: 1, v: 1 },
+      { k: "sayi", a: "phi0", ad: "Başlangıç akısı Φ₀", min: -100, max: 100, adim: 0.5, v: 0 },
+      { k: "sayilar", a: "sure", ad: "Etap süreleri (s; 0 = etap yok)", n: 6, min: 0, max: 30, v: [2, 2, 2, 2, 0, 0] },
+      { k: "sayilar", a: "phi", ad: "Etap sonu akıları Φ", n: 6, min: -100, max: 100, v: [6, 6, 0, 0, 0, 0] },
+      { k: "sec", a: "yerlesim", ad: "Dizilim", sec: [["alt", "Alt alta (t eksenleri hizalı)"], ["yan", "Yan yana"]], v: "alt" },
+      { k: "sec", a: "sayilar", ad: "Zaman ekseni sayıları", sec: [["etap", "Etap sınırları"], ["adim", "Düzenli aralık"], ["yok", "Yok"]], v: "etap" },
+      { k: "mantik", a: "kilavuz", ad: "Etap sınırlarında kesikli dikey kılavuz", v: true },
+      { k: "mantik", a: "izgara", ad: "Kare çizgileri", v: false },
+      { k: "mantik", a: "nokta", ad: "Φ–t köşe noktaları", v: false },
+      { k: "mantik", a: "deger", ad: "ε basamaklarının değerini yaz", v: false },
+      { k: "mantik", a: "dik", ad: "ε basamakları arasında kesikli sıçrama çizgisi", v: false },
+      { k: "mantik", a: "bosSayi", ad: "Boş grafikte de düşey eksen sayıları", v: true },
+      { k: "mantik", a: "sifir", ad: "Orijine 0 yaz", v: true },
+      { k: "metin", a: "tAd", ad: "Yatay eksen adı", en: 30, v: "t (s)" },
+      { k: "metin", a: "phiAd", ad: "Akı ekseni adı", en: 30, v: "Φ (Wb)" },
+      { k: "metin", a: "emkAd", ad: "emk ekseni adı", en: 30, v: "ε (V)" },
+    ],
+  },
   // ── Öğrenci cevap alanı: boş kareli alanlar
   kareliAlan: {
     ad: "Boş kareli alan (cevap/çizim alanı, 1–3 adet)", alt: "Fizik – Vektör",
@@ -580,4 +668,5 @@ export const FIZIK_EK_BOYUT: Record<FizikEkYapi, { w: number; h: number }> = {
   fotoelektrik: { w: 440, h: 250 }, fotoGrafik: { w: 400, h: 260 }, bozunma: { w: 450, h: 250 }, basitMakine: { w: 420, h: 260 }, vektorSerbest: { w: 340, h: 280 }, kareliAlan: { w: 540, h: 230 }, panelIzgara: { w: 540, h: 190 },
   kirilma: { w: 440, h: 270 }, gorunurDerinlik: { w: 420, h: 270 }, prizmaIsin: { w: 440, h: 270 }, fiberOptik: { w: 530, h: 200 },
   karmaDevre: { w: 460, h: 270 },
+  hareketUclu: { w: 400, h: 450 }, ohmGrafik: { w: 380, h: 250 }, surtunmeGrafik: { w: 380, h: 250 }, akiEmk: { w: 400, h: 380 },
 };

@@ -878,6 +878,7 @@ export function GrafikSecimPaneli({ sekil, guncelle, tarihceyeKaydet, onUcluEkle
         {([["oto", "Düzenli"], ["kilavuz", "Yalnız köşe değerleri"], ["yok", "Yok"]] as const).map(([id, ad]) => (
           <TogglePill key={id} aktif={sayilar === id} onClick={() => { tarihceyeKaydet(); yaz({ sayilar: id }); }}>{ad}</TogglePill>
         ))}
+        <TogglePill aktif={!!veri.sifir} onClick={() => { tarihceyeKaydet(); yaz({ sifir: !veri.sifir }); }}>Sayılar yokken orijine 0 yaz</TogglePill>
       </div>
     </div>
   );

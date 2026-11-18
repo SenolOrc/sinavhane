@@ -7,6 +7,7 @@ import { horstGrabenCiz, kivrimCiz } from "./jeoloji";
 import { fizikSekilCiz } from "./fizikCiz";
 import { FIZIK_BOYUTLARI } from "./fizikSema";
 import { panelBoyutu } from "./panelIzgara";
+import { grafikKutuBoyutu } from "./fizikCizGrafik";
 import type { CografyaVerisi } from "./sema";
 
 export * from "./sema";
@@ -38,5 +39,6 @@ export const COGRAFYA_BOYUTLARI: Record<CografyaVerisi["yapi"], { w: number; h: 
 
 /** Verinin önerilen kutu boyutu: panel ızgarası satır/sütuna göre, diğerleri yapı tablosundan. */
 export function cografyaKutuBoyutu(v: CografyaVerisi): { w: number; h: number } {
-  return v.yapi === "panelIzgara" ? panelBoyutu(v) : COGRAFYA_BOYUTLARI[v.yapi];
+  if (v.yapi === "panelIzgara") return panelBoyutu(v);
+  return grafikKutuBoyutu(v) ?? COGRAFYA_BOYUTLARI[v.yapi];
 }

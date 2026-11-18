@@ -457,6 +457,8 @@ export type GrafikVerisi = {
   sayilar?: "oto" | "kilavuz" | "yok";
   /** Yatay eksen radyan: sayılar π katı olarak yazılır (π/2, π, 3π/2…). */
   piEksen?: boolean;
+  /** Eksen sayıları kapalıyken de orijine "0" yaz (boş cevap grafiği: yalnız adlı eksenler ve 0). */
+  sifir?: boolean;
   /** Önizleme/simge: yazısız, sade çizim. */
   sade?: boolean;
 };

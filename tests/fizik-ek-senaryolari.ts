@@ -10,6 +10,8 @@ import { vektorlerHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/f
 import { fotoHesap, bozunmaHesap, makineHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizModern";
 import { kirilmaHesap, derinlikHesap, prizmaHesap, fiberHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizOptik";
 import { devreAyristir, devreModeli, devreHesapla, devreDuzenle, devreOzet, degerleriOku, yapraklar } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizDevre";
+import { ucluHesap, akiHesap, ohmHesap, surtunmeHesap, lambaV, ekBul, gSayi } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizGrafik";
+import { hareketParcalari, GRAFIK_SABLONLARI, grafikCiz } from "../src/modules/sinav-olusturucu/cizim/grafik";
 import { atmaYuksekligi, dalgaHesap, rezonansHesap } from "../src/modules/sinav-olusturucu/cizim/cografya/fizikCizDalga";
 
 function dogrula(k: unknown, m: string) { if (!k) { console.error("✗ " + m); process.exit(1); } }
@@ -436,6 +438,106 @@ senaryo("Karma devre: yerleşim (dik tel, çakışmasız elemanlar, kutuya sığ
   dogrula(mürekkep(dv({ soru: false })) > mürekkep(dv({ soru: true })), "soru modunda değerler çizilmez");
   dogrula(cografyaGecerliMi({ tur: "cografya", yapi: "karmaDevre", ayar: { ifade: "R1+(R2//R3)", V: 12 } }), "geçerli ayar");
   dogrula(!cografyaGecerliMi({ tur: "cografya", yapi: "karmaDevre", ayar: { V: 999 } }), "V sınırı");
+});
+
+// ── Hesaplı grafikler: hareket üçlüsü, V–I, sürtünme, Φ–t / ε–t
+senaryo("Hareket üçlüsü: v, x'in türevi; a, v'nin eğimi; süresi 0 olan etap atlanır", () => {
+  const v = ayar("hareketUclu", { n: 4, x0: 3, v0: 2, sure: [4, 0, 4, 2, 0, 0], ivme: [3, 99, -2, 0, 0, 0] });
+  const h = ucluHesap(v);
+  dogrula(h.etaplar.length === 3 && yakin(h.T, 10), "0 süreli etap atlanmalı");
+  const xp = hareketParcalari("konum", h.x0, h.v0, h.evreler)[0], vp = hareketParcalari("hiz", h.x0, h.v0, h.evreler)[0], ap = hareketParcalari("ivme", h.x0, h.v0, h.evreler);
+  dogrula(ap.length === 3 && yakin(ap[0][0].y, 3) && yakin(ap[1][0].y, -2) && yakin(ap[2][0].y, 0), "a = etap ivmesi");
+  for (let i = 1; i < vp.length; i++) dogrula(yakin((vp[i].y - vp[i - 1].y) / (vp[i].x - vp[i - 1].x), ap[i - 1][0].y), "a = v eğimi");
+  // x'in sayısal türevi v'ye eşit (örneklenen parabol noktalarında)
+  for (let i = 1; i < xp.length - 1; i++) {
+    const hv = (xp[i + 1].y - xp[i - 1].y) / (xp[i + 1].x - xp[i - 1].x);
+    const t = xp[i].x, ev = vp.length > 1 ? vp.reduce((a, b, j) => (j && vp[j - 1].x <= t && t <= b.x ? vp[j - 1].y + ((b.y - vp[j - 1].y) * (t - vp[j - 1].x)) / (b.x - vp[j - 1].x) : a), NaN) : NaN;
+    if (Number.isFinite(ev)) dogrula(Math.abs(hv - ev) < 0.4, `x'=v t=${t.toFixed(2)}: ${hv} vs ${ev}`);
+  }
+  dogrula(yakin(xp[xp.length - 1].y, h.xSon, 1e-6) && yakin(h.vSon, 2 + 12 - 8 + 0), "uç değerler");
+  dogrula(yakin(h.yer, h.xSon - 3), "yer değiştirme");
+});
+senaryo("Hareket üçlüsü: hız girişinde ivme = Δv/Δt; geri dönüşte yol > yer değiştirme", () => {
+  const h = ucluHesap(ayar("hareketUclu", { giris: "hiz", n: 3, sure: [2, 2, 2, 0, 0, 0], vson: [8, 0, -4, 0, 0, 0], v0: 0 }));
+  dogrula(yakin(h.etaplar[0].ivme, 4) && yakin(h.etaplar[1].ivme, -4) && yakin(h.etaplar[2].ivme, -2), "ivmeler");
+  dogrula(yakin(h.vSon, -4) && yakin(h.yer, 8 + 8 - 4) && yakin(h.yol, 8 + 8 + 4), `yer ${h.yer} yol ${h.yol}`);
+  const g = ucluHesap(ayar("hareketUclu", { n: 1, v0: 10, sure: [4, 0, 0, 0, 0, 0], ivme: [-5, 0, 0, 0, 0, 0] }));
+  dogrula(yakin(g.vSon, -10) && yakin(g.yer, 0) && yakin(g.yol, 20), "dönüş: 10 m ileri, 10 m geri");
+  const o = fizikHesapOzeti(ayar("hareketUclu", {}));
+  dogrula(o && o.includes("1. etap") && o.includes("a = 5 m/s²"), "özet: " + o);
+});
+senaryo("Hareket üçlüsü: soru modunda iki grafik boş; kenar durumlar çizilir", () => {
+  const dolu = mürekkep(ayar("hareketUclu", { goster: "hepsi" })), bir = mürekkep(ayar("hareketUclu", { goster: "x" })), uc = mürekkep(ayar("hareketUclu", { goster: "a", bosSayi: false }));
+  dogrula(dolu > bir && bir > 1500 && uc > 800, `soru modu mürekkebi ${dolu} ${bir} ${uc}`);
+  const durumlar: Record<string, number | boolean | string | number[]>[] = [
+    { sure: [0, 0, 0, 0, 0, 0] }, { ivme: [0, 0, 0, 0, 0, 0], v0: 0, x0: 0 }, { n: 6, sure: [1, 2, 3, 1, 2, 3], ivme: [30, -30, 30, -30, 30, -30], v0: -60, x0: -200 },
+    { n: 6, sure: [30, 30, 30, 30, 30, 30], ivme: [1, 1, 1, 1, 1, 1] }, { giris: "hiz", n: 6, sure: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1], vson: [60, -60, 60, -60, 60, -60] },
+    { yerlesim: "yan", sayilar: "adim" }, { sayilar: "yok", sifir: false }, { tAd: "zaman t (saniye cinsinden)", xAd: "konum x (kilometre cinsinden)" },
+  ];
+  for (const d of durumlar) { const n = mürekkep(ayar("hareketUclu", d)); dogrula(n > 300, "çizim boş: " + JSON.stringify(d)); dogrula(cografyaGecerliMi(ayar("hareketUclu", d) as unknown as Record<string, unknown>), "geçerli: " + JSON.stringify(d)); }
+  dogrula(!cografyaGecerliMi({ tur: "cografya", yapi: "hareketUclu", ayar: { n: 9 } }), "etap sınırı");
+  dogrula(fizikHesapOzeti(ayar("hareketUclu", { sure: [0, 0, 0, 0, 0, 0] }))!.includes("boş"), "boş özet");
+});
+senaryo("V–I: R eğimi, lamba doğrusal değil, kılavuz değerleri", () => {
+  const h = ohmHesap(ayar("ohmGrafik", { n: 3, R: [2, 4, 8], I0: 2 }));
+  dogrula(h.n === 3 && yakin(h.Vler[0], 4) && yakin(h.Vler[1], 8) && yakin(h.Vler[2], 16), "V = R·I₀");
+  dogrula(ohmHesap(ayar("ohmGrafik", { n: 2, R: [2, 4, 8] })).R.length === 2, "n direnç");
+  const a = lambaV(1, 4, 4), b = lambaV(2, 4, 4), c = lambaV(4, 4, 4);
+  dogrula(b > a && c > b && c / 4 > a / 1 * 1.2 && yakin(lambaV(0, 4, 4), 0), "lamba: R artar, V(0)=0");
+  const l = ohmHesap(ayar("ohmGrafik", { lamba: "yalniz" }));
+  dogrula(l.n === 0 && l.lambaVar, "yalnız lamba");
+  const o = fizikHesapOzeti(ayar("ohmGrafik", { n: 2, R: [2, 5, 10], I0: 2 }));
+  dogrula(o && o.includes("R1 = 2 Ω → V = 4 V") && o.includes("R2 = 5 Ω → V = 10 V"), "özet: " + o);
+  for (const d of [{ lamba: "ekle" }, { lamba: "yalniz", I0: 0 }, { eksen: "IV", n: 3, deger: true, rDeger: true }, { R: [1000, 1000, 1000], Imax: 100, I0: 100 }, { R: [0.5, 1000, 0.5], n: 3 }, { I0: 0, eksenSayi: true, izgara: true }, { R: [5, 5, 5], n: 3 }, { iAd: "akım şiddeti I (amper)", vAd: "potansiyel fark V (volt)", n: 3, deger: true }]) {
+    dogrula(mürekkep(ayar("ohmGrafik", d as never)) > 600, "V–I çizimi: " + JSON.stringify(d));
+  }
+  dogrula(mürekkep(ayar("ohmGrafik", { I0: 2 })) > mürekkep(ayar("ohmGrafik", { I0: 0 })), "kılavuz çizgi ekler");
+});
+senaryo("Sürtünme grafiği: f_s,max ve kinetik", () => {
+  const h = surtunmeHesap(ayar("surtunmeGrafik", { fsmax: 20, fk: 14 }));
+  dogrula(yakin(h.fsmax, 20) && yakin(h.fk, 14) && yakin(h.mu, 0.7), "değerler");
+  dogrula(yakin(surtunmeHesap(ayar("surtunmeGrafik", { fsmax: 10, fk: 30 })).fk, 10), "f_k ≤ f_s,max kırpılır");
+  const o = fizikHesapOzeti(ayar("surtunmeGrafik", {}));
+  dogrula(o && o.includes("20 N") && o.includes("14 N"), "özet: " + o);
+  for (const d of [{ fk: 0 }, { fk: 20 }, { fsmax: 500, fk: 499 }, { fsmax: 1, fk: 1 }, { etiket: false, kilavuz: false }, { deger: true, devam: true, eksenSayi: true, izgara: true }, { fsmax: 100, fk: 98, deger: true }]) {
+    dogrula(mürekkep(ayar("surtunmeGrafik", d as never)) > 500, "sürtünme çizimi: " + JSON.stringify(d));
+  }
+  dogrula(mürekkep(ayar("surtunmeGrafik", { etiket: true })) > mürekkep(ayar("surtunmeGrafik", { etiket: false })), "durgun/kinetik yazıları");
+});
+senaryo("Φ–t ve ε–t: ε = −N·ΔΦ/Δt, işaret ve sıfır", () => {
+  const h = akiHesap(ayar("akiEmk", { N: 1, n: 4, sure: [2, 2, 2, 2, 0, 0], phi: [6, 6, 0, 0, 0, 0] }));
+  dogrula(h.etaplar.length === 4 && yakin(h.etaplar[0].emk, -3) && yakin(h.etaplar[1].emk, 0) && yakin(h.etaplar[2].emk, 3) && yakin(h.etaplar[3].emk, 0), "ε basamakları " + h.etaplar.map((e) => e.emk));
+  const n = akiHesap(ayar("akiEmk", { N: 50, n: 1, phi0: 0.1, sure: [0.5, 0, 0, 0, 0, 0], phi: [0.4, 0, 0, 0, 0, 0] }));
+  dogrula(yakin(n.etaplar[0].emk, -30, 1e-6), "N=50: ε = −50·0,3/0,5 = −30, bulunan " + n.etaplar[0].emk);
+  const z = akiHesap(ayar("akiEmk", { n: 3, sure: [2, 0, 2, 0, 0, 0], phi: [4, 99, 0, 0, 0, 0] }));
+  dogrula(z.etaplar.length === 2 && yakin(z.etaplar[1].phi0, 4) && yakin(z.etaplar[1].emk, 2), "0 süreli etap atlanır, akı sürekli");
+  const o = fizikHesapOzeti(ayar("akiEmk", {}));
+  dogrula(o && o.includes("ε = −ΔΦ/Δt = −3") && o.includes("Lenz"), "özet: " + o);
+  const hepsi = mürekkep(ayar("akiEmk", { goster: "ikisi" })), soru = mürekkep(ayar("akiEmk", { goster: "akiVerilir" })), tek = mürekkep(ayar("akiEmk", { goster: "emk" }));
+  dogrula(hepsi > soru && soru > 800 && tek > 400, `gösterim kipleri ${hepsi} ${soru} ${tek}`);
+  for (const d of [{ sure: [0, 0, 0, 0, 0, 0] }, { phi: [0, 0, 0, 0, 0, 0], phi0: 0 }, { n: 6, sure: [1, 1, 1, 1, 1, 1], phi: [100, -100, 100, -100, 100, -100], phi0: -100 }, { yerlesim: "yan", goster: "aki" }, { goster: "emkVerilir", deger: true, dik: true, nokta: true, izgara: true }, { N: 1000, sure: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5], n: 6 }, { phiAd: "manyetik akı Φ (weber cins.)", emkAd: "indüksiyon emk'sı ε (volt)" }]) {
+    dogrula(mürekkep(ayar("akiEmk", d as never)) > 300, "Φ–t çizimi: " + JSON.stringify(d));
+  }
+});
+senaryo("Boş cevap grafikleri (genel grafik): eğri yok, eksenler ve kareler var; 0 ve sayılar ayarlanır", () => {
+  const bos = GRAFIK_SABLONLARI.filter((x) => x.id.startsWith("bos-"));
+  dogrula(bos.length >= 5, "boş şablonlar");
+  const ink = (g: ReturnType<typeof bos[0]["olustur"]>) => {
+    const c = createCanvas(420, 260); const x = c.getContext("2d") as unknown as CanvasRenderingContext2D;
+    x.fillStyle = "#fff"; x.fillRect(0, 0, 420, 260); x.strokeStyle = "#0f172a"; x.fillStyle = "#0f172a";
+    grafikCiz(x, { id: "g", tur: "fizik", nesne: "grafik", kalinlik: 2, x: 80, y: 60, w: 250, h: 140, grafik: g } as never);
+    const d = x.getImageData(0, 0, 420, 260).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 200) n++; return n;
+  };
+  for (const b of bos) { const g = b.olustur(); dogrula(g.egriler.length === 0 && g.izgara === true && g.yEtiket && g.xEtiket, b.id + ": eğrisiz kareli"); dogrula(ink(g) > 500, b.id + ": boş değil"); }
+  const sayisiz = bos.find((x) => x.id === "bos-sayisiz")!.olustur();
+  dogrula(ink({ ...sayisiz, sifir: true }) > ink({ ...sayisiz, sifir: false }), "orijin 0 yazısı");
+  dogrula(ink(bos.find((x) => x.id === "bos-xt")!.olustur()) > ink(sayisiz), "sayılar yazılır");
+  dogrula(bos.find((x) => x.id === "bos-vt")!.olustur().yMin! < 0, "negatif bölge");
+});
+senaryo("Sayı biçimi ve eksen aralığı yardımcıları", () => {
+  dogrula(gSayi(-1.5) === "−1,5" && gSayi(-0.001) === "0" && gSayi(0.25) === "0,25", "Türkçe ondalık, −");
+  const e = ekBul(-3, 6); dogrula(e.lo <= -3 && e.hi >= 6 && e.adim > 0, "aralık kapsar");
+  dogrula(ekBul(0, 0).lo === -1 && ekBul(0, 0).hi === 1, "hepsi sıfır");
 });
 // <<PAKET-EK-TEST>>
 
