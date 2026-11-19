@@ -1,6 +1,6 @@
 # Sınav Oluşturucu
 
-Sınavhane'nin tek modülü: yazılı kâğıdı hazırlama akışı (A4 önizleme, çizim editörü, denklem editörü,
+Sınavhane Fizik'in tek modülü (gizli dersler için bkz. `odak.ts`): yazılı kâğıdı hazırlama akışı (A4 önizleme, çizim editörü, denklem editörü,
 OCR, Sınavlarım kütüphanesi, parolalı sınav dosyası, yazdır / PDF).
 
 ## Çizim editörü (v1.2): öğretmen dostu arayüz

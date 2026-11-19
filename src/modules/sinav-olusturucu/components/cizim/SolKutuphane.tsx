@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { ChevronDown, ChevronRight, Search, X } from "lucide-react";
 
 import {
-  KUTUPHANE_KATEGORILERI,
+  kutuphaneKategorileri,
   aramaOnerileri,
   kutuphaneAra,
   type KutuphaneGirdisi,
@@ -18,11 +18,12 @@ import {
 import { fizikDisPayi, fizikSimgeCiz } from "../../cizim/fizik";
 import { sekilleriCiz } from "../../cizim/ciz";
 import { sekilTamKutusu } from "../../cizim/sinirlar";
+import { varsayilanAcikKategoriler } from "../../odak";
 import type { Sekil } from "../../cizim/tipler";
 
 const ONIZLEME_W = 112;
 const ONIZLEME_H = 64;
-const ACIK_KATEGORI_ANAHTARI = "sinavhane:cizim-kutuphane-acik:v1";
+const ACIK_KATEGORI_ANAHTARI = "sinavhane:cizim-kutuphane-acik:v2";
 
 /**
  * Şekilleri, kutuları kartın iki katı büyüklükte bir taslak tuvalin ortasına
@@ -192,9 +193,9 @@ export function SolKutuphane({
     try {
       const k = window.localStorage.getItem(ACIK_KATEGORI_ANAHTARI);
       const v: unknown = k ? JSON.parse(k) : null;
-      if (Array.isArray(v)) return v.filter((x): x is KutuphaneKategorisi => KUTUPHANE_KATEGORILERI.some((c) => c.id === x));
+      if (Array.isArray(v)) return v.filter((x): x is KutuphaneKategorisi => kutuphaneKategorileri().some((c) => c.id === x));
     } catch { /* tarayıcı depolaması kapalı olabilir */ }
-    return [];
+    return varsayilanAcikKategoriler().filter((x): x is KutuphaneKategorisi => kutuphaneKategorileri().some((c) => c.id === x));
   });
   const [ekAcik, setEkAcik] = useState<KutuphaneKategorisi | null>(null);
   useEffect(() => {
@@ -217,8 +218,8 @@ export function SolKutuphane({
             aria-label="Şekil veya şablon ara"
             value={arama}
             onChange={(e) => setArama(e.target.value)}
-            placeholder="Ara: makara, parabol, beher…"
-            title="Şekil veya şablon ara... ör. makara, parabol, dik üçgen, beher, venn"
+            placeholder="Ara: makara, mercek…"
+            title="Şekil veya şablon ara... ör. makara, eğik düzlem, mercek, parabol, dik üçgen"
             className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-9 text-sm [&::-webkit-search-cancel-button]:hidden text-slate-700 outline-none placeholder:text-slate-400 focus:border-brand-400 focus:bg-white"
           />
           {arama && (
@@ -245,12 +246,12 @@ export function SolKutuphane({
             </div>
           ) : (
             <p className="px-2 py-6 text-center text-sm text-slate-500">
-              “{arama}” için şekil bulunamadı. Başka bir sözcük deneyin; ör. <b>eğik düzlem</b>, <b>beher</b>, <b>y = x^2</b>.
+              “{arama}” için şekil bulunamadı. Başka bir sözcük deneyin; ör. <b>eğik düzlem</b>, <b>mercek</b>, <b>y = x^2</b>.
             </p>
           )
         ) : (
           <div className="flex flex-col gap-1">
-            {KUTUPHANE_KATEGORILERI.map((k) => {
+            {kutuphaneKategorileri().map((k) => {
               const liste = kategoriGirdileri(k.id);
               const ek = ekBolumler[k.id];
               if (!liste.length && !ek && k.id !== "sablonlarim") return null;

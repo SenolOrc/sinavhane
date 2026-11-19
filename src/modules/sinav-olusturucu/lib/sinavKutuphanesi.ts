@@ -20,6 +20,7 @@ import {
   sinavIcerigiOku,
 } from "../storage/taslakDepo";
 import { SATIR_MM } from "../constants";
+import { VARSAYILAN_DERS } from "../odak";
 import type { SinavTaslagi } from "../types";
 import { mantiksalSoruGruplari } from "../utils";
 import { okulProfiliOku } from "@/lib/useEokulProfil";
@@ -131,7 +132,7 @@ export function bosSinavTaslagiOlustur(): SinavTaslagi {
       sinifSeviyesi: "",
       donem: "",
       yaziliNo: "",
-      ders: "",
+      ders: VARSAYILAN_DERS,
       tarih: "",
       sureDakika: "",
     },

@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { FilePlus2, FolderOpen } from "lucide-react";
 import { GeriAlToast } from "@/components/GeriAlToast";
+import { URUN_ADI } from "@/modules/sinav-olusturucu/odak";
 
 const baglanti = ({ isActive }: { isActive: boolean }) =>
   `inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition ${
@@ -12,7 +13,7 @@ export function Layout() {
   return (
     <div className="flex h-full flex-col bg-slate-50">
       <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-2 print:hidden">
-        <span className="text-sm font-extrabold tracking-tight text-slate-800">Sınavhane</span>
+        <span className="text-sm font-extrabold tracking-tight text-slate-800">{URUN_ADI}</span>
         <nav className="ml-4 flex gap-1" aria-label="Ana gezinme">
           <NavLink to="/sinav-olusturucu" end className={baglanti}><FilePlus2 size={16} /> Sınav Hazırla</NavLink>
           <NavLink to="/sinav-olusturucu/sinavlarim" className={baglanti}><FolderOpen size={16} /> Sınavlarım</NavLink>

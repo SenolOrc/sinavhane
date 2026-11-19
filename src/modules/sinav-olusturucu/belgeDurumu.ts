@@ -6,6 +6,7 @@ import {
 } from "./constants";
 import type { SinavGecmisDurumu } from "./history";
 import type { BaslikBilgileri, SinavTaslagi, SoruOgesi } from "./types";
+import { VARSAYILAN_DERS } from "./odak";
 import { sayiSinirla } from "./utils";
 
 /**
@@ -126,7 +127,7 @@ export function bosBelgeDurumu(): SinavBelgeDurumu {
       sinifSeviyesi: "",
       donem: "",
       yaziliNo: "",
-      ders: "",
+      ders: VARSAYILAN_DERS,
       tarih: "",
       sureDakika: "",
       logoDataUrl: undefined,

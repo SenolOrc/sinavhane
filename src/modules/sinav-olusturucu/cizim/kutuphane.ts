@@ -10,6 +10,8 @@
 
 import { aramaIcinKucult } from "@/lib/turkceMetin";
 
+import { TUM_KATEGORILER, egriGizliMi, kartGorunurMu, sunulanKategoriler } from "../odak";
+
 import { FIZIK_GRUPLARI, FIZIK_TANIMLARI } from "./fizik";
 import {
   GRAFIK_SABLONLARI,
@@ -55,16 +57,12 @@ type FizikSekli = Extract<Sekil, { tur: "fizik" }>;
 export type KutuphaneKategorisi =
   | "sahne" | "geometri" | "matematik" | "istatistik" | "fizik" | "kimya" | "akis" | "sablonlarim";
 
-export const KUTUPHANE_KATEGORILERI: { id: KutuphaneKategorisi; ad: string }[] = [
-  { id: "sahne", ad: "Hazır Soru Sahneleri" },
-  { id: "geometri", ad: "Geometri" },
-  { id: "matematik", ad: "Matematik & Grafik" },
-  { id: "istatistik", ad: "İstatistik & Şema" },
-  { id: "fizik", ad: "Fizik" },
-  { id: "kimya", ad: "Kimya" },
-  { id: "akis", ad: "Akış Şeması" },
-  { id: "sablonlarim", ad: "Şablonlarım" },
-];
+/**
+ * Kütüphanede SUNULAN kategoriler (sıralı). Hangi derslerin görüneceği tek
+ * yerde, `../odak.ts`'te belirlenir ("Sınavhane Fizik": kimya ve akış şeması yok).
+ */
+export const kutuphaneKategorileri = (): { id: KutuphaneKategorisi; ad: string }[] =>
+  sunulanKategoriler() as { id: KutuphaneKategorisi; ad: string }[];
 
 // ── Girdi biçimi ───────────────────────────────────────────────────────────
 
@@ -135,7 +133,7 @@ export function kutuphaneAramaAnahtari(metin: string): string {
 export function kutuphaneAra(girdiler: KutuphaneGirdisi[], sorgu: string): KutuphaneGirdisi[] {
   const sozcukler = kutuphaneAramaAnahtari(sorgu).split(" ").filter(Boolean);
   if (!sozcukler.length) return girdiler;
-  const kategoriAdi = new Map(KUTUPHANE_KATEGORILERI.map((k) => [k.id, k.ad]));
+  const kategoriAdi = new Map([...TUM_KATEGORILER, ...sunulanKategoriler()].map((k) => [k.id, k.ad]));
   const puanli: { g: KutuphaneGirdisi; puan: number; sira: number }[] = [];
   girdiler.forEach((g, sira) => {
     const ad = kutuphaneAramaAnahtari(g.ad);
@@ -274,7 +272,13 @@ const SABLONLU_NESNELER: string[] = ["grafik", "istatistik", "sema", "kimya"];
  * Kütüphanedeki tüm girdiler (sıralı: kategori sırası, sonra kayıt sırası).
  * Saf: aynı kayıtlarla aynı listeyi verir; `ekle()` her çağrıda yeni veri üretir.
  */
-export function kutuphaneGirdileri(kullaniciSablonlari: KullaniciSablonu[] = []): KutuphaneGirdisi[] {
+export function kutuphaneGirdileri(kullaniciSablonlari: KullaniciSablonu[] = [], secenek: { gizlilikYok?: boolean } = {}): KutuphaneGirdisi[] {
+  const tum = tumGirdiler(kullaniciSablonlari);
+  // Gizli dersler/şekiller listeye girmez (kayıtlı sınavlardaki şekiller etkilenmez).
+  return secenek.gizlilikYok ? tum : tum.filter((g) => g.kategori === "sablonlarim" || kartGorunurMu(g));
+}
+
+function tumGirdiler(kullaniciSablonlari: KullaniciSablonu[]): KutuphaneGirdisi[] {
   const liste: KutuphaneGirdisi[] = [];
   const grupAdi = new Map(FIZIK_GRUPLARI.map((g) => [g.id as string, g.ad]));
 
@@ -494,7 +498,9 @@ export function aramaOnerileri(sorgu: string): KutuphaneGirdisi[] {
   // Matematik ifadesi: içinde x, =, ^ ya da ( olmalı; düz sözcükleri ("makara") denemeyiz.
   if (/[=^<>()]|\bx\b|\d\s*x|sin|cos|tan|log|kok|√/i.test(s)) {
     const r = hizliMatematik(s);
-    if ("veri" in r) {
+    // Gizli eğri türleri (eşitsizlik bölgesi, konik denklemi) öneri olarak sunulmaz.
+    const gizli = "veri" in r && r.veri.egriler.some((e) => egriGizliMi(e.tur));
+    if ("veri" in r && !gizli) {
       const veri = r.veri;
       oneriler.push({
         id: "yaz:fonksiyon", ad: `Çiz: ${s}`, kategori: "matematik", altBaslik: "Yazarak çiz", ipucu: "Yazdığınız ifadenin grafiği",

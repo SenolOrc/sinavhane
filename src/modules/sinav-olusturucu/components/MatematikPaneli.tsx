@@ -71,6 +71,7 @@ import type { AgacDali, GrafikVerisi, IsaretKoku, IstatistikVerisi, SemaVerisi, 
 import { MetinOlarakYapistir, MiniTablo, type MiniTabloOlayi } from "./MiniTablo";
 import { HIZLI_FONKSIYON_ORNEKLERI, MetinGirdisi, OndalikGirdisi, OrnekCipleri, okunurHata } from "./GrafikPaneli";
 import { TogglePill } from "./ModalParcalari";
+import { kartGorunurMu, seritSekmesiGorunurMu, yazarakOrnegiGizliMi } from "../odak";
 
 type FizikSekliTipi = Extract<Sekil, { tur: "fizik" }>;
 
@@ -141,7 +142,7 @@ export function MatematikSeridi({ onGrafik, onIstatistik, onSema }: {
   return (
     <div className="flex w-full flex-wrap gap-1.5" data-testid="matematik-seridi">
       <div className="flex w-full items-center gap-1.5">
-        {([["fonksiyon", "Fonksiyon"], ["istatistik", "İstatistik"], ["sema", "Şema"]] as const).map(([id, ad]) => (
+        {([["fonksiyon", "Fonksiyon"], ["istatistik", "İstatistik"], ["sema", "Şema"]] as const).filter(([id]) => seritSekmesiGorunurMu(id)).map(([id, ad]) => (
           <TogglePill key={id} aktif={sekme === id} onClick={() => setSekme(id)}>{ad}</TogglePill>
         ))}
         <span className="text-[10px] text-slate-500">
@@ -162,26 +163,26 @@ export function MatematikSeridi({ onGrafik, onIstatistik, onSema }: {
             className={`min-w-[16rem] flex-1 rounded-md border bg-white px-2 py-1 font-mono text-[11px] ${hata ? "border-red-400" : "border-slate-300"}`}
           />
           <button type="button" disabled={!sonuc || !!hata} onClick={ciz} className={`${DUGME} font-bold`}>Çiz</button>
-          <OrnekCipleri ornekler={HIZLI_FONKSIYON_ORNEKLERI.map((o) => ({ ad: o.ad, deger: o.ifade, ipucu: o.ipucu }))} onSec={(m) => { setMetin(m); girdiRef.current?.focus(); }} etiket="Tek tıkla örnek" />
+          <OrnekCipleri ornekler={HIZLI_FONKSIYON_ORNEKLERI.filter((o) => !yazarakOrnegiGizliMi(o.ad)).map((o) => ({ ad: o.ad, deger: o.ifade, ipucu: o.ipucu }))} onSec={(m) => { setMetin(m); girdiRef.current?.focus(); }} etiket="Tek tıkla örnek" />
           <span className={`w-full text-[10px] ${hata ? "text-red-600" : "text-slate-500"}`} role={hata ? "alert" : undefined}>
-            {hata ? okunurHata(hata) : "Örneğe tıklayıp değiştirin ya da yazın, Enter ile çizin. Birden fazla ifade ; ile ayrılır. > < >= <= yazarsanız bölge boyanır. Çember/elips: x^2+y^2=25. Alan: alan(x, x^2, 0, 1). Teğet: teget(x^2, 1). Kesişim noktaları: kesisim. Parçalı: {x<0: -x, x>=0: x^2} (açık/kapalı uç otomatik). Adlı nokta: A(2,3) ; F1(-3,0). Birden çok eğri düz/kesikli/noktalı çizgiyle ayrılır; sin/cos yazarsanız x ekseni π katlarıyla gelir."}
+            {hata ? okunurHata(hata) : "Örneğe tıklayıp değiştirin ya da yazın, Enter ile çizin. Birden fazla ifade ; ile ayrılır. Alan: alan(x, x^2, 0, 1). Teğet: teget(x^2, 1). Kesişim noktaları: kesisim. Parçalı: {x<0: -x, x>=0: x^2} (açık/kapalı uç otomatik). Adlı nokta: A(2,3) ; F1(-3,0). Birden çok eğri düz/kesikli/noktalı çizgiyle ayrılır; sin/cos yazarsanız x ekseni π katlarıyla gelir."}
           </span>
         </div>
       )}
 
-      {sekme === "fonksiyon" && MAT_GRAFIK_SABLONLARI.map((sb) => (
+      {sekme === "fonksiyon" && MAT_GRAFIK_SABLONLARI.filter((sb) => kartGorunurMu({ id: `mat:${sb.id}`, kategori: "matematik" })).map((sb) => (
         <SablonDugmesi key={sb.id} ad={sb.ad} ipucu={sb.ipucu} etiket={`Grafik ekle: ${sb.ad}`} onClick={() => onGrafik(sb.olustur())}>
           <Onizleme deps={sb.id} ciz={(ctx) => grafikCiz(ctx, { id: "o", tur: "fizik", nesne: "grafik", kalinlik: 3, x: 0, y: 0, w: 300, h: 190, grafik: { ...sb.olustur(), sade: true } })} />
         </SablonDugmesi>
       ))}
 
-      {sekme === "istatistik" && ISTATISTIK_SABLONLARI.map((sb) => (
+      {sekme === "istatistik" && ISTATISTIK_SABLONLARI.filter((sb) => kartGorunurMu({ id: `ist:${sb.id}`, kategori: "istatistik" })).map((sb) => (
         <SablonDugmesi key={sb.id} ad={sb.ad} ipucu={sb.ipucu} etiket={`İstatistik ekle: ${sb.ad}`} onClick={() => onIstatistik(sb.olustur())}>
           <Onizleme deps={sb.id} ciz={(ctx) => istatistikCiz(ctx, { id: "o", tur: "fizik", nesne: "istatistik", kalinlik: 3, x: 0, y: 0, w: 300, h: 190, istatistik: { ...sb.olustur(), sade: true } })} />
         </SablonDugmesi>
       ))}
 
-      {sekme === "sema" && SEMA_SABLONLARI.map((sb) => (
+      {sekme === "sema" && SEMA_SABLONLARI.filter((sb) => kartGorunurMu({ id: `sema:${sb.id}`, kategori: "istatistik" })).map((sb) => (
         <SablonDugmesi key={sb.id} ad={sb.ad} ipucu={sb.ipucu} etiket={`Şema ekle: ${sb.ad}`} onClick={() => onSema(sb.olustur())}>
           <Onizleme deps={sb.id} ciz={(ctx) => semaCiz(ctx, { id: "o", tur: "fizik", nesne: "sema", kalinlik: 3, x: 0, y: 0, w: 300, h: 190, sema: sb.olustur() })} />
         </SablonDugmesi>

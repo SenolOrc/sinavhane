@@ -1,4 +1,5 @@
 import { aramaIcinKucult } from "@/lib/turkceMetin";
+import { FIZIK_SEMBOL_SUZGECI, denklemKimyaGorunurMu } from "./odak";
 
 /**
  * Denklem editörünün sembol setleri ve aramaları.
@@ -187,9 +188,11 @@ export function sembolGruplariniSuz(
     semboller: OZEL_SEMBOLLER,
     adlar: OZEL_SEMBOL_ADLARI,
   };
+  // Fizik sürümünde kimya grubu kısalır (↑ ↓ °C iyon/yük işaretleri fizikte de lazım).
+  const kimyaSemboller = denklemKimyaGorunurMu() ? KIMYA_SEMBOLLERI : KIMYA_SEMBOLLERI.filter((s) => FIZIK_SEMBOL_SUZGECI.includes(s));
   const kimya: SembolGrubu = {
-    baslik: "Kimya (ok, faz, iyon yükü)",
-    semboller: KIMYA_SEMBOLLERI,
+    baslik: denklemKimyaGorunurMu() ? "Kimya (ok, faz, iyon yükü)" : "Ok, yük ve birim (↑ ↓ °C ⁺ ⁻)",
+    semboller: kimyaSemboller,
     adlar: KIMYA_SEMBOL_ADLARI,
   };
   const sirali = oncelikli === "operator" ? [islem, ozel, kimya] : [ozel, islem, kimya];

@@ -38,6 +38,9 @@ async function main() {
   const { act } = React;
   const { createRoot } = await import("react-dom/client");
   const { CizimEditoruModal } = await import("../src/modules/sinav-olusturucu/components/CizimEditoruModal");
+  // Bu test GİZLİ derslerin (kimya, akış, şema…) kodunu da sınar: "tüm dersler" kipinde çalışır.
+  // Fizik odaklı varsayılan davranış tests/fizik-odak-senaryolari.tsx'te sınanır.
+  (await import("../src/modules/sinav-olusturucu/odak")).odakKipiniAyarla(false);
 
   const host = document.getElementById("root")!;
   const root = createRoot(host);

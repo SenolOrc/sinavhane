@@ -1,7 +1,7 @@
 [package]
 name = "fizik-sinav"
 version = "1.3.0"
-description = "Sınavhane"
+description = "Sınavhane Fizik"
 edition = "2021"
 
 [lib]

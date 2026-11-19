@@ -1,4 +1,4 @@
-// Sınavhane — internetsiz çalışma için hafif servis çalışanı.
+// Sınavhane Fizik — internetsiz çalışma için hafif servis çalışanı.
 // Aynı kökten gelen GET isteklerini ilk kullanımda saklar; sonraki açılışlarda önce ağdan,
 // ağ yoksa saklıdan döner. Sürüm değişince eski saklar silinir.
 const SURUM = "sinavhane-v1";

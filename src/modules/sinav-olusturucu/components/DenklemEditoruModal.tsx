@@ -35,6 +35,7 @@ import { useKapatmaOnayi } from "../hooks/useKapatmaOnayi";
 import { kisayol } from "../lib/kisayol";
 import { parcaOzeti } from "../denklemOzet";
 import { OPERATORLER, sembolGruplariniSuz } from "../denklemSemboller";
+import { denklemKimyaGorunurMu } from "../odak";
 import { araclariSuz } from "../denklemArama";
 
 import type {
@@ -654,6 +655,7 @@ export function DenklemEditoruModal({
           >
             Ekle
           </button>
+          {denklemKimyaGorunurMu() && (
           <button
             type="button"
             data-testid="kimya-formulu-ekle"
@@ -664,6 +666,7 @@ export function DenklemEditoruModal({
           >
             Kimya formülü ekle
           </button>
+          )}
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           <span className="text-[10px] text-slate-500">Örnek:</span>
@@ -679,6 +682,7 @@ export function DenklemEditoruModal({
             </button>
           ))}
         </div>
+        {denklemKimyaGorunurMu() && (
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
           <span className="text-[10px] text-slate-500">Kimya örneği (<b>Kimya formülü ekle</b> ile):</span>
           {KIMYA_ORNEKLERI.map((o) => (
@@ -693,6 +697,7 @@ export function DenklemEditoruModal({
             </button>
           ))}
         </div>
+        )}
         <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500">
           <b>sum_{"{i=1}"}^n</b> Σ · <b>lim_{"{x->0}"}</b> · <b>int_0^1</b> ∫ · <b>cup cap emptyset</b> ∪ ∩ ∅ ·{" "}
           <b>x^2</b> üs · <b>v_0</b> alt simge · <b>1/2</b> bitişik kesir · <b>m v^2 / 2</b> boşluklu bölme: önündeki/sonrasındaki tüm terim ·{" "}

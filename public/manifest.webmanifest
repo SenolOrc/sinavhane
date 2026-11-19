@@ -1,7 +1,7 @@
 {
-  "name": "Sınavhane",
-  "short_name": "Sınavhane",
-  "description": "Öğretmenler için ücretsiz sınav hazırlama ve şekil çizme uygulaması",
+  "name": "Sınavhane Fizik",
+  "short_name": "Sınavhane Fizik",
+  "description": "Fizik öğretmenleri için ücretsiz yazılı sınav hazırlama ve fizik şekli çizme uygulaması",
   "lang": "tr",
   "start_url": "./",
   "scope": "./",

@@ -9,7 +9,7 @@ gerçek bir cihazda henüz denenmedi: ilk denemede hata çıkarsa çıktıyı Is
 1. developer.apple.com → Certificates, Identifiers & Profiles → **Identifiers** → yeni **App ID**.
    Bundle ID, `src-tauri/tauri.conf.json` içindeki `identifier` ile aynı olmalı (şu an `com.fiziksinav.app`;
    başka biri almışsa değiştirin, ama masaüstü veri klasörü de değişir).
-2. appstoreconnect.apple.com → **Apps** → **+** → yeni uygulama (ad: Sınavhane, aynı Bundle ID).
+2. appstoreconnect.apple.com → **Apps** → **+** → yeni uygulama (ad: Sınavhane Fizik, aynı Bundle ID).
 3. Takım Kimliğinizi (10 karakter, Membership sayfasında) not alın.
 
 ## 2. Mac'te araçlar (bir kez)

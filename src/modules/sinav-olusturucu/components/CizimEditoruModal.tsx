@@ -2775,7 +2775,7 @@ export function CizimEditoruModal({
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
               <div className="max-w-md rounded-2xl bg-white/90 px-5 py-4 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">
                 <p className="font-semibold text-slate-700">Soldaki kütüphaneden bir şekil seçin ya da üstteki araçlarla çizin.</p>
-                <p className="mt-1">Arama kutusuna <b>makara</b>, <b>parabol</b>, <b>dik üçgen</b> ya da <b>y = x^2 − 4</b> yazabilirsiniz. Köşeleri sürükleyin, etiketlere çift tıklayın, mavi halkalardan sürükleyerek bağlayın.</p>
+                <p className="mt-1">Arama kutusuna <b>makara</b>, <b>eğik düzlem</b>, <b>mercek</b> ya da <b>y = x^2 − 4</b> yazabilirsiniz. Köşeleri sürükleyin, etiketlere çift tıklayın, mavi halkalardan sürükleyerek bağlayın.</p>
               </div>
             </div>
           )}
@@ -2794,7 +2794,7 @@ export function CizimEditoruModal({
               sonEklenen={sonEklenen}
               ekBolumler={{
                 matematik: {
-                  baslik: "Yazarak çiz ve diğer matematik araçları",
+                  baslik: "Yazarak çiz (y = f(x)) ve grafik araçları",
                   icerik: <MatematikSeridi
                     onGrafik={(grafik) => fizikNesnesiEkle("grafik", { grafik })}
                     onIstatistik={(istatistik) => fizikNesnesiEkle("istatistik", { istatistik })}

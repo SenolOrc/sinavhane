@@ -1,8 +1,18 @@
-# Sınavhane — geliştirici notları
+# Sınavhane Fizik — geliştirici notları
 
 Tauri 2 + React + TypeScript masaüstü uygulaması (aynı kod tarayıcıda / iPad'de PWA olarak da çalışır).
 Uygulamanın tamamı tek modüldür: `src/modules/sinav-olusturucu` (A4 yazılı kâğıdı, çizim editörü, denklem
 editörü, OCR, Sınavlarım kütüphanesi, parolalı sınav dosyası, yazdır / PDF).
+
+## Fizik odaklı sürüm ("Sınavhane Fizik")
+
+Hangi derslerin/şekillerin kütüphanede ve aramada görüneceği **tek dosyada** belirlenir:
+`src/modules/sinav-olusturucu/odak.ts` (`FIZIK_ODAKLI`, `FIZIK_KATEGORILERI`, `GIZLI_KART_KIMLIKLERI`,
+`GIZLI_ALT_BASLIK_ONEKLERI`, `GIZLI_KIMLIK_ONEKLERI`…). Kimya, akış şeması, ileri istatistik/şema, ileri
+matematik ve coğrafya kodu silinmedi; yalnız "eklenebilir" listelerinden çıkarıldı. Eski sınavlardaki bu
+şekiller çizim/yazdırma/düzenleme açısından aynen çalışır. `FIZIK_ODAKLI = false` her şeyi geri açar.
+Uygulama adı ve yeni sınavların varsayılan dersi de aynı dosyadadır (`URUN_ADI`, `VARSAYILAN_DERS`).
+`src-tauri/tauri.conf.json` içindeki `identifier` DEĞİŞTİRİLMEMELİ (kayıtlı sınavların konumu buna bağlı).
 
 ## Kurulum (bir kez)
 1. Node.js 20+ ve Rust (https://rustup.rs). Windows'ta ayrıca "Visual Studio Build Tools (C++)" ve WebView2.
